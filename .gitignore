@@ -1,0 +1,23 @@
+# Folder hasil kompilasi
+build/
+.dart_tool/
+
+# Konfigurasi IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Konfigurasi lokal Android
+.gradle/
+local.properties
+captures
+.externalNativeBuild
+.cxx/
+
+# Log dan Cache
+*.log
+.packages
+.pub/
+.pub-cache/
