@@ -231,7 +231,7 @@ class EscPosHelper {
 
     // ── INFO TEST ──
     b.addAll(align(1));
-    b.addAll(text('[ Test $paperLabel - ${w} karakter/baris ]\n'));
+    b.addAll(text('[ Test $paperLabel - $w karakter/baris ]\n'));
     b.addAll(divider(size));
 
     // ── FOOTER ──

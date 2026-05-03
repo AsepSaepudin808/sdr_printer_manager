@@ -749,7 +749,7 @@ class _HomeScreenState extends State<HomeScreen>
                     MaterialPageRoute(
                         builder: (_) => LogScreen(logs: _logs)),
                   ),
-                  child: Text('Lihat semua',
+                  child: const Text('Lihat semua',
                       style: TextStyle(
                           color: _primary,
                           fontSize: 12,
@@ -851,54 +851,54 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // ── PORT DIALOG ──────────────────────────────────────────────────
-  Future<void> _showPortDialog() async {
-    final controller =
-    TextEditingController(text: _serverPort.toString());
-    final result = await showDialog<int>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18)),
-        title: const Text('Ganti Port',
-            style: TextStyle(fontWeight: FontWeight.w700)),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            labelText: 'Port (default: 8080)',
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12)),
-            prefixIcon:
-            const Icon(Icons.settings_ethernet_rounded),
-          ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Batal')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () {
-              final v = int.tryParse(controller.text);
-              if (v != null && v > 1024 && v < 65535) {
-                Navigator.pop(ctx, v);
-              }
-            },
-            child: const Text('Simpan'),
-          ),
-        ],
-      ),
-    );
-    if (result != null) {
-      setState(() => _serverPort = result);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('server_port', result);
-    }
-  }
+  // // ── PORT DIALOG ──────────────────────────────────────────────────
+  // Future<void> _showPortDialog() async {
+  //   final controller =
+  //   TextEditingController(text: _serverPort.toString());
+  //   final result = await showDialog<int>(
+  //     context: context,
+  //     builder: (ctx) => AlertDialog(
+  //       shape: RoundedRectangleBorder(
+  //           borderRadius: BorderRadius.circular(18)),
+  //       title: const Text('Ganti Port',
+  //           style: TextStyle(fontWeight: FontWeight.w700)),
+  //       content: TextField(
+  //         controller: controller,
+  //         keyboardType: TextInputType.number,
+  //         decoration: InputDecoration(
+  //           labelText: 'Port (default: 8080)',
+  //           border: OutlineInputBorder(
+  //               borderRadius: BorderRadius.circular(12)),
+  //           prefixIcon:
+  //           const Icon(Icons.settings_ethernet_rounded),
+  //         ),
+  //       ),
+  //       actions: [
+  //         TextButton(
+  //             onPressed: () => Navigator.pop(ctx),
+  //             child: const Text('Batal')),
+  //         ElevatedButton(
+  //           style: ElevatedButton.styleFrom(
+  //             backgroundColor: _primary,
+  //             foregroundColor: Colors.white,
+  //             shape: RoundedRectangleBorder(
+  //                 borderRadius: BorderRadius.circular(10)),
+  //           ),
+  //           onPressed: () {
+  //             final v = int.tryParse(controller.text);
+  //             if (v != null && v > 1024 && v < 65535) {
+  //               Navigator.pop(ctx, v);
+  //             }
+  //           },
+  //           child: const Text('Simpan'),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  //   if (result != null) {
+  //     setState(() => _serverPort = result);
+  //     final prefs = await SharedPreferences.getInstance();
+  //     await prefs.setInt('server_port', result);
+  //   }
+  // }
 }

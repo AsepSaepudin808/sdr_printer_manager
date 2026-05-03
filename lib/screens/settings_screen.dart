@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/escpos_helper.dart';
@@ -13,7 +14,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   PaperSize _paperSize = PaperSize.mm80;
-  bool _isPrinting = false;
+  bool _isPrinting    = false;
   String _printStatus = '';
 
   static const Color _primary   = Color(0xFF1346A0);
@@ -44,25 +45,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _doPrint(Uint8List data, String label) async {
-    if (!widget.btService.isConnected) {
-      _setStatus('❌ Printer belum terhubung!\nAktifkan printer di halaman utama dulu.', isError: true);
-      return;
-    }
     setState(() {
-      _isPrinting = true;
+      _isPrinting  = true;
       _printStatus = '';
     });
+
+    // Cek koneksi aktual
+    final connected = await widget.btService.checkConnection();
+
+    if (!connected) {
+      // Coba reconnect otomatis pakai lastAddress
+      final addr = widget.btService.lastAddress;
+      if (addr != null && addr.isNotEmpty) {
+        setState(() => _printStatus = '🔄 Menghubungkan ulang...');
+        final reconnected = await widget.btService.connect(addr);
+        if (!reconnected) {
+          setState(() {
+            _isPrinting  = false;
+            _printStatus =
+            '❌ Printer terputus!\nKembali ke halaman utama dan aktifkan printer kembali.';
+          });
+          return;
+        }
+      } else {
+        setState(() {
+          _isPrinting  = false;
+          _printStatus =
+          '❌ Printer belum terhubung!\nAktifkan printer di halaman utama dulu.';
+        });
+        return;
+      }
+    }
+
     final ok = await widget.btService.sendRaw(data);
     setState(() {
-      _isPrinting = false;
+      _isPrinting  = false;
       _printStatus = ok
           ? '✅ $label berhasil dicetak!'
-          : '❌ Gagal mencetak. Cek koneksi printer.';
+          : '❌ Gagal mencetak.\nPastikan printer menyala dan kertas tersedia.';
     });
-  }
-
-  void _setStatus(String msg, {bool isError = false}) {
-    setState(() => _printStatus = msg);
   }
 
   @override
@@ -81,6 +102,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            _buildConnectionStatus(),
+            const SizedBox(height: 16),
             _buildPaperSizeCard(),
             const SizedBox(height: 16),
             _buildTestPrintCard(),
@@ -90,6 +113,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  // ── STATUS KONEKSI ───────────────────────────────────────────────
+  Widget _buildConnectionStatus() {
+    final connected = widget.btService.isConnected;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: connected
+            ? _success.withValues(alpha: 0.08)
+            : _danger.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: connected
+              ? _success.withValues(alpha: 0.3)
+              : _danger.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: connected ? _success : _danger,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  connected
+                      ? 'Printer terhubung — siap test print'
+                      : 'Printer tidak aktif',
+                  style: TextStyle(
+                      color: connected ? _success : _danger,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13),
+                ),
+                if (!connected)
+                  const Text(
+                    'Kembali ke halaman utama dan aktifkan printer dulu',
+                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -119,7 +195,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       style: TextStyle(
                           fontWeight: FontWeight.w700, fontSize: 15)),
                   Text('Sesuaikan dengan printer Anda',
-                      style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      style:
+                      TextStyle(fontSize: 12, color: Colors.grey)),
                 ],
               ),
             ],
@@ -132,7 +209,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   size: PaperSize.mm58,
                   label: '58 mm',
                   sub: '32 karakter/baris',
-                  icon: Icons.straighten_rounded,
                 ),
               ),
               const SizedBox(width: 12),
@@ -141,7 +217,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   size: PaperSize.mm80,
                   label: '80 mm',
                   sub: '48 karakter/baris',
-                  icon: Icons.straighten_rounded,
                 ),
               ),
             ],
@@ -164,7 +239,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _paperSize == PaperSize.mm58
                         ? 'Kertas 58mm: lebar cetak ±48mm, umum di printer portable kecil.'
                         : 'Kertas 80mm: lebar cetak ±72mm, umum di printer kasir standard.',
-                    style: const TextStyle(fontSize: 11, color: Colors.blue),
+                    style: const TextStyle(
+                        fontSize: 11, color: Colors.blue),
                   ),
                 ),
               ],
@@ -179,14 +255,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required PaperSize size,
     required String label,
     required String sub,
-    required IconData icon,
   }) {
     final selected = _paperSize == size;
     return GestureDetector(
       onTap: () => _savePaperSize(size),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        padding:
+        const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
         decoration: BoxDecoration(
           color: selected
               ? _primary.withValues(alpha: 0.08)
@@ -199,7 +275,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         child: Column(
           children: [
-            Icon(icon,
+            Icon(Icons.straighten_rounded,
                 color: selected ? _primary : Colors.grey, size: 28),
             const SizedBox(height: 8),
             Text(label,
@@ -221,7 +297,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 color: selected ? _primary : Colors.transparent,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                    color: selected ? _primary : Colors.grey.shade300),
+                    color: selected
+                        ? _primary
+                        : Colors.grey.shade300),
               ),
               child: Text(
                 selected ? '✓ Dipilih' : 'Pilih',
@@ -262,49 +340,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       style: TextStyle(
                           fontWeight: FontWeight.w700, fontSize: 15)),
                   Text('Cetak struk percobaan ke printer',
-                      style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      style:
+                      TextStyle(fontSize: 12, color: Colors.grey)),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: widget.btService.isConnected
-                  ? _success.withValues(alpha: 0.08)
-                  : _danger.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: widget.btService.isConnected
-                        ? _success
-                        : _danger,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  widget.btService.isConnected
-                      ? 'Printer terhubung — siap test print'
-                      : 'Printer belum terhubung — aktifkan di halaman utama',
-                  style: TextStyle(
-                      fontSize: 11,
-                      color: widget.btService.isConnected
-                          ? _success
-                          : _danger,
-                      fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 16),
-          // Struk pendek
           _testBtn(
             label: 'Cetak Struk Pendek',
             sub: 'Header + total saja (~10 baris)',
@@ -318,7 +360,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 10),
-          // Struk panjang
           _testBtn(
             label: 'Cetak Struk Lengkap',
             sub: 'Header + item + subtotal + footer (~30 baris)',
@@ -333,17 +374,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           if (_isPrinting) ...[
             const SizedBox(height: 16),
-            const Row(
+            Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                SizedBox(
+                const SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
-                SizedBox(width: 10),
-                Text('Mengirim ke printer...',
-                    style: TextStyle(color: Colors.grey)),
+                const SizedBox(width: 10),
+                Text(
+                  _printStatus.contains('Menghubungkan')
+                      ? _printStatus
+                      : 'Mengirim ke printer...',
+                  style: const TextStyle(color: Colors.grey),
+                ),
               ],
             ),
           ],
@@ -369,9 +414,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               : color.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-              color: onTap == null
-                  ? Colors.grey.shade200
-                  : color.withValues(alpha: 0.3)),
+            color: onTap == null
+                ? Colors.grey.shade200
+                : color.withValues(alpha: 0.3),
+          ),
         ),
         child: Row(
           children: [
@@ -384,7 +430,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(icon,
-                  color: onTap == null ? Colors.grey : color, size: 22),
+                  color: onTap == null ? Colors.grey : color,
+                  size: 22),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -395,7 +442,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       style: TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 14,
-                          color: onTap == null ? Colors.grey : Colors.black87)),
+                          color: onTap == null
+                              ? Colors.grey
+                              : Colors.black87)),
                   Text(sub,
                       style: const TextStyle(
                           fontSize: 11, color: Colors.grey)),
@@ -403,7 +452,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             Icon(Icons.chevron_right_rounded,
-                color: onTap == null ? Colors.grey.shade300 : color),
+                color: onTap == null
+                    ? Colors.grey.shade300
+                    : color),
           ],
         ),
       ),
@@ -421,9 +472,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             : _danger.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-            color: isOk
-                ? _success.withValues(alpha: 0.3)
-                : _danger.withValues(alpha: 0.3)),
+          color: isOk
+              ? _success.withValues(alpha: 0.3)
+              : _danger.withValues(alpha: 0.3),
+        ),
       ),
       child: Text(
         _printStatus,
