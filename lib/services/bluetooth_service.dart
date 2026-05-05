@@ -41,7 +41,6 @@ class SdrBluetoothService {
   }
 
   Future<bool> sendRaw(Uint8List data) async {
-    // Cek koneksi aktual
     try {
       _isConnected = await PrintBluetoothThermal.connectionStatus;
       debugPrint('[SDR-BT] connectionStatus: $_isConnected');
@@ -50,7 +49,6 @@ class SdrBluetoothService {
       _isConnected = false;
     }
 
-    // Auto reconnect
     if (!_isConnected && _lastAddress != null) {
       debugPrint('[SDR-BT] Auto-reconnecting to $_lastAddress...');
       try {
@@ -73,10 +71,8 @@ class SdrBluetoothService {
       final List<int> bytes = data.toList();
       debugPrint('[SDR-BT] Sending ${bytes.length} bytes...');
 
-      // Delay awal agar buffer printer siap
       await Future.delayed(const Duration(milliseconds: 200));
 
-      // Coba kirim langsung dulu (banyak printer handle data kecil langsung)
       if (bytes.length <= 512) {
         final ok = await PrintBluetoothThermal.writeBytes(bytes);
         debugPrint('[SDR-BT] Direct write result: $ok');
@@ -84,7 +80,6 @@ class SdrBluetoothService {
         return ok;
       }
 
-      // Kirim per chunk untuk data besar
       const chunkSize = 512;
       int sent = 0;
       for (int i = 0; i < bytes.length; i += chunkSize) {

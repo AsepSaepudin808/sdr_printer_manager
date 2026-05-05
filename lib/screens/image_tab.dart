@@ -50,7 +50,6 @@ class _ImageTabState extends State<ImageTab> {
         return;
       }
 
-      // Resize to printer width
       final maxW = widget.paperSize == PaperSize.mm58
           ? 384
           : widget.paperSize == PaperSize.mm80
@@ -59,7 +58,6 @@ class _ImageTabState extends State<ImageTab> {
       final resized = img.copyResize(original, width: maxW);
       final mono = img.grayscale(resized);
 
-      // Convert to ESC/POS raster bitmap
       final escData = _imageToEscPos(mono, maxW);
       final ok = await widget.btService.sendRaw(escData);
       setState(() {
@@ -80,15 +78,11 @@ class _ImageTabState extends State<ImageTab> {
     final widthBytes = (w + 7) ~/ 8;
     final List<int> buf = [];
 
-    // Initialize printer
     buf.addAll([0x1B, 0x40]);
-    // Center align
     buf.addAll([0x1B, 0x61, 0x01]);
 
-    // Print in bands of 24 pixels height (GS v 0)
     for (int y = 0; y < h; y += 24) {
       final bandH = (y + 24 > h) ? h - y : 24;
-      // GS v 0 command
       buf.addAll([0x1D, 0x76, 0x30, 0x00]);
       buf.addAll([widthBytes & 0xFF, (widthBytes >> 8) & 0xFF]);
       buf.addAll([bandH & 0xFF, (bandH >> 8) & 0xFF]);
@@ -109,7 +103,6 @@ class _ImageTabState extends State<ImageTab> {
       }
     }
 
-    // Feed and left align
     buf.addAll([0x0A, 0x0A, 0x0A]);
     buf.addAll([0x1B, 0x61, 0x00]);
 

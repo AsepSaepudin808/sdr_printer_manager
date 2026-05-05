@@ -76,10 +76,8 @@ class _MainShellState extends State<MainShell> {
           : ps == 'mm100'
               ? PaperSize.mm100
               : PaperSize.mm80;
-      // Load dan terapkan karakter per baris custom
       final customChars = p.getInt('chars_per_line') ?? 0;
       EscPosHelper.setCustomCharsPerLine(customChars);
-      // Load extra feed dan auto cut
       EscPosHelper.setExtraFeed(p.getInt('extra_feed') ?? 3);
       EscPosHelper.setAutoCut(p.getBool('auto_cut') ?? false);
       final addr = p.getString('printer_address');

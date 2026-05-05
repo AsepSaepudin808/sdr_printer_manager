@@ -47,7 +47,7 @@ class S {
   static String get selectPrinterFirst =>
       isEn ? 'Select printer first' : 'Pilih printer dulu';
   static String get change => isEn ? 'Change' : 'Ganti';
-  static String get select => isEn ? 'Pilih' : 'Pilih';
+  static String get select => isEn ? 'Select' : 'Pilih';
   static String get receiptsPrinted =>
       isEn ? 'Receipts Printed' : 'Struk Dicetak';
   static String get paperSize => isEn ? 'Paper Size' : 'Ukuran Kertas';

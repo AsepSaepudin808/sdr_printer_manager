@@ -50,7 +50,6 @@ class _PdfTabState extends State<PdfTab> {
           ? '${(fileSize / (1024 * 1024)).toStringAsFixed(1)} MB'
           : '${(fileSize / 1024).toStringAsFixed(1)} KB';
 
-      // Build ESC/POS receipt with PDF info
       final List<int> buf = [];
       buf.addAll(EscPosHelper.init());
       buf.addAll(EscPosHelper.align(1));
