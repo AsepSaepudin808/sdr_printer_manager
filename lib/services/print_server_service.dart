@@ -86,11 +86,24 @@ class PrintServerService {
     });
 
     // ── OPTIONS preflight ────────────────────────────────────────────────────
+    // PENTING: 'Access-Control-Allow-Private-Network: true' wajib ada agar
+    // Chrome 98+ mengizinkan request dari HTTPS page (mis. odoo-dev.dretail.id)
+    // ke server lokal (http://127.0.0.1:8080) — Private Network Access policy.
     router.options('/print', (Request req) {
       return Response.ok('', headers: const {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, X-Print-Format',
+        'Access-Control-Allow-Headers': 'Content-Type, X-Print-Format, X-Print-Source',
+        'Access-Control-Allow-Private-Network': 'true',
+      });
+    });
+
+    router.options('/status', (Request req) {
+      return Response.ok('', headers: const {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Private-Network': 'true',
       });
     });
 
@@ -217,7 +230,10 @@ class PrintServerService {
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
             'Access-Control-Allow-Headers':
-                'Content-Type, X-Print-Format, Authorization',
+                'Content-Type, X-Print-Format, X-Print-Source, Authorization',
+            // Wajib untuk Chrome 98+ Private Network Access:
+            // Mengizinkan HTTPS page mengakses server lokal (127.0.0.1)
+            'Access-Control-Allow-Private-Network': 'true',
           });
         }
         final response = await handler(request);
@@ -225,7 +241,8 @@ class PrintServerService {
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
           'Access-Control-Allow-Headers':
-              'Content-Type, X-Print-Format, Authorization',
+              'Content-Type, X-Print-Format, X-Print-Source, Authorization',
+          'Access-Control-Allow-Private-Network': 'true',
           ...response.headers,
         });
       };
