@@ -1,8 +1,8 @@
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
 class SdrBluetoothService {
-  bool _isConnected  = false;
+  bool _isConnected = false;
   String? _lastAddress;
 
   bool get isConnected => _isConnected;
@@ -44,48 +44,74 @@ class SdrBluetoothService {
     // Cek koneksi aktual
     try {
       _isConnected = await PrintBluetoothThermal.connectionStatus;
-    } catch (_) {
+      debugPrint('[SDR-BT] connectionStatus: $_isConnected');
+    } catch (e) {
+      debugPrint('[SDR-BT] connectionStatus error: $e');
       _isConnected = false;
     }
 
     // Auto reconnect
     if (!_isConnected && _lastAddress != null) {
+      debugPrint('[SDR-BT] Auto-reconnecting to $_lastAddress...');
       try {
         _isConnected = await PrintBluetoothThermal.connect(
           macPrinterAddress: _lastAddress!,
         );
-      } catch (_) {
+        debugPrint('[SDR-BT] reconnect result: $_isConnected');
+      } catch (e) {
+        debugPrint('[SDR-BT] reconnect error: $e');
         _isConnected = false;
       }
     }
 
-    if (!_isConnected) return false;
+    if (!_isConnected) {
+      debugPrint('[SDR-BT] NOT connected, aborting send');
+      return false;
+    }
 
     try {
-      // Konversi Uint8List → List<int> sesuai signature plugin
       final List<int> bytes = data.toList();
+      debugPrint('[SDR-BT] Sending ${bytes.length} bytes...');
 
-      const chunkSize = 512;
+      // Delay awal agar buffer printer siap
+      await Future.delayed(const Duration(milliseconds: 200));
 
-      if (bytes.length <= chunkSize) {
-        // Langsung kirim sebagai List<int>
-        return await PrintBluetoothThermal.writeBytes(bytes);
+      // Coba kirim langsung dulu (banyak printer handle data kecil langsung)
+      if (bytes.length <= 512) {
+        final ok = await PrintBluetoothThermal.writeBytes(bytes);
+        debugPrint('[SDR-BT] Direct write result: $ok');
+        if (!ok) _isConnected = false;
+        return ok;
       }
 
-      // Kirim per chunk sebagai List<int>
+      // Kirim per chunk untuk data besar
+      const chunkSize = 512;
+      int sent = 0;
       for (int i = 0; i < bytes.length; i += chunkSize) {
         final end =
-        (i + chunkSize < bytes.length) ? i + chunkSize : bytes.length;
-        final chunk = bytes.sublist(i, end); // List<int> langsung
-        final ok = await PrintBluetoothThermal.writeBytes(chunk);
+            (i + chunkSize < bytes.length) ? i + chunkSize : bytes.length;
+        final chunk = bytes.sublist(i, end);
+
+        bool ok = false;
+        for (int retry = 0; retry < 3 && !ok; retry++) {
+          if (retry > 0) {
+            debugPrint('[SDR-BT] Retry $retry for chunk at offset $i');
+            await Future.delayed(const Duration(milliseconds: 300));
+          }
+          ok = await PrintBluetoothThermal.writeBytes(chunk);
+        }
         if (!ok) {
+          debugPrint('[SDR-BT] FAILED at offset $i after 3 retries');
           _isConnected = false;
           return false;
         }
-        await Future.delayed(const Duration(milliseconds: 30));
+        sent += chunk.length;
+        await Future.delayed(const Duration(milliseconds: 120));
       }
+      debugPrint('[SDR-BT] All $sent bytes sent successfully');
       return true;
     } catch (e) {
+      debugPrint('[SDR-BT] sendRaw exception: $e');
       _isConnected = false;
       return false;
     }

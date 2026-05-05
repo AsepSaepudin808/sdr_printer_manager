@@ -18,7 +18,13 @@ class PrintServerService {
   Function()? onPrintSuccess;
   Function(bool)? onStatusChange;
 
+  PaperSize _paperSize = PaperSize.mm80;
+
   bool get isRunning => _server != null;
+
+  void setPaperSize(PaperSize size) {
+    _paperSize = size;
+  }
 
   Future<String> getLocalIp() async {
     try {
@@ -36,10 +42,11 @@ class PrintServerService {
     PaperSize paperSize = PaperSize.mm80,
   }) async {
     _btService = bluetoothService;
+    _paperSize = paperSize;
 
     final router = Router();
 
-    // ── GET /status ──────────────────────────────────────────────
+    // ── GET /status ──────────────────────────────────────────────────────────
     router.get('/status', (Request req) {
       final body = jsonEncode({
         'status': 'ok',
@@ -47,16 +54,15 @@ class PrintServerService {
         'version': '1.0.0',
         'printer_connected': _btService?.isConnected ?? false,
       });
-      return Response.ok(body,
-          headers: const {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-          });
+      return Response.ok(body, headers: const {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      });
     });
 
-    // ── GET /test-print ──────────────────────────────────────────
+    // ── GET /test-print ──────────────────────────────────────────────────────
     router.get('/test-print', (Request req) async {
-      final testData = EscPosHelper.buildTestShort(paperSize);
+      final testData = EscPosHelper.buildTestShort(_paperSize);
       final ok = await _btService?.sendRaw(testData) ?? false;
       if (ok) {
         onLog?.call('Test print berhasil');
@@ -68,7 +74,7 @@ class PrintServerService {
               'Access-Control-Allow-Origin': '*',
             });
       } else {
-        onLog?.call('Test print GAGAL');
+        onLog?.call('❌ Test print GAGAL — printer tidak terhubung');
         return Response.internalServerError(
             body: jsonEncode(
                 {'status': 'error', 'message': 'Printer tidak terhubung'}),
@@ -79,38 +85,78 @@ class PrintServerService {
       }
     });
 
-    // ── OPTIONS preflight ────────────────────────────────────────
+    // ── OPTIONS preflight ────────────────────────────────────────────────────
     router.options('/print', (Request req) {
-      return Response.ok('',
-          headers: const {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, X-Print-Format',
-          });
+      return Response.ok('', headers: const {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, X-Print-Format',
+      });
     });
 
-    // ── POST /print ───────────────────────────────────────────────
+    // ── POST /print ──────────────────────────────────────────────────────────
     router.post('/print', (Request req) async {
+      onLog?.call('📥 Request masuk dari Odoo!');
+
       try {
         final contentType = req.headers['content-type'] ?? '';
         Uint8List printData;
 
         if (contentType.contains('application/json')) {
-          final body = await req.readAsString();
-          final json = jsonDecode(body) as Map<String, dynamic>;
-          final format    = json['format'] as String? ?? 'escpos';
-          final dataField = json['data']   as String? ?? '';
+          final bodyStr = await req.readAsString();
+          final Map<String, dynamic> json =
+              jsonDecode(bodyStr) as Map<String, dynamic>;
 
-          if (format == 'text') {
-            printData = EscPosHelper.textToEscPos(dataField, paperSize);
+          final format = json['format'] as String? ?? 'escpos';
+          final dataField = json['data'];
+
+          if (format == 'odoo_json') {
+            Map<String, dynamic> orderData;
+            if (dataField is Map<String, dynamic>) {
+              orderData = dataField;
+            } else if (dataField is String) {
+              orderData = jsonDecode(dataField) as Map<String, dynamic>;
+            } else {
+              orderData = {};
+            }
+
+            final receiptType = orderData['receipt_type'] as String? ?? 'full';
+
+            if (receiptType == 'basic') {
+              printData = EscPosHelper.buildFromOdooData(orderData, _paperSize,
+                  basic: true);
+              onLog?.call(
+                  '🖨️ Terima job Basic Receipt (odoo_json, ${printData.length}B)');
+            } else {
+              printData = EscPosHelper.buildFromOdooData(orderData, _paperSize,
+                  basic: false);
+              onLog?.call(
+                  '🖨️ Terima job Full Receipt (odoo_json, ${printData.length}B)');
+            }
+          } else if (format == 'text') {
+            final textContent =
+                dataField is String ? dataField : dataField.toString();
+            printData = EscPosHelper.textToEscPos(textContent, _paperSize);
+            onLog?.call('Terima job (TEXT, ${printData.length}B)');
           } else {
-            printData = base64Decode(dataField);
+            final b64 = dataField is String ? dataField : '';
+            if (b64.isEmpty) {
+              onLog?.call('❌ Format escpos tapi data kosong');
+              return Response.badRequest(
+                body: jsonEncode(
+                    {'status': 'error', 'message': 'Data base64 kosong'}),
+                headers: const {
+                  'Content-Type': 'application/json',
+                  'Access-Control-Allow-Origin': '*',
+                },
+              );
+            }
+            printData = base64Decode(b64);
+            onLog?.call('Terima job (ESC/POS base64, ${printData.length}B)');
           }
-          onLog?.call(
-              'Terima job (JSON, format=$format, ${printData.length}B)');
         } else if (contentType.contains('text/plain')) {
           final body = await req.readAsString();
-          printData = EscPosHelper.textToEscPos(body, paperSize);
+          printData = EscPosHelper.textToEscPos(body, _paperSize);
           onLog?.call('Terima job (TEXT, ${printData.length}B)');
         } else {
           final bytes = await req.read().expand((x) => x).toList();
@@ -120,7 +166,7 @@ class PrintServerService {
 
         final ok = await _btService?.sendRaw(printData) ?? false;
         if (ok) {
-          onLog?.call('✅ Print berhasil');
+          onLog?.call('✅ Print berhasil (${printData.length}B dikirim)');
           onPrintSuccess?.call();
           return Response.ok(
             jsonEncode({'status': 'ok', 'message': 'Print berhasil'}),
@@ -130,7 +176,7 @@ class PrintServerService {
             },
           );
         } else {
-          onLog?.call('❌ Gagal kirim ke printer');
+          onLog?.call('❌ Gagal kirim ke printer — cek koneksi Bluetooth');
           return Response.internalServerError(
             body: jsonEncode(
                 {'status': 'error', 'message': 'Gagal kirim ke printer'}),
@@ -140,8 +186,10 @@ class PrintServerService {
             },
           );
         }
-      } catch (e) {
-        onLog?.call('❌ Error: $e');
+      } catch (e, st) {
+        onLog?.call('❌ Error handler /print: $e');
+        // ignore: avoid_print
+        print('[SDR] /print error:\n$e\n$st');
         return Response.internalServerError(
           body: jsonEncode({'status': 'error', 'message': e.toString()}),
           headers: const {
@@ -158,17 +206,26 @@ class PrintServerService {
 
     _server = await io.serve(handler, InternetAddress.anyIPv4, port);
     onStatusChange?.call(true);
-    onLog?.call('HTTP Server aktif di port $port');
+    onLog?.call('🚀 HTTP Server aktif di port $port');
   }
 
   Middleware _corsMiddleware() {
     return (Handler handler) {
       return (Request request) async {
+        if (request.method == 'OPTIONS') {
+          return Response.ok('', headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers':
+                'Content-Type, X-Print-Format, Authorization',
+          });
+        }
         final response = await handler(request);
         return response.change(headers: {
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, X-Print-Format',
+          'Access-Control-Allow-Headers':
+              'Content-Type, X-Print-Format, Authorization',
           ...response.headers,
         });
       };
@@ -179,5 +236,6 @@ class PrintServerService {
     await _server?.close(force: true);
     _server = null;
     onStatusChange?.call(false);
+    onLog?.call('⏹️ HTTP Server dihentikan');
   }
 }

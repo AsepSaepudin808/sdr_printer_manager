@@ -61,121 +61,117 @@ class _ScanScreenState extends State<ScanScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
-        children: [
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.all(12),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: _btEnabled ? Colors.blue[50] : Colors.red[50],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: _btEnabled
-                    ? Colors.blue.shade200
-                    : Colors.red.shade200,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      _btEnabled
-                          ? Icons.bluetooth
-                          : Icons.bluetooth_disabled,
-                      color: _btEnabled ? Colors.blue : Colors.red,
-                      size: 18,
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _btEnabled ? Colors.blue[50] : Colors.red[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: _btEnabled
+                          ? Colors.blue.shade200
+                          : Colors.red.shade200,
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      _btEnabled
-                          ? '📌 Menampilkan perangkat yang sudah dipair'
-                          : '⚠️ Bluetooth tidak aktif',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color:
-                        _btEnabled ? Colors.black : Colors.red,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            _btEnabled
+                                ? Icons.bluetooth
+                                : Icons.bluetooth_disabled,
+                            color: _btEnabled ? Colors.blue : Colors.red,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            _btEnabled
+                                ? '📌 Menampilkan perangkat yang sudah dipair'
+                                : '⚠️ Bluetooth tidak aktif',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: _btEnabled ? Colors.black : Colors.red,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      Text(
+                        _btEnabled
+                            ? 'Jika printer belum muncul, pair dulu melalui '
+                                'Pengaturan Bluetooth Android, lalu refresh.'
+                            : 'Aktifkan Bluetooth di Android terlebih dahulu.',
+                        style:
+                            const TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  _btEnabled
-                      ? 'Jika printer belum muncul, pair dulu melalui '
-                      'Pengaturan Bluetooth Android, lalu refresh.'
-                      : 'Aktifkan Bluetooth di Android terlebih dahulu.',
-                  style: const TextStyle(
-                      fontSize: 12, color: Colors.grey),
+                Expanded(
+                  child: !_btEnabled
+                      ? const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.bluetooth_disabled,
+                                  size: 60, color: Colors.red),
+                              SizedBox(height: 12),
+                              Text('Aktifkan Bluetooth terlebih dahulu',
+                                  style: TextStyle(color: Colors.grey)),
+                            ],
+                          ),
+                        )
+                      : _pairedDevices.isEmpty
+                          ? const Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.bluetooth_disabled,
+                                      size: 60, color: Colors.grey),
+                                  SizedBox(height: 12),
+                                  Text('Tidak ada perangkat paired',
+                                      style: TextStyle(color: Colors.grey)),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: _pairedDevices.length,
+                              itemBuilder: (_, i) {
+                                final device = _pairedDevices[i];
+                                return ListTile(
+                                  leading: const Icon(Icons.print,
+                                      color: Colors.blue, size: 36),
+                                  title: Text(
+                                    device.name,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                  subtitle: Text(
+                                    device.macAdress,
+                                    style: const TextStyle(
+                                        fontFamily: 'monospace', fontSize: 12),
+                                  ),
+                                  trailing: const Icon(Icons.chevron_right),
+                                  onTap: () {
+                                    Navigator.pop(
+                                      context,
+                                      PrinterDevice(
+                                        address: device.macAdress,
+                                        name: device.name,
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                            ),
                 ),
               ],
             ),
-          ),
-          Expanded(
-            child: !_btEnabled
-                ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.bluetooth_disabled,
-                      size: 60, color: Colors.red),
-                  SizedBox(height: 12),
-                  Text('Aktifkan Bluetooth terlebih dahulu',
-                      style: TextStyle(color: Colors.grey)),
-                ],
-              ),
-            )
-                : _pairedDevices.isEmpty
-                ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.bluetooth_disabled,
-                      size: 60, color: Colors.grey),
-                  SizedBox(height: 12),
-                  Text('Tidak ada perangkat paired',
-                      style:
-                      TextStyle(color: Colors.grey)),
-                ],
-              ),
-            )
-                : ListView.builder(
-              itemCount: _pairedDevices.length,
-              itemBuilder: (_, i) {
-                final device = _pairedDevices[i];
-                return ListTile(
-                  leading: const Icon(Icons.print,
-                      color: Colors.blue, size: 36),
-                  title: Text(
-                    device.name,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text(
-                    device.macAdress,
-                    style: const TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 12),
-                  ),
-                  trailing:
-                  const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.pop(
-                      context,
-                      PrinterDevice(
-                        address: device.macAdress,
-                        name: device.name,
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
