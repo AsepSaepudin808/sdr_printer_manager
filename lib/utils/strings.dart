@@ -1,151 +1,539 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+class SLanguage {
+  final String code;
+  final String name;
+  final String nativeName;
+
+  const SLanguage({
+    required this.code,
+    required this.name,
+    required this.nativeName,
+  });
+
+  String get displayLabel => '$nativeName ($code)';
+}
+
 class S {
-  static String _lang = 'Indonesia';
-  static String get lang => _lang;
+  static String _langCode = 'id';
+  static String get langCode => _langCode;
+
+  static const List<SLanguage> languages = [
+    SLanguage(code: 'id', name: 'Indonesian', nativeName: 'Indonesia'),
+    SLanguage(code: 'en', name: 'English', nativeName: 'English'),
+    SLanguage(code: 'ms', name: 'Malay', nativeName: 'Melayu'),
+    SLanguage(code: 'th', name: 'Thai', nativeName: 'ไทย'),
+    SLanguage(code: 'zh', name: 'Chinese (Simplified)', nativeName: '简体中文'),
+    SLanguage(code: 'ar', name: 'Arabic', nativeName: 'العربية'),
+  ];
 
   static Future<void> load() async {
     final p = await SharedPreferences.getInstance();
-    _lang = p.getString('language') ?? 'Indonesia';
+    final saved = p.getString('language_code');
+    if (saved != null && languages.any((e) => e.code == saved)) {
+      _langCode = saved;
+      return;
+    }
+
+    // backward compatibility: legacy saved language label
+    final legacy = p.getString('language');
+    if (legacy != null) {
+      _langCode = _legacyToCode(legacy);
+      await p.setString('language_code', _langCode);
+      return;
+    }
+
+    _langCode = 'id';
   }
 
-  static Future<void> setLang(String l) async {
-    _lang = l;
+  static Future<void> setLang(String input) async {
+    final code = _normalizeLang(input);
+    _langCode = code;
     final p = await SharedPreferences.getInstance();
-    await p.setString('language', l);
+    await p.setString('language_code', code);
+    // keep legacy key for compatibility with old app state
+    await p.setString('language', _codeToLegacy(code));
   }
 
-  static bool get isEn => _lang == 'English';
+  static String _normalizeLang(String input) {
+    final lowered = input.trim().toLowerCase();
+    if (languages.any((e) => e.code == lowered)) return lowered;
+    return _legacyToCode(input);
+  }
+
+  static String _legacyToCode(String legacy) {
+    switch (legacy.trim().toLowerCase()) {
+      case 'english':
+        return 'en';
+      case 'melayu':
+      case 'malay':
+        return 'ms';
+      case 'ไทย':
+      case 'thai':
+        return 'th';
+      case '简体中文':
+      case 'chinese':
+      case 'chinese (simplified)':
+        return 'zh';
+      case 'العربية':
+      case 'arabic':
+        return 'ar';
+      case 'indonesia':
+      default:
+        return 'id';
+    }
+  }
+
+  static String _codeToLegacy(String code) {
+    switch (code) {
+      case 'en':
+        return 'English';
+      case 'ms':
+        return 'Melayu';
+      case 'th':
+        return 'ไทย';
+      case 'zh':
+        return '简体中文';
+      case 'ar':
+        return 'العربية';
+      case 'id':
+      default:
+        return 'Indonesia';
+    }
+  }
+
+  static bool get isEn => _langCode == 'en';
+
+  static String _t(Map<String, String> map) {
+    return map[_langCode] ?? map['en'] ?? map['id'] ?? '';
+  }
+
+  static String withLang({
+    required String id,
+    required String en,
+    String? ms,
+    String? th,
+    String? zh,
+    String? ar,
+  }) {
+    return _t({
+      'id': id,
+      'en': en,
+      'ms': ms ?? id,
+      'th': th ?? en,
+      'zh': zh ?? en,
+      'ar': ar ?? en,
+    });
+  }
 
   // ── App ──
   static String get appName => 'dRetail Printer Manager';
 
   // ── Nav & Titles ──
-  static String get home => isEn ? 'Home' : 'Beranda';
-  static String get freeText => isEn ? 'Free Text' : 'Text Bebas';
-  static String get printImage => isEn ? 'Print Image' : 'Cetak Gambar';
-  static String get printPdf => isEn ? 'Print PDF' : 'Cetak PDF';
-  static String get settings => isEn ? 'Settings' : 'Pengaturan';
-  static String get activityHistory =>
-      isEn ? 'Activity History' : 'Riwayat Aktivitas';
-  static String get aboutApp => isEn ? 'About App' : 'Tentang Aplikasi';
-  static String get exit => isEn ? 'Exit' : 'Keluar';
+  static String get home => withLang(
+        id: 'Beranda',
+        en: 'Home',
+        ms: 'Laman Utama',
+        th: 'หน้าแรก',
+        zh: '首页',
+        ar: 'الرئيسية',
+      );
+  static String get freeText => withLang(
+        id: 'Text Bebas',
+        en: 'Free Text',
+        ms: 'Teks Bebas',
+        th: 'ข้อความอิสระ',
+        zh: '自由文本',
+        ar: 'نص حر',
+      );
+  static String get printImage => withLang(
+        id: 'Cetak Gambar',
+        en: 'Print Image',
+        ms: 'Cetak Imej',
+        th: 'พิมพ์รูปภาพ',
+        zh: '打印图片',
+        ar: 'طباعة صورة',
+      );
+  static String get printPdf => withLang(
+        id: 'Cetak PDF',
+        en: 'Print PDF',
+        ms: 'Cetak PDF',
+        th: 'พิมพ์ PDF',
+        zh: '打印 PDF',
+        ar: 'طباعة PDF',
+      );
+  static String get settings => withLang(
+        id: 'Pengaturan',
+        en: 'Settings',
+        ms: 'Tetapan',
+        th: 'การตั้งค่า',
+        zh: '设置',
+        ar: 'الإعدادات',
+      );
+  static String get activityHistory => withLang(
+        id: 'Riwayat Aktivitas',
+        en: 'Activity History',
+        ms: 'Sejarah Aktiviti',
+        th: 'ประวัติกิจกรรม',
+        zh: '活动记录',
+        ar: 'سجل النشاط',
+      );
+  static String get aboutApp => withLang(
+        id: 'Tentang Aplikasi',
+        en: 'About App',
+        ms: 'Tentang Aplikasi',
+        th: 'เกี่ยวกับแอป',
+        zh: '关于应用',
+        ar: 'حول التطبيق',
+      );
+  static String get exit => withLang(
+        id: 'Keluar',
+        en: 'Exit',
+        ms: 'Keluar',
+        th: 'ออก',
+        zh: '退出',
+        ar: 'خروج',
+      );
 
   // ── Home ──
-  static String get printerActive => isEn ? 'Printer Active' : 'Printer Aktif';
-  static String get printerInactive =>
-      isEn ? 'Printer Inactive' : 'Printer Tidak Aktif';
-  static String get tapToCopy =>
-      isEn ? 'Tap URL to copy' : 'Ketuk URL untuk menyalin';
-  static String get pressToActivate => isEn
-      ? 'Press printer button to activate'
-      : 'Tekan tombol printer untuk mengaktifkan';
-  static String get urlCopied => isEn ? 'URL copied' : 'URL disalin';
-  static String get noPrinter => isEn ? 'No printer' : 'Belum ada printer';
-  static String get connected => isEn ? 'Connected' : 'Terhubung';
-  static String get notConnected => isEn ? 'Not connected' : 'Belum terhubung';
-  static String get selectPrinterFirst =>
-      isEn ? 'Select printer first' : 'Pilih printer dulu';
-  static String get change => isEn ? 'Change' : 'Ganti';
-  static String get select => isEn ? 'Select' : 'Pilih';
-  static String get receiptsPrinted =>
-      isEn ? 'Receipts Printed' : 'Struk Dicetak';
-  static String get paperSize => isEn ? 'Paper Size' : 'Ukuran Kertas';
-  static String get portHttpServer =>
-      isEn ? 'HTTP Server Port' : 'Port HTTP Server';
-  static String get save => isEn ? 'Save' : 'Simpan';
-  static String get cancel => isEn ? 'Cancel' : 'Batal';
-  static String get testPrint => isEn ? 'Test Print' : 'Test Print';
-  static String get shortReceipt =>
-      isEn ? 'Print Short Receipt' : 'Cetak Struk Pendek';
-  static String get fullReceipt =>
-      isEn ? 'Print Full Receipt' : 'Cetak Struk Lengkap';
-  static String get sending => isEn ? 'Sending...' : 'Mengirim...';
-  static String get activity => isEn ? 'Activity' : 'Aktivitas';
-  static String get viewAll => isEn ? 'View all' : 'Lihat semua';
-  static String get noActivity =>
-      isEn ? 'No activity yet' : 'Belum ada aktivitas';
-  static String get autoStart => isEn ? 'Auto Start' : 'Aktifkan Otomatis';
-  static String get autoStartDesc => isEn
-      ? 'Printer activates when app opens'
-      : 'Printer langsung aktif saat app dibuka';
-  static String get portSaved => isEn ? 'Port saved' : 'Port disimpan';
-  static String get portInvalid =>
-      isEn ? 'Port must be 1024–65535' : 'Port harus 1024–65535';
-  static String get selectPrinterToast =>
-      isEn ? 'Select a printer first' : 'Pilih printer terlebih dahulu';
-  static String get printerConnectFail =>
-      isEn ? '❌ Printer connection failed' : '❌ Gagal menghubungkan printer';
-  static String get printerConnected => isEn
-      ? '✅ Printer connected via Bluetooth'
-      : '✅ Printer terhubung via Bluetooth';
-  static String get printerReady =>
-      isEn ? 'Printer ready!' : 'Printer siap digunakan!';
-  static String get serverReady =>
-      isEn ? '🚀 Ready to receive from POS' : '🚀 Siap menerima print dari POS';
-  static String get printerStopped =>
-      isEn ? '⏹️ Printer deactivated' : '⏹️ Printer dinonaktifkan';
-  static String get printerSelected =>
-      isEn ? 'Printer selected' : 'Printer dipilih';
-  static String printSuccess(String l) =>
-      isEn ? '✅ $l printed!' : '✅ $l berhasil dicetak!';
-  static String get printFail => isEn ? '❌ Print failed.' : '❌ Gagal mencetak.';
-  static String get reconnecting =>
-      isEn ? '🔄 Reconnecting...' : '🔄 Menghubungkan ulang...';
-  static String get printerDisconnected =>
-      isEn ? '❌ Printer disconnected!' : '❌ Printer terputus!';
-  static String get printerNotConnected =>
-      isEn ? '❌ Printer not connected!' : '❌ Printer belum terhubung!';
+  static String get printerActive => withLang(
+        id: 'Printer Aktif',
+        en: 'Printer Active',
+        ms: 'Pencetak Aktif',
+        th: 'เครื่องพิมพ์พร้อมใช้งาน',
+        zh: '打印机已激活',
+        ar: 'الطابعة نشطة',
+      );
+  static String get printerInactive => withLang(
+        id: 'Printer Tidak Aktif',
+        en: 'Printer Inactive',
+        ms: 'Pencetak Tidak Aktif',
+        th: 'เครื่องพิมพ์ไม่พร้อมใช้งาน',
+        zh: '打印机未激活',
+        ar: 'الطابعة غير نشطة',
+      );
+  static String get tapToCopy => withLang(
+        id: 'Ketuk URL untuk menyalin',
+        en: 'Tap URL to copy',
+        ms: 'Ketik URL untuk salin',
+      );
+  static String get pressToActivate => withLang(
+        id: 'Tekan tombol printer untuk mengaktifkan',
+        en: 'Press printer button to activate',
+        ms: 'Tekan butang pencetak untuk aktifkan',
+      );
+  static String get urlCopied => withLang(
+        id: 'URL disalin',
+        en: 'URL copied',
+        ms: 'URL disalin',
+      );
+  static String get noPrinter => withLang(
+        id: 'Belum ada printer',
+        en: 'No printer',
+        ms: 'Tiada pencetak',
+      );
+  static String get connected => withLang(
+        id: 'Terhubung',
+        en: 'Connected',
+        ms: 'Disambungkan',
+      );
+  static String get notConnected => withLang(
+        id: 'Belum terhubung',
+        en: 'Not connected',
+        ms: 'Belum disambung',
+      );
+  static String get selectPrinterFirst => withLang(
+        id: 'Pilih printer dulu',
+        en: 'Select printer first',
+        ms: 'Pilih pencetak dahulu',
+      );
+  static String get change => withLang(
+        id: 'Ganti',
+        en: 'Change',
+        ms: 'Tukar',
+      );
+  static String get select => withLang(
+        id: 'Pilih',
+        en: 'Select',
+        ms: 'Pilih',
+      );
+  static String get receiptsPrinted => withLang(
+        id: 'Struk Dicetak',
+        en: 'Receipts Printed',
+        ms: 'Resit Dicetak',
+      );
+  static String get paperSize => withLang(
+        id: 'Ukuran Kertas',
+        en: 'Paper Size',
+        ms: 'Saiz Kertas',
+      );
+  static String get portHttpServer => withLang(
+        id: 'Port HTTP Server',
+        en: 'HTTP Server Port',
+        ms: 'Port Pelayan HTTP',
+      );
+  static String get save => withLang(
+        id: 'Simpan',
+        en: 'Save',
+        ms: 'Simpan',
+      );
+  static String get cancel => withLang(
+        id: 'Batal',
+        en: 'Cancel',
+        ms: 'Batal',
+      );
+  static String get testPrint => withLang(
+        id: 'Test Print',
+        en: 'Test Print',
+        ms: 'Ujian Cetak',
+      );
+  static String get shortReceipt => withLang(
+        id: 'Cetak Struk Pendek',
+        en: 'Print Short Receipt',
+        ms: 'Cetak Resit Pendek',
+      );
+  static String get fullReceipt => withLang(
+        id: 'Cetak Struk Lengkap',
+        en: 'Print Full Receipt',
+        ms: 'Cetak Resit Penuh',
+      );
+  static String get sending => withLang(
+        id: 'Mengirim...',
+        en: 'Sending...',
+        ms: 'Menghantar...',
+      );
+  static String get activity => withLang(
+        id: 'Aktivitas',
+        en: 'Activity',
+        ms: 'Aktiviti',
+      );
+  static String get viewAll => withLang(
+        id: 'Lihat semua',
+        en: 'View all',
+        ms: 'Lihat semua',
+      );
+  static String get noActivity => withLang(
+        id: 'Belum ada aktivitas',
+        en: 'No activity yet',
+        ms: 'Belum ada aktiviti',
+      );
+  static String get autoStart => withLang(
+        id: 'Aktifkan Otomatis',
+        en: 'Auto Start',
+        ms: 'Mula Automatik',
+      );
+  static String get autoStartDesc => withLang(
+        id: 'Printer langsung aktif saat app dibuka',
+        en: 'Printer activates when app opens',
+        ms: 'Pencetak aktif automatik apabila aplikasi dibuka',
+      );
+  static String get portSaved => withLang(
+        id: 'Port disimpan',
+        en: 'Port saved',
+        ms: 'Port disimpan',
+      );
+  static String get portInvalid => withLang(
+        id: 'Port harus 1024–65535',
+        en: 'Port must be 1024–65535',
+        ms: 'Port mesti 1024–65535',
+      );
+  static String get selectPrinterToast => withLang(
+        id: 'Pilih printer terlebih dahulu',
+        en: 'Select a printer first',
+        ms: 'Pilih pencetak terlebih dahulu',
+      );
+  static String get printerConnectFail => withLang(
+        id: '❌ Gagal menghubungkan printer',
+        en: '❌ Printer connection failed',
+        ms: '❌ Sambungan pencetak gagal',
+      );
+  static String get printerConnected => withLang(
+        id: '✅ Printer terhubung via Bluetooth',
+        en: '✅ Printer connected via Bluetooth',
+        ms: '✅ Pencetak disambung melalui Bluetooth',
+      );
+  static String get printerReady => withLang(
+        id: 'Printer siap digunakan!',
+        en: 'Printer ready!',
+        ms: 'Pencetak sedia digunakan!',
+      );
+  static String get serverReady => withLang(
+        id: '🚀 Siap menerima print dari POS',
+        en: '🚀 Ready to receive from POS',
+        ms: '🚀 Sedia menerima cetakan dari POS',
+      );
+  static String get printerStopped => withLang(
+        id: '⏹️ Printer dinonaktifkan',
+        en: '⏹️ Printer deactivated',
+        ms: '⏹️ Pencetak dinyahaktifkan',
+      );
+  static String get printerSelected => withLang(
+        id: 'Printer dipilih',
+        en: 'Printer selected',
+        ms: 'Pencetak dipilih',
+      );
+  static String printSuccess(String l) => withLang(
+        id: '✅ $l berhasil dicetak!',
+        en: '✅ $l printed!',
+        ms: '✅ $l berjaya dicetak!',
+      );
+  static String get printFail => withLang(
+        id: '❌ Gagal mencetak.',
+        en: '❌ Print failed.',
+        ms: '❌ Gagal mencetak.',
+      );
+  static String get reconnecting => withLang(
+        id: '🔄 Menghubungkan ulang...',
+        en: '🔄 Reconnecting...',
+        ms: '🔄 Menyambung semula...',
+      );
+  static String get printerDisconnected => withLang(
+        id: '❌ Printer terputus!',
+        en: '❌ Printer disconnected!',
+        ms: '❌ Pencetak terputus!',
+      );
+  static String get printerNotConnected => withLang(
+        id: '❌ Printer belum terhubung!',
+        en: '❌ Printer not connected!',
+        ms: '❌ Pencetak belum disambung!',
+      );
 
   // ── Settings ──
-  static String get language => isEn ? 'Language' : 'Bahasa';
-  static String get notifPermission =>
-      isEn ? 'Notification Permission' : 'Ijin Notifikasi';
-  static String get notifDesc => isEn
-      ? 'Permission needed so the app can show notifications'
-      : 'Ijin dibutuhkan supaya aplikasi bisa menampilkan notifikasi';
-  static String get directPrint => isEn ? 'Direct Print' : 'Langsung Cetak';
-  static String get directPrintDesc => isEn
-      ? 'App will print immediately when receiving data from POS'
-      : 'Aplikasi akan langsung cetak ketika menerima data dari POS';
-  static String get printerConnection =>
-      isEn ? 'Printer Connection' : 'Koneksi Printer';
-  static String get printer => isEn ? 'Printer' : 'Printer';
-  static String get printerSize => isEn ? 'Paper Size' : 'Ukuran Kertas';
-  static String get charsPerLine =>
-      isEn ? 'Characters per Line' : 'Karakter per Baris';
-  static String get autoCut => isEn ? 'Auto Cut' : 'Auto Cut';
-  static String get autoCutDesc => isEn
-      ? 'Enable if printer has auto cutter'
-      : 'Aktifkan jika printer memiliki pemotong otomatis';
-  static String get extraFeed => isEn ? 'Extra Feed' : 'Extra Feed';
-  static String get extraFeedDesc => isEn
-      ? 'Extra blank lines after print for easy tear-off'
-      : 'Baris kosong tambahan setelah cetak agar mudah disobek';
-  static String get lines => isEn ? 'lines' : 'baris';
-  static String get version => isEn ? 'Version' : 'Versi';
-  static String get selectPrinter =>
-      isEn ? 'Select Printer...' : 'Pilih Printer...';
-  static String get settingsSaved =>
-      isEn ? 'Settings saved!' : 'Pengaturan disimpan!';
-  static String get settingsCancelled =>
-      isEn ? 'Changes cancelled' : 'Perubahan dibatalkan';
+  static String get language => withLang(
+        id: 'Bahasa',
+        en: 'Language',
+        ms: 'Bahasa',
+        th: 'ภาษา',
+        zh: '语言',
+        ar: 'اللغة',
+      );
+  static String get notifPermission => withLang(
+        id: 'Ijin Notifikasi',
+        en: 'Notification Permission',
+        ms: 'Kebenaran Notifikasi',
+      );
+  static String get notifDesc => withLang(
+        id: 'Ijin dibutuhkan supaya aplikasi bisa menampilkan notifikasi',
+        en: 'Permission needed so the app can show notifications',
+        ms: 'Kebenaran diperlukan supaya aplikasi boleh memaparkan notifikasi',
+      );
+  static String get directPrint => withLang(
+        id: 'Langsung Cetak',
+        en: 'Direct Print',
+        ms: 'Cetak Terus',
+      );
+  static String get directPrintDesc => withLang(
+        id: 'Aplikasi akan langsung cetak ketika menerima data dari POS',
+        en: 'App will print immediately when receiving data from POS',
+        ms: 'Aplikasi akan terus mencetak apabila menerima data dari POS',
+      );
+  static String get printerConnection => withLang(
+        id: 'Koneksi Printer',
+        en: 'Printer Connection',
+        ms: 'Sambungan Pencetak',
+      );
+  static String get printer =>
+      withLang(id: 'Printer', en: 'Printer', ms: 'Pencetak');
+  static String get printerSize => withLang(
+        id: 'Ukuran Kertas',
+        en: 'Paper Size',
+        ms: 'Saiz Kertas',
+      );
+  static String get charsPerLine => withLang(
+        id: 'Karakter per Baris',
+        en: 'Characters per Line',
+        ms: 'Aksara Setiap Baris',
+      );
+  static String get autoCut =>
+      withLang(id: 'Auto Cut', en: 'Auto Cut', ms: 'Auto Cut');
+  static String get autoCutDesc => withLang(
+        id: 'Aktifkan jika printer memiliki pemotong otomatis',
+        en: 'Enable if printer has auto cutter',
+        ms: 'Aktifkan jika pencetak mempunyai pemotong automatik',
+      );
+  static String get extraFeed =>
+      withLang(id: 'Extra Feed', en: 'Extra Feed', ms: 'Suapan Tambahan');
+  static String get extraFeedDesc => withLang(
+        id: 'Baris kosong tambahan setelah cetak agar mudah disobek',
+        en: 'Extra blank lines after print for easy tear-off',
+        ms: 'Baris kosong tambahan selepas cetak untuk mudah koyak',
+      );
+  static String get lines => withLang(id: 'baris', en: 'lines', ms: 'baris');
+  static String get version => withLang(
+        id: 'Versi',
+        en: 'Version',
+        ms: 'Versi',
+      );
+  static String get selectPrinter => withLang(
+        id: 'Pilih Printer...',
+        en: 'Select Printer...',
+        ms: 'Pilih Pencetak...',
+      );
+  static String get settingsSaved => withLang(
+        id: 'Pengaturan disimpan!',
+        en: 'Settings saved!',
+        ms: 'Tetapan disimpan!',
+      );
+  static String get settingsCancelled => withLang(
+        id: 'Perubahan dibatalkan',
+        en: 'Changes cancelled',
+        ms: 'Perubahan dibatalkan',
+      );
 
   // ── Tabs ──
-  static String get typeTextHere =>
-      isEn ? 'Type text here...' : 'Ketik teks di sini...';
-  static String get size => isEn ? 'Size:' : 'Ukuran:';
-  static String get printText => isEn ? 'Print Text' : 'Cetak Teks';
-  static String get printing => isEn ? 'Printing...' : 'Mencetak...';
-  static String get tapToSelectImage =>
-      isEn ? 'Tap to select image' : 'Ketuk untuk memilih gambar';
-  static String get selectImage => isEn ? 'Select Image' : 'Pilih Gambar';
-  static String get print_ => isEn ? 'Print' : 'Cetak';
-  static String get tapToSelectPdf =>
-      isEn ? 'Tap to select PDF' : 'Ketuk untuk memilih PDF';
-  static String get selectPdf => isEn ? 'Select PDF' : 'Pilih PDF';
-  static String get tapToChange =>
-      isEn ? 'Tap to change file' : 'Ketuk untuk ganti file';
-  static String get imageReadFail =>
-      isEn ? '❌ Failed to read image' : '❌ Gagal membaca gambar';
+  static String get typeTextHere => withLang(
+        id: 'Ketik teks di sini...',
+        en: 'Type text here...',
+        ms: 'Taip teks di sini...',
+      );
+  static String get size => withLang(
+        id: 'Ukuran:',
+        en: 'Size:',
+        ms: 'Saiz:',
+      );
+  static String get printText => withLang(
+        id: 'Cetak Teks',
+        en: 'Print Text',
+        ms: 'Cetak Teks',
+      );
+  static String get printing => withLang(
+        id: 'Mencetak...',
+        en: 'Printing...',
+        ms: 'Mencetak...',
+      );
+  static String get tapToSelectImage => withLang(
+        id: 'Ketuk untuk memilih gambar',
+        en: 'Tap to select image',
+        ms: 'Ketik untuk pilih imej',
+      );
+  static String get selectImage => withLang(
+        id: 'Pilih Gambar',
+        en: 'Select Image',
+        ms: 'Pilih Imej',
+      );
+  static String get print_ => withLang(
+        id: 'Cetak',
+        en: 'Print',
+        ms: 'Cetak',
+      );
+  static String get tapToSelectPdf => withLang(
+        id: 'Ketuk untuk memilih PDF',
+        en: 'Tap to select PDF',
+        ms: 'Ketik untuk pilih PDF',
+      );
+  static String get selectPdf => withLang(
+        id: 'Pilih PDF',
+        en: 'Select PDF',
+        ms: 'Pilih PDF',
+      );
+  static String get tapToChange => withLang(
+        id: 'Ketuk untuk ganti file',
+        en: 'Tap to change file',
+        ms: 'Ketik untuk tukar fail',
+      );
+  static String get imageReadFail => withLang(
+        id: '❌ Gagal membaca gambar',
+        en: '❌ Failed to read image',
+        ms: '❌ Gagal membaca imej',
+      );
 }

@@ -13,9 +13,10 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   static const Color _primary = Color(0xFF2BBCC4);
-  static const _channel = MethodChannel('id.dretail.sdr_printer_manager/settings');
+  static const _channel =
+      MethodChannel('id.dretail.sdr_printer_manager/settings');
 
-  late String _language;
+  late String _languageCode;
   late bool _notifEnabled;
   late bool _directPrint;
   late bool _androidPrintService;
@@ -32,7 +33,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadPrefs() async {
     final p = await SharedPreferences.getInstance();
     setState(() {
-      _language = p.getString('language') ?? 'Indonesia';
+      _languageCode = p.getString('language_code') ?? 'id';
       _notifEnabled = false;
       _directPrint = p.getBool('direct_print') ?? false;
       _androidPrintService = p.getBool('android_print_service') ?? false;
@@ -61,7 +62,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _save() async {
     final p = await SharedPreferences.getInstance();
-    await S.setLang(_language);
+    await S.setLang(_languageCode);
     await p.setBool('direct_print', _directPrint);
     await p.setBool('android_print_service', _androidPrintService);
     if (mounted) {
@@ -81,7 +82,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gagal membuka pengaturan cetak Android')),
+          const SnackBar(
+              content: Text('Gagal membuka pengaturan cetak Android')),
         );
       }
     }
@@ -92,14 +94,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!_loaded) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    String tr(String id, String en) => _language == 'English' ? en : id;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FC),
       appBar: AppBar(
         backgroundColor: _primary,
         foregroundColor: Colors.white,
-        title: Text(tr('Pengaturan', 'Settings'),
+        title: Text(S.settings,
             style: const TextStyle(fontWeight: FontWeight.w700)),
         elevation: 0,
       ),
@@ -107,25 +107,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           // 1. Bahasa
-          _section(tr('Bahasa', 'Language'),
+          _section(S.language,
               child: DropdownButton<String>(
-                value: _language,
+                value: _languageCode,
                 isExpanded: true,
                 underline: const SizedBox(),
-                items: const [
-                  DropdownMenuItem(value: 'Indonesia', child: Text('Indonesia')),
-                  DropdownMenuItem(value: 'English', child: Text('English')),
-                ],
-                onChanged: (v) => setState(() => _language = v ?? 'Indonesia'),
+                items: S.languages
+                    .map((e) => DropdownMenuItem(
+                          value: e.code,
+                          child:
+                              Text('${e.nativeName} (${e.code.toUpperCase()})'),
+                        ))
+                    .toList(),
+                onChanged: (v) async {
+                  if (v == null) return;
+                  setState(() => _languageCode = v);
+                  await S.setLang(v);
+                  if (mounted) setState(() {});
+                },
               )),
           // 2. Printer
-          _section('Printer',
+          _section(S.printer,
               child: GestureDetector(
                 onTap: _pickPrinter,
                 child: Text(
                   _printer != null
                       ? '${_printer!.name} (${_printer!.address})'
-                      : tr('Pilih Printer...', 'Select Printer...'),
+                      : S.selectPrinter,
                   style: TextStyle(
                       fontSize: 14,
                       color: _printer != null ? _primary : Colors.grey,
@@ -133,7 +141,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               )),
           // 3. Koneksi Printer
-          _section(tr('Koneksi Printer', 'Printer Connection'),
+          _section(S.printerConnection,
               child: SegmentedButton<String>(
                 segments: const [
                   ButtonSegment(
@@ -159,26 +167,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               )),
           // 4. Ijin Notifikasi
-          _section(tr('Ijin Notifikasi', 'Notification Permission'),
+          _section(S.notifPermission,
               child: _checkTile(
-                tr('Ijin dibutuhkan supaya aplikasi bisa menampilkan notifikasi',
-                    'Permission needed so the app can show notifications'),
+                S.notifDesc,
                 _notifEnabled,
                 (v) => setState(() => _notifEnabled = v ?? false),
               )),
           // 5. Langsung Cetak
-          _section(tr('Langsung Cetak', 'Direct Print'),
+          _section(S.directPrint,
               child: _checkTile(
-                tr('Aplikasi akan langsung cetak ketika menerima data dari POS',
-                    'App will print immediately when receiving data from POS'),
+                S.directPrintDesc,
                 _directPrint,
                 (v) => setState(() => _directPrint = v ?? false),
               )),
           // 6. Layanan Cetak Android
-          _section(tr('Layanan Cetak Android', 'Android Print Service'),
+          _section(
+              S.withLang(
+                  id: 'Layanan Cetak Android',
+                  en: 'Android Print Service',
+                  ms: 'Perkhidmatan Cetak Android',
+                  th: 'บริการพิมพ์ Android',
+                  zh: 'Android 打印服务',
+                  ar: 'خدمة طباعة أندرويد'),
               child: _checkTile(
-                tr('Aktifkan agar muncul sebagai pilihan printer di dialog cetak Android',
-                    'Enable to appear as a printer option in Android print dialog'),
+                S.withLang(
+                    id: 'Aktifkan agar muncul sebagai pilihan printer di dialog cetak Android',
+                    en: 'Enable to appear as a printer option in Android print dialog',
+                    ms: 'Aktifkan agar muncul sebagai pilihan pencetak di dialog cetak Android',
+                    th: 'เปิดใช้งานเพื่อให้แสดงเป็นตัวเลือกเครื่องพิมพ์ในกล่องพิมพ์ Android',
+                    zh: '启用后会在 Android 打印对话框中显示为打印机选项',
+                    ar: 'فعّل هذا الخيار ليظهر كخيار طابعة في نافذة طباعة أندرويد'),
                 _androidPrintService,
                 (v) async {
                   setState(() => _androidPrintService = v ?? false);
@@ -188,7 +206,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 },
               )),
           // 7. Versi
-          _section(tr('Versi', 'Version'),
+          _section(S.version,
               child: const Center(
                 child: Text('1.0.0',
                     style: TextStyle(
@@ -208,7 +226,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
-              child: Text(tr('Batal', 'Cancel'),
+              child: Text(S.cancel,
                   style: const TextStyle(fontWeight: FontWeight.w700)),
             )),
             const SizedBox(width: 12),
@@ -222,7 +240,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
-              child: Text(tr('Simpan', 'Save'),
+              child: Text(S.save,
                   style: const TextStyle(fontWeight: FontWeight.w700)),
             )),
           ]),

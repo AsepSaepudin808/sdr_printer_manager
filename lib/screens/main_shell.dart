@@ -514,34 +514,20 @@ class _MainShellState extends State<MainShell> {
   }
 
   Widget _buildBottomBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-      child: Container(
-        height: 68,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: _primary.withValues(alpha: 0.18),
-              blurRadius: 26,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: BottomAppBar(
-          shape: const CircularNotchedRectangle(),
-          notchMargin: 10,
-          color: Colors.transparent,
-          elevation: 0,
-          child: Row(children: [
-            _navBtn(Icons.home_rounded, 'Home', 0),
-            _navBtn(Icons.description_rounded, 'Text', 1),
-            const SizedBox(width: 58),
-            _navBtn(Icons.image_rounded, 'Image', 2),
-            _navBtn(Icons.picture_as_pdf_rounded, 'Pdf', 3),
-          ]),
-        ),
+    return BottomAppBar(
+      shape: const CircularNotchedRectangle(),
+      notchMargin: 8,
+      color: Colors.white,
+      elevation: 10,
+      child: SizedBox(
+        height: 62,
+        child: Row(children: [
+          _navBtn(Icons.home_rounded, S.home, 0),
+          _navBtn(Icons.description_rounded, S.freeText, 1),
+          const SizedBox(width: 52),
+          _navBtn(Icons.image_rounded, S.printImage, 2),
+          _navBtn(Icons.picture_as_pdf_rounded, S.printPdf, 3),
+        ]),
       ),
     );
   }
@@ -625,37 +611,18 @@ class _MainShellState extends State<MainShell> {
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: (_connecting
-                    ? Colors.grey
-                    : _serverRunning
-                        ? _danger
-                        : _primary)
-                .withValues(alpha: 0.38),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
+            color: _primary.withValues(alpha: 0.22),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
       child: FloatingActionButton(
-        backgroundColor: _connecting
-            ? Colors.grey
-            : _serverRunning
-                ? _danger
-                : _primary,
-        onPressed: _connecting
-            ? null
-            : _serverRunning
-                ? _stopServer
-                : _startServer,
+        backgroundColor: _primary,
+        onPressed: _showPrintHistory,
         elevation: 0,
-        child: _connecting
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2.5, color: Colors.white))
-            : Icon(_serverRunning ? Icons.stop_rounded : Icons.print_rounded,
-                color: Colors.white, size: 28),
+        child:
+            const Icon(Icons.insights_rounded, color: Colors.white, size: 26),
       ),
     );
   }
@@ -799,13 +766,84 @@ class _MainShellState extends State<MainShell> {
                 color: has ? _dark : Colors.grey)),
         if (has) ...[
           const SizedBox(height: 2),
-          Text('ID: ${_printer!.address}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                  fontSize: 10.5,
-                  color: Colors.grey.shade500,
-                  fontFamily: 'monospace')),
+          GestureDetector(
+            onTap: () {
+              showModalBottomSheet(
+                context: context,
+                backgroundColor: Colors.white,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+                ),
+                builder: (_) => SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          S.isEn ? 'Printer ID' : 'ID Printer',
+                          style: const TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 8),
+                        SelectableText(
+                          _printer!.address,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.black87,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            onPressed: () async {
+                              await Clipboard.setData(
+                                  ClipboardData(text: _printer!.address));
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(S.urlCopied)),
+                                );
+                              }
+                            },
+                            icon: const Icon(Icons.copy_rounded, size: 18),
+                            label: Text(S.isEn ? 'Copy ID' : 'Salin ID'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text('ID: ${_printer!.address}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 10.5,
+                          color: Colors.grey.shade500,
+                          fontFamily: 'monospace')),
+                ),
+                const SizedBox(width: 4),
+                Icon(Icons.content_copy_rounded,
+                    size: 12, color: Colors.grey.shade500),
+              ],
+            ),
+          ),
         ],
         const SizedBox(height: 3),
         Row(children: [
@@ -816,31 +854,119 @@ class _MainShellState extends State<MainShell> {
                   color: _btConnected ? _success : Colors.grey,
                   shape: BoxShape.circle)),
           const SizedBox(width: 5),
-          Text(
-              _btConnected
-                  ? S.connected
-                  : has
-                      ? S.notConnected
-                      : S.selectPrinterFirst,
-              style: TextStyle(
-                  fontSize: 11, color: _btConnected ? _success : Colors.grey)),
+          Expanded(
+            child: Text(
+                _btConnected
+                    ? S.connected
+                    : has
+                        ? S.notConnected
+                        : S.selectPrinterFirst,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontSize: 11,
+                    color: _btConnected ? _success : Colors.grey)),
+          ),
         ]),
       ])),
-      GestureDetector(
-        onTap: _serverRunning ? null : _goScan,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          decoration: BoxDecoration(
-              color: (_serverRunning ? Colors.grey : _primary)
-                  .withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8)),
-          child: Text(has ? S.change : S.select,
-              style: TextStyle(
-                  color: _serverRunning ? Colors.grey : _primary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12)),
-        ),
-      ),
+      LayoutBuilder(builder: (context, constraints) {
+        final compact = constraints.maxWidth < 120;
+        final changeFont = compact ? 11.0 : 12.0;
+        final powerFont = compact ? 10.0 : 11.5;
+        final powerHPad = compact ? 10.0 : 16.0;
+        final powerVPad = compact ? 8.0 : 10.0;
+        final iconSize = compact ? 12.0 : 14.0;
+        final gap = compact ? 4.0 : 6.0;
+
+        return Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          alignment: WrapAlignment.end,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            GestureDetector(
+              onTap: _serverRunning ? null : _goScan,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                    color: (_serverRunning ? Colors.grey : _primary)
+                        .withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8)),
+                child: Text(has ? S.change : S.select,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        color: _serverRunning ? Colors.grey : _primary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: changeFont)),
+              ),
+            ),
+            GestureDetector(
+              onTap: _connecting
+                  ? null
+                  : (_serverRunning ? _stopServer : _startServer),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                padding: EdgeInsets.symmetric(
+                    horizontal: powerHPad, vertical: powerVPad),
+                constraints: BoxConstraints(minWidth: compact ? 66 : 78),
+                decoration: BoxDecoration(
+                  color: _connecting
+                      ? Colors.grey.shade400
+                      : _serverRunning
+                          ? _danger
+                          : _success,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (_connecting
+                              ? Colors.grey
+                              : _serverRunning
+                                  ? _danger
+                                  : _success)
+                          .withValues(alpha: 0.28),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _connecting
+                          ? Icons.hourglass_top_rounded
+                          : _serverRunning
+                              ? Icons.power_settings_new_rounded
+                              : Icons.play_arrow_rounded,
+                      size: iconSize,
+                      color: Colors.white,
+                    ),
+                    SizedBox(width: gap),
+                    Text(
+                      _connecting
+                          ? (S.isEn ? 'WAIT' : 'TUNGGU')
+                          : _serverRunning
+                              ? (S.isEn ? 'STOP' : 'MATIKAN')
+                              : (S.isEn ? 'ON' : 'NYALAKAN'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: powerFont,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      }),
     ]));
   }
 
