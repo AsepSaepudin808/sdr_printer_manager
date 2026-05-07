@@ -7,6 +7,7 @@ import '../services/print_server_service.dart';
 import '../services/bluetooth_service.dart';
 import '../models/printer_device.dart';
 import '../utils/escpos_helper.dart';
+import '../utils/test_print_template.dart';
 import '../utils/strings.dart';
 import 'scan_screen.dart';
 import 'log_screen.dart';
@@ -846,7 +847,7 @@ class _MainShellState extends State<MainShell> {
           _isPrinting
               ? null
               : () => _doTestPrint(
-                  EscPosHelper.buildTestShort(_paperSize), 'Struk pendek')),
+                  TestPrintTemplate.buildTestShort(_paperSize), 'Struk pendek')),
       const SizedBox(height: 8),
       _tpBtn(
           S.fullReceipt,
@@ -855,7 +856,7 @@ class _MainShellState extends State<MainShell> {
           _isPrinting
               ? null
               : () => _doTestPrint(
-                  EscPosHelper.buildTestLong(_paperSize), 'Struk lengkap')),
+                  TestPrintTemplate.buildTestLong(_paperSize), 'Struk lengkap')),
       if (_isPrinting) ...[
         const SizedBox(height: 10),
         Row(mainAxisAlignment: MainAxisAlignment.center, children: [

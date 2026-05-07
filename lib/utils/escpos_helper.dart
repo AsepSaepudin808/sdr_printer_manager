@@ -112,18 +112,42 @@ class EscPosHelper {
     return txt(char * w);
   }
 
-  static List<int> rowLR(String left, String right, PaperSize size) {
+  static List<int> rowLR(String left, String right, PaperSize size, {bool boldRight = false}) {
     final w = charsPerLine(size);
 
     if (right.length >= w) return txt(right.substring(0, w));
 
-    int spaceLeft = w - right.length;
+    int effectiveRightLen = right.length;
+    // Bold characters are slightly wider on MPT-II, so we reserve 1 extra space to prevent wrap
+    if (boldRight) effectiveRightLen += 1;
+
+    int spaceLeft = w - effectiveRightLen;
     if (left.length > spaceLeft) {
       left = '${left.substring(0, spaceLeft > 0 ? spaceLeft - 1 : 0)} ';
     }
 
-    final space = w - left.length - right.length;
+    final space = w - left.length - effectiveRightLen;
     final padding = space > 0 ? ' ' * space : '';
+    
+    if (boldRight) {
+      final bytes = <int>[];
+      for (int i = 0; i < left.length; i++) {
+        int c = left.codeUnitAt(i);
+        bytes.add(c < 256 ? c : 0x3F);
+      }
+      for (int i = 0; i < padding.length; i++) {
+        bytes.add(0x20); // space
+      }
+      bytes.addAll(bold(true));
+      for (int i = 0; i < right.length; i++) {
+        int c = right.codeUnitAt(i);
+        bytes.add(c < 256 ? c : 0x3F);
+      }
+      bytes.addAll(bold(false));
+      bytes.add(lfCmd);
+      return bytes;
+    }
+
     return txt('$left$padding$right');
   }
 
@@ -213,6 +237,7 @@ class EscPosHelper {
     final storeName = (company['name'] as String? ?? 'Toko').trim();
     final storePhone = company['phone'] as String? ?? '';
     final storeEmail = company['email'] as String? ?? '';
+    final storeAddress = company['address'] as String? ?? '';
 
     b.addAll(align(1));
     b.addAll(bold(true));
@@ -220,6 +245,9 @@ class EscPosHelper {
     b.addAll(bold(false));
     if (storePhone.isNotEmpty) b.addAll(txt(storePhone));
     if (storeEmail.isNotEmpty) b.addAll(txt(storeEmail));
+    if (storeAddress.isNotEmpty) {
+      b.addAll(txt(storeAddress));
+    }
     b.addAll(align(0));
     b.addAll(divider(size, char: '='));
 
@@ -242,37 +270,47 @@ class EscPosHelper {
       final rawName = m['product_name'] as String? ?? '';
       final name = rawName.replaceAll('\n', ' ').trim();
       final qty = (m['qty'] ?? 1).toDouble();
-      final unitPrice = (m['price'] ?? 0).toDouble();
-      final subtotal = (m['price_with_tax'] ?? unitPrice * qty).toDouble();
-
       final discountAmt = (m['discount_amount'] ?? 0).toDouble();
       final discountPct = (m['discount'] ?? 0).toDouble();
       final discType =
           m['discount_type']?.toString() ?? (discountPct > 0 ? '%' : 'Rp');
+
+      final basePrice = (m['price'] ?? 0).toDouble();
+      final origPrice = (m['original_price'] ?? 0).toDouble();
+      
+      final unitPrice = (origPrice > basePrice) ? origPrice : basePrice;
+      
+      final subtotal = (origPrice > basePrice) ? (unitPrice * qty) : (m['price_with_tax'] ?? unitPrice * qty).toDouble();
 
       b.addAll(bold(true));
       int start = 0;
       while (start < name.length) {
         int end = start + w;
         if (end > name.length) end = name.length;
-        b.addAll(txt(name.substring(start, end)));
+        String lineName = name.substring(start, end);
+        if (start > 0) lineName = lineName.trimLeft();
+        b.addAll(txt(lineName));
         start += w;
       }
       b.addAll(bold(false));
 
-      final qtyStr = '  ${_formatQty(qty)} x Rp ${rp(unitPrice.round())}';
+      final qtyStr = '${_formatQty(qty)} x Rp ${rp(unitPrice.round())}';
       final subtotalStr = 'Rp ${rp(subtotal.round())}';
-      b.addAll(rowLR(qtyStr, subtotalStr, size));
+      b.addAll(rowLR(qtyStr, subtotalStr, size, boldRight: true));
 
       // Diskon Item
       if (discountAmt > 0 || discountPct > 0) {
-        String discLabel = discType == '%'
-            ? '  Disc (${_formatQty(discountPct)}%)'
-            : '  Disc (Rp)';
+        bool isPercent = discType == '%' || discType == 'percentage' || (discountPct > 0 && discountAmt == 0);
+        String discLabel = isPercent
+            ? 'Disc(${_formatQty(discountPct)}%)'
+            : 'Disc(Rp)';
         double nominalAmt = discountAmt > 0
             ? discountAmt
-            : (unitPrice * qty * (discountPct / 100));
-        b.addAll(rowLR(discLabel, '-Rp ${rp(nominalAmt.round())}', size));
+            : (basePrice * qty * (discountPct / 100));
+        if (discountAmt <= 0 && discountPct > 0) {
+           nominalAmt = unitPrice * qty * (discountPct / 100);
+        }
+        b.addAll(rowLR(discLabel, 'Rp ${rp(nominalAmt.round())}', size));
       }
     }
 
@@ -290,16 +328,17 @@ class EscPosHelper {
     final globalDiscPct = (d['global_discount'] ?? 0).toDouble();
     final totalDiscount = (d['total_discount'] ?? 0).toDouble();
 
-    b.addAll(rowLR('Subtotal', 'Rp ${rp(subtotalVal.round())}', size));
+    final displaySubtotal = subtotalVal + totalDiscount;
+    b.addAll(rowLR('Subtotal', 'Rp ${rp(displaySubtotal.round())}', size));
 
     if (globalDiscAmt > 0 || globalDiscPct > 0) {
       String gDiscLabel = globalDiscType == '%'
           ? 'Diskon Global (${_formatQty(globalDiscPct)}%)'
           : 'Diskon Global (Rp)';
       double gNominal = globalDiscAmt > 0 ? globalDiscAmt : totalDiscount;
-      b.addAll(rowLR(gDiscLabel, '-Rp ${rp(gNominal.round())}', size));
+      b.addAll(rowLR(gDiscLabel, 'Rp ${rp(gNominal.round())}', size));
     } else if (totalDiscount > 0) {
-      b.addAll(rowLR('Total Diskon', '-Rp ${rp(totalDiscount.round())}', size));
+      b.addAll(rowLR('Total Diskon', 'Rp ${rp(totalDiscount.round())}', size));
     }
 
     if (taxVal > 0) {
@@ -308,14 +347,16 @@ class EscPosHelper {
 
     b.addAll(divider(size));
     b.addAll(bold(true));
-    
-    // For bold TOTAL, we reduce width by 1 because bold chars are physically slightly wider 
-    // on MPT-II printers, causing 32-char lines to wrap the price to the next line.
+
+
     final totalStr = 'Rp ${rp(totalVal.round())}';
-    int spaceTot = w - 5 - totalStr.length - 1; // 5 is length of 'TOTAL', -1 for bold offset
+    int spaceTot = w -
+        5 -
+        totalStr.length -
+        1; 
     if (spaceTot < 1) spaceTot = 1;
     b.addAll(txt('TOTAL${" " * spaceTot}$totalStr'));
-    
+
     b.addAll(bold(false));
     b.addAll(divider(size));
 
@@ -383,158 +424,6 @@ class EscPosHelper {
 
     b.addAll(align(1));
     b.addAll(txt('Terima kasih!'));
-    b.addAll(align(0));
-
-    b.addAll(poweredBy(size));
-    b.addAll(finalize());
-    return Uint8List.fromList(b);
-  }
-
-  // ── TEST PRINT PENDEK ────────────────────────────────────────────────────────
-  static Uint8List buildTestShort(PaperSize size) {
-    final List<int> b = [];
-    final w = charsPerLine(size);
-    final paperLabel = switch (size) {
-      PaperSize.mm58 => '58mm',
-      PaperSize.mm80 => '80mm',
-      PaperSize.mm100 => '100mm'
-    };
-    final now = DateTime.now();
-    final dateStr =
-        '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
-    final timeStr =
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-
-    b.addAll(init());
-    _applyFontConfig(b);
-
-    b.addAll(logoHeader(size));
-    b.addAll(align(1));
-    b.addAll(txt('-- TEST PRINT PENDEK --'));
-    b.addAll(align(0));
-    b.addAll(divider(size));
-
-    // Tampilkan info Font yang dipakai pada Test Print
-    final String fontLabel = _useFontB ? "Font B (Kecil)" : "Font A (Normal)";
-    b.addAll(rowLR('Kertas', '$paperLabel (${w}kar)', size));
-    b.addAll(rowLR('Mode', fontLabel, size));
-    b.addAll(rowLR('Tanggal', dateStr, size));
-    b.addAll(rowLR('Waktu', timeStr, size));
-    b.addAll(divider(size));
-
-    b.addAll(bold(true));
-    b.addAll(rowLR('TOTAL', 'Rp ${rp(150000)}', size));
-    b.addAll(bold(false));
-    b.addAll(rowLR('Tunai', 'Rp ${rp(200000)}', size));
-    b.addAll(rowLR('Kembali', 'Rp ${rp(50000)}', size));
-    b.addAll(divider(size));
-
-    b.addAll(align(1));
-    b.addAll(bold(true));
-    b.addAll(txt('*** Printer OK! ***'));
-    b.addAll(bold(false));
-    b.addAll(align(0));
-
-    b.addAll(poweredBy(size));
-    b.addAll(finalize());
-    return Uint8List.fromList(b);
-  }
-
-  // ── TEST PRINT PANJANG ────────────────────────────────────────────────────────
-  static Uint8List buildTestLong(PaperSize size) {
-    final List<int> b = [];
-    final w = charsPerLine(size);
-    final paperLabel = switch (size) {
-      PaperSize.mm58 => '58mm',
-      PaperSize.mm80 => '80mm',
-      PaperSize.mm100 => '100mm'
-    };
-    final now = DateTime.now();
-    final dateStr =
-        '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
-    final timeStr =
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-
-    b.addAll(init());
-    _applyFontConfig(b);
-
-    b.addAll(logoHeader(size));
-
-    b.addAll(align(1));
-    b.addAll(txt('Jl. Contoh No. 123, Bandung'));
-    b.addAll(txt('Telp: (022) 1234-5678'));
-    b.addAll(align(0));
-    b.addAll(divider(size, char: '='));
-
-    b.addAll(rowLR('No.', 'TRX-20250502-001', size));
-    b.addAll(rowLR('Tanggal', dateStr, size));
-    b.addAll(rowLR('Waktu', timeStr, size));
-    b.addAll(rowLR('Kasir', 'Admin', size));
-    b.addAll(divider(size));
-
-    const items = [
-      ('Indomie Goreng', 3, 3500, 10500),
-      ('Aqua 600ml', 2, 5000, 10000),
-      ('Roti Tawar Sari Roti', 1, 18500, 18500),
-      ('Susu Ultra 200ml', 4, 6500, 26000),
-      ('Sabun Lifebuoy', 2, 12000, 24000),
-      ('Kopi Kapal Api', 5, 2500, 12500),
-    ];
-
-    // Kolom dinamis berdasarkan lebar yang dipilih
-    const int cQ = 4; // Qty
-    final int cP = w >= 48 ? 11 : 8; // Harga
-    final int cT = w >= 48 ? 12 : 9; // Total
-    final int cN = w - cQ - cP - cT; // Sisa untuk nama Item
-
-    b.addAll(bold(true));
-    b.addAll(txt(
-      '${fixLen("Item", cN)}'
-      '${fixLenR("Qty", cQ)}'
-      '${fixLenR("Harga", cP)}'
-      '${fixLenR("Total", cT)}',
-    ));
-    b.addAll(bold(false));
-    b.addAll(divider(size));
-
-    for (final (name, qty, price, total) in items) {
-      b.addAll(txt(
-        '${fixLen(name, cN)}'
-        '${fixLenR('${qty}x', cQ)}'
-        '${fixLenR(rp(price), cP)}'
-        '${fixLenR(rp(total), cT)}',
-      ));
-    }
-
-    b.addAll(divider(size));
-
-    const subtotal = 101500;
-    const diskon = 5000;
-    const total = 96500;
-    const bayar = 100000;
-    const kembali = 3500;
-
-    b.addAll(rowLR('Subtotal', 'Rp ${rp(subtotal)}', size));
-    b.addAll(rowLR('Diskon', '-Rp ${rp(diskon)}', size));
-    b.addAll(rowLR('Pajak (0%)', 'Rp 0', size));
-    b.addAll(divider(size));
-
-    b.addAll(bold(true));
-    b.addAll(rowLR('TOTAL', 'Rp ${rp(total)}', size));
-    b.addAll(bold(false));
-    b.addAll(divider(size));
-
-    b.addAll(rowLR('Tunai', 'Rp ${rp(bayar)}', size));
-    b.addAll(bold(true));
-    b.addAll(rowLR('Kembali', 'Rp ${rp(kembali)}', size));
-    b.addAll(bold(false));
-    b.addAll(divider(size, char: '='));
-
-    final String fontLabel = _useFontB ? "Font B" : "Font A";
-    b.addAll(align(1));
-    b.addAll(txt('[ Test $paperLabel - $w kar - $fontLabel ]'));
-    b.addAll(divider(size));
-    b.addAll(txt('Terima kasih telah berbelanja'));
     b.addAll(align(0));
 
     b.addAll(poweredBy(size));

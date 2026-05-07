@@ -9,6 +9,7 @@ import 'package:network_info_plus/network_info_plus.dart';
 
 import 'bluetooth_service.dart';
 import '../utils/escpos_helper.dart';
+import '../utils/test_print_template.dart';
 
 class PrintServerService {
   HttpServer? _server;
@@ -62,7 +63,18 @@ class PrintServerService {
 
     // ── GET /test-print ──────────────────────────────────────────────────────
     router.get('/test-print', (Request req) async {
-      final testData = EscPosHelper.buildTestShort(_paperSize);
+      final action = req.url.queryParameters['type'] ?? 'test_short';
+      final size = _paperSize;
+
+      Uint8List? testData;
+      if (action == 'test_short') {
+        testData = TestPrintTemplate.buildTestShort(size);
+      } else if (action == 'test_long') {
+        testData = TestPrintTemplate.buildTestLong(size);
+      } else {
+        testData = TestPrintTemplate.buildTestShort(size);
+      }
+
       final ok = await _btService?.sendRaw(testData) ?? false;
       if (ok) {
         onLog?.call('Test print berhasil');
@@ -93,7 +105,8 @@ class PrintServerService {
       return Response.ok('', headers: const {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, X-Print-Format, X-Print-Source',
+        'Access-Control-Allow-Headers':
+            'Content-Type, X-Print-Format, X-Print-Source',
         'Access-Control-Allow-Private-Network': 'true',
       });
     });
