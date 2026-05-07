@@ -73,37 +73,17 @@ class SdrBluetoothService {
 
       await Future.delayed(const Duration(milliseconds: 200));
 
-      if (bytes.length <= 512) {
-        final ok = await PrintBluetoothThermal.writeBytes(bytes);
-        debugPrint('[SDR-BT] Direct write result: $ok');
-        if (!ok) _isConnected = false;
-        return ok;
+      // Send all bytes at once to let the Android Bluetooth socket handle flow control
+      // Manual chunking with delays causes MPT-II printers to flush the buffer and insert random newlines.
+      bool ok = await PrintBluetoothThermal.writeBytes(bytes);
+      
+      if (!ok) {
+        debugPrint('[SDR-BT] FAILED to send data');
+        _isConnected = false;
+        return false;
       }
-
-      const chunkSize = 512;
-      int sent = 0;
-      for (int i = 0; i < bytes.length; i += chunkSize) {
-        final end =
-            (i + chunkSize < bytes.length) ? i + chunkSize : bytes.length;
-        final chunk = bytes.sublist(i, end);
-
-        bool ok = false;
-        for (int retry = 0; retry < 3 && !ok; retry++) {
-          if (retry > 0) {
-            debugPrint('[SDR-BT] Retry $retry for chunk at offset $i');
-            await Future.delayed(const Duration(milliseconds: 300));
-          }
-          ok = await PrintBluetoothThermal.writeBytes(chunk);
-        }
-        if (!ok) {
-          debugPrint('[SDR-BT] FAILED at offset $i after 3 retries');
-          _isConnected = false;
-          return false;
-        }
-        sent += chunk.length;
-        await Future.delayed(const Duration(milliseconds: 120));
-      }
-      debugPrint('[SDR-BT] All $sent bytes sent successfully');
+      
+      debugPrint('[SDR-BT] All ${bytes.length} bytes sent successfully');
       return true;
     } catch (e) {
       debugPrint('[SDR-BT] sendRaw exception: $e');
