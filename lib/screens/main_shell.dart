@@ -514,61 +514,149 @@ class _MainShellState extends State<MainShell> {
   }
 
   Widget _buildBottomBar() {
-    return BottomAppBar(
-      shape: const CircularNotchedRectangle(),
-      notchMargin: 8,
-      color: Colors.white,
-      elevation: 12,
-      child: SizedBox(
-          height: 60,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+      child: Container(
+        height: 68,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: _primary.withValues(alpha: 0.18),
+              blurRadius: 26,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: BottomAppBar(
+          shape: const CircularNotchedRectangle(),
+          notchMargin: 10,
+          color: Colors.transparent,
+          elevation: 0,
           child: Row(children: [
             _navBtn(Icons.home_rounded, 'Home', 0),
             _navBtn(Icons.description_rounded, 'Text', 1),
-            const SizedBox(width: 56),
+            const SizedBox(width: 58),
             _navBtn(Icons.image_rounded, 'Image', 2),
             _navBtn(Icons.picture_as_pdf_rounded, 'Pdf', 3),
-          ])),
+          ]),
+        ),
+      ),
     );
   }
 
   Widget _navBtn(IconData icon, String label, int idx) {
     final sel = _tab == idx;
     return Expanded(
-        child: InkWell(
-      onTap: () => setState(() => _tab = idx),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, color: sel ? _primary : Colors.grey, size: 22),
-        const SizedBox(height: 2),
-        Text(label,
-            style: TextStyle(
-                fontSize: 10,
-                color: sel ? _primary : Colors.grey,
-                fontWeight: sel ? FontWeight.w700 : FontWeight.normal)),
-      ]),
-    ));
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => setState(() => _tab = idx),
+        child: SizedBox(
+          height: 54,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 380),
+                curve: Curves.easeOutBack,
+                top: sel ? 6 : 11,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 380),
+                  curve: Curves.easeOutCubic,
+                  width: sel ? 44 : 0,
+                  height: sel ? 30 : 0,
+                  decoration: BoxDecoration(
+                    color: sel
+                        ? _primary.withValues(alpha: 0.14)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+              AnimatedSlide(
+                duration: const Duration(milliseconds: 360),
+                curve: Curves.easeOutCubic,
+                offset: Offset(0, sel ? -0.12 : 0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TweenAnimationBuilder<double>(
+                      duration: const Duration(milliseconds: 360),
+                      curve: Curves.easeOutBack,
+                      tween: Tween(begin: 0, end: sel ? 1 : 0),
+                      builder: (context, t, child) {
+                        final scale = 1 + (0.13 * t);
+                        return Transform.scale(scale: scale, child: child);
+                      },
+                      child: Icon(
+                        icon,
+                        color: sel ? _primary : Colors.grey.shade500,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    AnimatedOpacity(
+                      duration: const Duration(milliseconds: 260),
+                      opacity: sel ? 1 : 0.78,
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: sel ? 10.5 : 10,
+                          color: sel ? _primary : Colors.grey.shade500,
+                          fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+                          letterSpacing: sel ? 0.1 : 0,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildFAB() {
-    return FloatingActionButton(
-      backgroundColor: _connecting
-          ? Colors.grey
-          : _serverRunning
-              ? _danger
-              : _primary,
-      onPressed: _connecting
-          ? null
-          : _serverRunning
-              ? _stopServer
-              : _startServer,
-      elevation: 4,
-      child: _connecting
-          ? const SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2.5, color: Colors.white))
-          : Icon(_serverRunning ? Icons.stop_rounded : Icons.print_rounded,
-              color: Colors.white, size: 28),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: (_connecting
+                    ? Colors.grey
+                    : _serverRunning
+                        ? _danger
+                        : _primary)
+                .withValues(alpha: 0.38),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: FloatingActionButton(
+        backgroundColor: _connecting
+            ? Colors.grey
+            : _serverRunning
+                ? _danger
+                : _primary,
+        onPressed: _connecting
+            ? null
+            : _serverRunning
+                ? _stopServer
+                : _startServer,
+        elevation: 0,
+        child: _connecting
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2.5, color: Colors.white))
+            : Icon(_serverRunning ? Icons.stop_rounded : Icons.print_rounded,
+                color: Colors.white, size: 28),
+      ),
     );
   }
 
@@ -703,10 +791,22 @@ class _MainShellState extends State<MainShell> {
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(has ? _printer!.name : S.noPrinter,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
                 color: has ? _dark : Colors.grey)),
+        if (has) ...[
+          const SizedBox(height: 2),
+          Text('ID: ${_printer!.address}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  fontSize: 10.5,
+                  color: Colors.grey.shade500,
+                  fontFamily: 'monospace')),
+        ],
         const SizedBox(height: 3),
         Row(children: [
           Container(
@@ -846,8 +946,8 @@ class _MainShellState extends State<MainShell> {
           _primary,
           _isPrinting
               ? null
-              : () => _doTestPrint(
-                  TestPrintTemplate.buildTestShort(_paperSize), 'Struk pendek')),
+              : () => _doTestPrint(TestPrintTemplate.buildTestShort(_paperSize),
+                  'Struk pendek')),
       const SizedBox(height: 8),
       _tpBtn(
           S.fullReceipt,
@@ -855,8 +955,8 @@ class _MainShellState extends State<MainShell> {
           const Color(0xFF7B2FBE),
           _isPrinting
               ? null
-              : () => _doTestPrint(
-                  TestPrintTemplate.buildTestLong(_paperSize), 'Struk lengkap')),
+              : () => _doTestPrint(TestPrintTemplate.buildTestLong(_paperSize),
+                  'Struk lengkap')),
       if (_isPrinting) ...[
         const SizedBox(height: 10),
         Row(mainAxisAlignment: MainAxisAlignment.center, children: [
