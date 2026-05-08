@@ -19,7 +19,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "id.dretail.sdr_printer_manager"
+        applicationId = "id.dprinter.mart"
         minSdk = flutter.minSdkVersion
         targetSdk = 36
         versionCode = flutter.versionCode
