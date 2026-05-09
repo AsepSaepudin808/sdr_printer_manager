@@ -139,9 +139,9 @@ class S {
         ar: 'الرئيسية',
       );
   static String get freeText => withLang(
-        id: 'Text Bebas',
-        en: 'Free Text',
-        ms: 'Teks Bebas',
+        id: 'Print Text',
+        en: 'Print Text',
+        ms: 'Print Text',
         th: 'ข้อความอิสระ',
         zh: '自由文本',
         ar: 'نص حر',

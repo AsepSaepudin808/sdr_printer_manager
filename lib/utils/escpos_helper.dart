@@ -433,14 +433,17 @@ class EscPosHelper {
 
   // ── CONVERT TEXT KE ESCPOS ──────────────────────────────────────────────────
 
-  static Uint8List textToEscPos(String text, PaperSize size) {
+  static Uint8List textToEscPos(String text, PaperSize size, {bool isBold = false, int alignMode = 0}) {
     final List<int> b = [];
     b.addAll(init());
     _applyFontConfig(b);
+    b.addAll(align(alignMode));
+    if (isBold) b.addAll(bold(true));
     for (int i = 0; i < text.length; i++) {
       int c = text.codeUnitAt(i);
       b.add(c < 256 ? c : 0x3F);
     }
+    if (isBold) b.addAll(bold(false));
     b.addAll(finalize());
     return Uint8List.fromList(b);
   }
