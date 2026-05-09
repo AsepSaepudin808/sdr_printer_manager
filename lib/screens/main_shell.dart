@@ -565,8 +565,11 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     final titles = [S.home, S.freeText, S.printImage, S.printPdf];
+    final isKeyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
+
     return Scaffold(
       backgroundColor: _bg,
+      resizeToAvoidBottomInset: true, // Keep resizing for text input accessibility
       appBar: AppBar(
         backgroundColor: _primary,
         foregroundColor: Colors.white,
@@ -576,8 +579,8 @@ class _MainShellState extends State<MainShell> {
       ),
       drawer: _buildDrawer(),
       body: _buildBody(),
-      bottomNavigationBar: _buildBottomBar(),
-      floatingActionButton: _buildFAB(),
+      bottomNavigationBar: isKeyboardVisible ? null : _buildBottomBar(),
+      floatingActionButton: isKeyboardVisible ? null : _buildFAB(),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }

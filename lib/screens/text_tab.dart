@@ -180,7 +180,7 @@ class _TextTabState extends State<TextTab> {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 64),
         child: Column(
           children: [
             // ── MODERN GLASS TOOLBAR ──
