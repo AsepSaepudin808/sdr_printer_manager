@@ -437,13 +437,23 @@ class EscPosHelper {
     final List<int> b = [];
     b.addAll(init());
     _applyFontConfig(b);
-    b.addAll(align(alignMode));
-    if (isBold) b.addAll(bold(true));
-    for (int i = 0; i < text.length; i++) {
-      int c = text.codeUnitAt(i);
-      b.add(c < 256 ? c : 0x3F);
+    
+    // Split by newline to apply alignment and bolding per-line for better consistency
+    final lines = text.split('\n');
+    for (int i = 0; i < lines.length; i++) {
+      b.addAll(align(alignMode));
+      if (isBold) b.addAll(bold(true));
+      
+      final line = lines[i];
+      for (int j = 0; j < line.length; j++) {
+        int c = line.codeUnitAt(j);
+        b.add(c < 256 ? c : 0x3F);
+      }
+      
+      if (isBold) b.addAll(bold(false));
+      b.add(lfCmd); 
     }
-    if (isBold) b.addAll(bold(false));
+    
     b.addAll(finalize());
     return Uint8List.fromList(b);
   }

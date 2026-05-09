@@ -364,18 +364,10 @@ class _MainShellState extends State<MainShell> {
   Future<void> _goPrinterSettings() async {
     await Navigator.push(context,
         MaterialPageRoute(builder: (_) => const PrinterSettingsScreen()));
-    final p = await SharedPreferences.getInstance();
-    final ps = p.getString('paper_size') ?? 'mm80';
-    final newSize = ps == 'mm58'
-        ? PaperSize.mm58
-        : ps == 'mm100'
-            ? PaperSize.mm100
-            : PaperSize.mm80;
-    EscPosHelper.setCustomCharsPerLine(p.getInt('chars_per_line') ?? 0);
-    EscPosHelper.setExtraFeed(p.getInt('extra_feed') ?? 3);
-    EscPosHelper.setAutoCut(p.getBool('auto_cut') ?? false);
-    setState(() => _paperSize = newSize);
-    _server.setPaperSize(newSize);
+    await _loadPrefs();
+    if (_serverRunning) {
+      _server.setPaperSize(_paperSize);
+    }
   }
 
   Future<void> _savePort() async {
@@ -629,9 +621,13 @@ class _MainShellState extends State<MainShell> {
               MaterialPageRoute(builder: (_) => LogScreen(logs: _logs)));
         }),
         const Divider(),
-        _drawerItem(Icons.settings_rounded, S.settings, () {
+        _drawerItem(Icons.settings_rounded, S.settings, () async {
           Navigator.pop(context);
-          _goSettings();
+          await _goSettings();
+        }),
+        _drawerItem(Icons.print_outlined, S.printerSize, () async {
+          Navigator.pop(context);
+          await _goPrinterSettings();
         }),
         _drawerItem(Icons.info_outline_rounded, S.aboutApp, () {
           Navigator.pop(context);

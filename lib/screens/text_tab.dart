@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/bluetooth_service.dart';
 import '../utils/escpos_helper.dart';
 import '../utils/strings.dart';
@@ -19,13 +20,38 @@ class TextTab extends StatefulWidget {
 }
 
 class _TextTabState extends State<TextTab> {
+  PaperSize? _localPaperSize;
   final TextEditingController _textCtrl = TextEditingController();
   bool _isPrinting = false;
-  
-  // Format state
   int _alignMode = 0; // 0: Left, 1: Center, 2: Right
   bool _isBold = false;
   
+  @override
+  void initState() {
+    super.initState();
+    _localPaperSize = widget.paperSize;
+    _loadLocalSettings();
+  }
+
+  Future<void> _loadLocalSettings() async {
+    final p = await SharedPreferences.getInstance();
+    final ps = p.getString('paper_size') ?? 'mm80';
+    final newSize = ps == 'mm58' ? PaperSize.mm58 : ps == 'mm100' ? PaperSize.mm100 : PaperSize.mm80;
+    
+    // Also ensure EscPosHelper is updated with latest settings
+    EscPosHelper.setCustomCharsPerLine(p.getInt('chars_per_line') ?? 0);
+    EscPosHelper.setExtraFeed(p.getInt('extra_feed') ?? 3);
+    EscPosHelper.setAutoCut(p.getBool('auto_cut') ?? false);
+
+    if (mounted) {
+      setState(() {
+        _localPaperSize = newSize;
+      });
+    }
+  }
+
+  PaperSize get _paperSize => _localPaperSize ?? widget.paperSize;
+
   @override
   void dispose() {
     _textCtrl.dispose();
@@ -35,9 +61,14 @@ class _TextTabState extends State<TextTab> {
   Future<void> _print() async {
     if (_textCtrl.text.isEmpty) return;
     setState(() => _isPrinting = true);
+    
+    // Auto-wrap text to match the paper size for "What You See Is What You Get"
+    final cpl = EscPosHelper.charsPerLine(_paperSize);
+    final wrappedText = _wrapText(_textCtrl.text, cpl);
+
     final data = EscPosHelper.textToEscPos(
-      _textCtrl.text,
-      widget.paperSize,
+      wrappedText,
+      _paperSize,
       isBold: _isBold,
       alignMode: _alignMode,
     );
@@ -45,9 +76,49 @@ class _TextTabState extends State<TextTab> {
     setState(() => _isPrinting = false);
   }
 
+  String _wrapText(String text, int width) {
+    final lines = text.split('\n');
+    final result = <String>[];
+    for (var line in lines) {
+      if (line.isEmpty) {
+        result.add('');
+        continue;
+      }
+      
+      String currentLine = line;
+      while (currentLine.length > width) {
+        // Try to find last space within width
+        int cutIndex = currentLine.lastIndexOf(' ', width);
+        if (cutIndex == -1) cutIndex = width;
+        
+        result.add(currentLine.substring(0, cutIndex).trimRight());
+        currentLine = currentLine.substring(cutIndex).trimLeft();
+      }
+      result.add(currentLine);
+    }
+    return result.join('\n');
+  }
+
+  double _getCharWidth(int charsPerLine) {
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: 'W', // Use a wide character to be safe, though monospace should be equal
+        style: TextStyle(
+          fontFamily: 'monospace',
+          fontSize: 14,
+          fontWeight: _isBold ? FontWeight.w700 : FontWeight.w400,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    return textPainter.width;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final charsPerLine = EscPosHelper.charsPerLine(widget.paperSize);
+    final charsPerLine = EscPosHelper.charsPerLine(_paperSize);
+    final charWidth = _getCharWidth(charsPerLine);
+    final paperContentWidth = charWidth * charsPerLine;
     
     final textAlign = _alignMode == 0 ? TextAlign.left 
                     : _alignMode == 1 ? TextAlign.center 
@@ -105,7 +176,7 @@ class _TextTabState extends State<TextTab> {
                       context,
                       MaterialPageRoute(builder: (_) => const PrinterSettingsScreen()),
                     );
-                    setState(() {});
+                    await _loadLocalSettings();
                   },
                   icon: const Icon(Icons.settings_rounded, size: 16),
                   label: const Text('Setting', style: TextStyle(fontSize: 12)),
@@ -149,35 +220,56 @@ class _TextTabState extends State<TextTab> {
                     ),
                     child: Center(
                       child: Text(
-                        'Preview — Lebar: ${widget.paperSize.name} ($charsPerLine kar)',
+                        'Preview — Lebar: ${_paperSize.name} ($charsPerLine kar)',
                         style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
                   Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: TextField(
-                        controller: _textCtrl,
-                        maxLines: null,
-                        expands: true,
-                        textAlign: textAlign,
-                        onChanged: (_) => setState(() {}),
-                        style: TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 14,
-                          fontWeight: _isBold ? FontWeight.w700 : FontWeight.w400,
-                          color: Colors.black87,
-                          height: 1.5,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Ketik struk Anda di sini...\n\nTampilan ini mengikuti font monospace dan ukuran kertas printer.',
-                          hintStyle: TextStyle(
-                            color: Colors.grey.shade400, 
-                            fontFamily: 'sans-serif',
-                            fontWeight: FontWeight.normal,
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Center(
+                        child: Container(
+                          width: paperContentWidth, // Exact width for the character count
+                          constraints: const BoxConstraints(minHeight: 400),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              )
+                            ],
                           ),
-                          border: InputBorder.none,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 20), // Only vertical padding
+                            child: TextField(
+                              controller: _textCtrl,
+                              maxLines: null,
+                              textAlign: textAlign,
+                              onChanged: (_) => setState(() {}),
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 14,
+                                fontWeight: _isBold ? FontWeight.w700 : FontWeight.w400,
+                                color: Colors.black,
+                                height: 1.1,
+                                letterSpacing: 0,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: 'Ketik struk Anda di sini...',
+                                hintStyle: TextStyle(
+                                  color: Colors.grey.shade300, 
+                                  fontFamily: 'sans-serif',
+                                  fontSize: 12,
+                                ),
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
