@@ -62,24 +62,26 @@ class _TextTabState extends State<TextTab> {
     if (_textCtrl.text.isEmpty) return;
     setState(() => _isPrinting = true);
     
-    // Auto-wrap text to match the paper size for "What You See Is What You Get"
+    // For justification, we send left-aligned commands but pre-justified text
     final cpl = EscPosHelper.charsPerLine(_paperSize);
-    final wrappedText = _wrapText(_textCtrl.text, cpl);
+    final printAlignMode = _alignMode == 3 ? 0 : _alignMode;
+    final wrappedText = _wrapText(_textCtrl.text, cpl, justify: _alignMode == 3);
 
     final data = EscPosHelper.textToEscPos(
       wrappedText,
       _paperSize,
       isBold: _isBold,
-      alignMode: _alignMode,
+      alignMode: printAlignMode,
     );
     await widget.btService.sendRaw(data);
     setState(() => _isPrinting = false);
   }
 
-  String _wrapText(String text, int width) {
+  String _wrapText(String text, int width, {bool justify = false}) {
     final lines = text.split('\n');
     final result = <String>[];
-    for (var line in lines) {
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
       if (line.isEmpty) {
         result.add('');
         continue;
@@ -87,16 +89,56 @@ class _TextTabState extends State<TextTab> {
       
       String currentLine = line;
       while (currentLine.length > width) {
-        // Try to find last space within width
         int cutIndex = currentLine.lastIndexOf(' ', width);
         if (cutIndex == -1) cutIndex = width;
         
-        result.add(currentLine.substring(0, cutIndex).trimRight());
+        String segment = currentLine.substring(0, cutIndex).trim();
+        if (justify) {
+          result.add(_justifyLine(segment, width));
+        } else {
+          result.add(segment);
+        }
         currentLine = currentLine.substring(cutIndex).trimLeft();
       }
-      result.add(currentLine);
+      // Last part of the line (or the whole line if shorter than width)
+      // Usually, the last line of a paragraph is NOT justified.
+      result.add(currentLine.trimRight());
     }
     return result.join('\n');
+  }
+
+  String _justifyLine(String line, int width) {
+    final words = line.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    if (words.length <= 1) return line.padRight(width);
+    
+    int totalWordsLength = words.fold(0, (sum, word) => sum + word.length);
+    int totalSpacesNeeded = width - totalWordsLength;
+    int gaps = words.length - 1;
+    
+    int spacePerGap = totalSpacesNeeded ~/ gaps;
+    int extraSpaces = totalSpacesNeeded % gaps;
+    
+    StringBuffer sb = StringBuffer();
+    for (int i = 0; i < words.length; i++) {
+      sb.write(words[i]);
+      if (i < gaps) {
+        int spacesToApply = spacePerGap + (i < extraSpaces ? 1 : 0);
+        sb.write(' ' * spacesToApply);
+      }
+    }
+    return sb.toString();
+  }
+
+  void _insertTestPattern() {
+    const pattern = "TEST PRINT PATTERN\n"
+                    "================================\n"
+                    "ABCDEFG HIJKLMNOP QRSTUV WXYZ\n"
+                    "abcdefg hijklmnop qrstuv wxyz\n"
+                    "0123456789 !@#\$%^&*()_+-=\n"
+                    "--------------------------------\n"
+                    "dPrinter Mart - OK\n";
+    _textCtrl.text = pattern;
+    setState(() {});
   }
 
   double _getCharWidth(int charsPerLine) {
@@ -118,207 +160,343 @@ class _TextTabState extends State<TextTab> {
   Widget build(BuildContext context) {
     final charsPerLine = EscPosHelper.charsPerLine(_paperSize);
     final charWidth = _getCharWidth(charsPerLine);
-    final paperContentWidth = charWidth * charsPerLine;
+    // Add a 2px buffer to prevent the cursor from pushing text to the next line prematurely
+    final paperContentWidth = (charWidth * charsPerLine) + 2.0;
     
     final textAlign = _alignMode == 0 ? TextAlign.left 
                     : _alignMode == 1 ? TextAlign.center 
-                    : TextAlign.right;
+                    : _alignMode == 2 ? TextAlign.right
+                    : TextAlign.justify;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-      child: Column(
-        children: [
-          // ── TOOLBAR ATAS ──
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                )
-              ],
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              children: [
-                _formatBtn(
-                  icon: Icons.format_align_left_rounded, 
-                  isActive: _alignMode == 0, 
-                  onTap: () => setState(() => _alignMode = 0),
-                ),
-                _formatBtn(
-                  icon: Icons.format_align_center_rounded, 
-                  isActive: _alignMode == 1, 
-                  onTap: () => setState(() => _alignMode = 1),
-                ),
-                _formatBtn(
-                  icon: Icons.format_align_right_rounded, 
-                  isActive: _alignMode == 2, 
-                  onTap: () => setState(() => _alignMode = 2),
-                ),
-                Container(
-                  width: 1, height: 24, 
-                  color: Colors.grey.shade300, 
-                  margin: const EdgeInsets.symmetric(horizontal: 8)
-                ),
-                _formatBtn(
-                  icon: Icons.format_bold_rounded, 
-                  isActive: _isBold, 
-                  onTap: () => setState(() => _isBold = !_isBold),
-                ),
-                const Spacer(),
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const PrinterSettingsScreen()),
-                    );
-                    await _loadLocalSettings();
-                  },
-                  icon: const Icon(Icons.settings_rounded, size: 16),
-                  label: const Text('Setting', style: TextStyle(fontSize: 12)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF2BBCC4),
-                    side: const BorderSide(color: Color(0xFF2BBCC4)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                    minimumSize: const Size(0, 36),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-
-          // ── REALISTIC PREVIEW AREA ──
-          Expanded(
-            child: Container(
-              width: double.infinity,
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            const Color(0xFFF8FAFB),
+            Colors.white.withValues(alpha: 0.8),
+          ],
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: Column(
+          children: [
+            // ── MODERN GLASS TOOLBAR ──
+            Container(
               decoration: BoxDecoration(
-                color: const Color(0xFFFDFBF7),
-                borderRadius: BorderRadius.circular(8),
+                color: Colors.white.withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
+                    color: const Color(0xFF2BBCC4).withValues(alpha: 0.08),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
                   )
                 ],
-                border: Border.all(color: Colors.grey.shade300),
+                border: Border.all(color: Colors.white, width: 1.5),
               ),
-              child: Column(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
                 children: [
-                  Container(
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-                    ),
-                    child: Center(
-                      child: Text(
-                        'Preview — Lebar: ${_paperSize.name} ($charsPerLine kar)',
-                        style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Row(
+                        children: [
+                          _formatBtn(
+                            icon: Icons.format_align_left_rounded, 
+                            isActive: _alignMode == 0, 
+                            onTap: () => setState(() => _alignMode = 0),
+                            tooltip: 'Rata Kiri',
+                          ),
+                          _formatBtn(
+                            icon: Icons.format_align_center_rounded, 
+                            isActive: _alignMode == 1, 
+                            onTap: () => setState(() => _alignMode = 1),
+                            tooltip: 'Rata Tengah',
+                          ),
+                          _formatBtn(
+                            icon: Icons.format_align_right_rounded, 
+                            isActive: _alignMode == 2, 
+                            onTap: () => setState(() => _alignMode = 2),
+                            tooltip: 'Rata Kanan',
+                          ),
+                          _formatBtn(
+                            icon: Icons.format_align_justify_rounded, 
+                            isActive: _alignMode == 3, 
+                            onTap: () => setState(() => _alignMode = 3),
+                            tooltip: 'Rata Kanan Kiri',
+                          ),
+                          const SizedBox(width: 8),
+                          Container(width: 1.5, height: 24, color: Colors.grey.shade200),
+                          const SizedBox(width: 8),
+                          _formatBtn(
+                            icon: Icons.format_bold_rounded, 
+                            isActive: _isBold, 
+                            onTap: () => setState(() => _isBold = !_isBold),
+                            tooltip: 'Tebal',
+                          ),
+                          _formatBtn(
+                            icon: Icons.text_fields_rounded, 
+                            isActive: false, 
+                            onTap: _insertTestPattern,
+                            tooltip: 'Teks Tes',
+                            color: const Color(0xFF6C757D),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(vertical: 24),
-                      child: Center(
-                        child: Container(
-                          width: paperContentWidth, // Exact width for the character count
-                          constraints: const BoxConstraints(minHeight: 400),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.1),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              )
-                            ],
+                  const SizedBox(width: 8),
+                  Container(width: 1.5, height: 24, color: Colors.grey.shade200),
+                  const SizedBox(width: 8),
+                  // Settings button is now FIXED (always visible)
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const PrinterSettingsScreen()),
+                        );
+                        await _loadLocalSettings();
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2BBCC4).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.settings_suggest_rounded, size: 22, color: Color(0xFF2BBCC4)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 20),
+
+            // ── PREMIUM RECEIPT PREVIEW ──
+            Expanded(
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 10),
+                        Expanded(
+                          child: Container(
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0F2F5),
+                              borderRadius: BorderRadius.circular(24),
+                            ),
                           ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 20), // Only vertical padding
-                            child: TextField(
-                              controller: _textCtrl,
-                              maxLines: null,
-                              textAlign: textAlign,
-                              onChanged: (_) => setState(() {}),
-                              style: TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 14,
-                                fontWeight: _isBold ? FontWeight.w700 : FontWeight.w400,
-                                color: Colors.black,
-                                height: 1.1,
-                                letterSpacing: 0,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 40),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2BBCC4),
+                          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF2BBCC4).withValues(alpha: 0.3),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            )
+                          ],
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${_paperSize.name.replaceAll('mm', '')}mm • $charsPerLine CHARS',
+                            style: const TextStyle(
+                              fontSize: 10, 
+                              color: Colors.white, 
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
+                          child: Center(
+                            child: Container(
+                              width: paperContentWidth + 24, 
+                              constraints: const BoxConstraints(minHeight: 450),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(4),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.12),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 10),
+                                  ),
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.05),
+                                    blurRadius: 5,
+                                    offset: const Offset(5, 0),
+                                  ),
+                                ],
                               ),
-                              decoration: InputDecoration(
-                                hintText: 'Ketik struk Anda di sini...',
-                                hintStyle: TextStyle(
-                                  color: Colors.grey.shade300, 
-                                  fontFamily: 'sans-serif',
-                                  fontSize: 12,
-                                ),
-                                border: InputBorder.none,
-                                isDense: true,
-                                contentPadding: EdgeInsets.zero,
+                              child: Stack(
+                                children: [
+                                  // Paper texture/edge effect
+                                  Positioned(
+                                    top: 0, left: 0, right: 0, height: 10,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topCenter,
+                                          end: Alignment.bottomCenter,
+                                          colors: [
+                                            Colors.grey.shade200,
+                                            Colors.transparent,
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+                                    child: TextField(
+                                      controller: _textCtrl,
+                                      maxLines: null,
+                                      textAlign: textAlign,
+                                      onChanged: (_) => setState(() {}),
+                                      style: TextStyle(
+                                        fontFamily: 'monospace',
+                                        fontSize: 14,
+                                        fontWeight: _isBold ? FontWeight.w700 : FontWeight.w400,
+                                        color: const Color(0xFF1A1A1A),
+                                        height: 1.1,
+                                        letterSpacing: 0,
+                                      ),
+                                      decoration: InputDecoration(
+                                        hintText: 'Ketik struk Anda di sini...',
+                                        hintStyle: TextStyle(
+                                          color: Colors.grey.shade300, 
+                                          fontFamily: 'sans-serif',
+                                          fontSize: 13,
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                        border: InputBorder.none,
+                                        isDense: true,
+                                        contentPadding: EdgeInsets.zero,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
             ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // ── PRINT BUTTON ──
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _isPrinting ? null : _print,
-              icon: _isPrinting
-                  ? const SizedBox(
-                      width: 16, height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.print_rounded),
-              label: Text(_isPrinting ? S.printing : S.printText),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2BBCC4),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            
+            const SizedBox(height: 20),
+            
+            // ── MODERN PRINT BUTTON ──
+            Container(
+              width: double.infinity,
+              height: 60,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF2BBCC4), Color(0xFF24AAB1)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF2BBCC4).withValues(alpha: 0.35),
+                    blurRadius: 15,
+                    offset: const Offset(0, 6),
+                  )
+                ],
+              ),
+              child: ElevatedButton.icon(
+                onPressed: _isPrinting ? null : _print,
+                icon: _isPrinting
+                    ? const SizedBox(
+                        width: 20, height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                    : const Icon(Icons.print_rounded, size: 24),
+                label: Text(
+                  _isPrinting ? S.printing.toUpperCase() : S.printText.toUpperCase(),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 1),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  foregroundColor: Colors.white,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _formatBtn({required IconData icon, required bool isActive, required VoidCallback onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(right: 6),
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF2BBCC4).withValues(alpha: 0.15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Icon(
-          icon, 
-          size: 20, 
-          color: isActive ? const Color(0xFF2BBCC4) : Colors.grey.shade600,
+  Widget _formatBtn({
+    required IconData icon, 
+    required bool isActive, 
+    required VoidCallback onTap,
+    required String tooltip,
+    Color? color,
+  }) {
+    final themeColor = color ?? const Color(0xFF2BBCC4);
+    return Tooltip(
+      message: tooltip,
+      child: Padding(
+        padding: const EdgeInsets.only(right: 8.0),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          child: Material(
+            color: isActive ? themeColor.withValues(alpha: 0.15) : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isActive ? themeColor.withValues(alpha: 0.3) : Colors.transparent,
+                    width: 1,
+                  ),
+                ),
+                child: Icon(
+                  icon, 
+                  size: 22, 
+                  color: isActive ? themeColor : Colors.grey.shade500,
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
