@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pdfx/pdfx.dart';
 import 'package:image/image.dart' as img;
+import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 
 import '../services/print_server_service.dart';
 import '../services/bluetooth_service.dart';
@@ -191,7 +192,7 @@ class _MainShellState extends State<MainShell> {
       });
       SharedPreferences.getInstance()
           .then((p) => p.setInt('print_count', _printCount));
-          
+
       // Clean up temp file
       try {
         await file.delete();
@@ -564,12 +565,28 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    final titles = [S.home, S.freeText, S.printImage, S.printPdf];
+    final titles = [
+      S.home,
+      S.freeText,
+      S.isEn ? 'Statistics' : 'Statistik',
+      S.printImage,
+      S.printPdf
+    ];
     final isKeyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
+
+    // System nav bar (Back/Home/Recent) dibuat putih agar menyatu dengan bottom bar.
+    // extendBody: false → Flutter otomatis reservasi ruang untuk bottomNavigationBar,
+    // sehingga konten tab tidak perlu menghitung padding manual yang kompleks.
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      systemNavigationBarColor: Colors.white,
+      systemNavigationBarDividerColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.dark,
+    ));
 
     return Scaffold(
       backgroundColor: _bg,
-      resizeToAvoidBottomInset: true, // Keep resizing for text input accessibility
+      extendBody: false,
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: _primary,
         foregroundColor: Colors.white,
@@ -580,8 +597,6 @@ class _MainShellState extends State<MainShell> {
       drawer: _buildDrawer(),
       body: _buildBody(),
       bottomNavigationBar: isKeyboardVisible ? null : _buildBottomBar(),
-      floatingActionButton: isKeyboardVisible ? null : _buildFAB(),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
 
@@ -662,8 +677,10 @@ class _MainShellState extends State<MainShell> {
       case 1:
         return TextTab(btService: _bt, paperSize: _paperSize);
       case 2:
-        return ImageTab(btService: _bt, paperSize: _paperSize);
+        return _buildStatsTab();
       case 3:
+        return ImageTab(btService: _bt, paperSize: _paperSize);
+      case 4:
         return PdfTab(btService: _bt, paperSize: _paperSize);
       default:
         return _buildHomeTab();
@@ -671,115 +688,144 @@ class _MainShellState extends State<MainShell> {
   }
 
   Widget _buildBottomBar() {
-    return BottomAppBar(
-      shape: const CircularNotchedRectangle(),
-      notchMargin: 8,
+    return CurvedNavigationBar(
+      backgroundColor: _bg,
       color: Colors.white,
-      elevation: 10,
-      child: SizedBox(
-        height: 62,
-        child: Row(children: [
-          _navBtn(Icons.home_rounded, S.home, 0),
-          _navBtn(Icons.description_rounded, S.freeText, 1),
-          const SizedBox(width: 52),
-          _navBtn(Icons.image_rounded, S.printImage, 2),
-          _navBtn(Icons.picture_as_pdf_rounded, S.printPdf, 3),
-        ]),
-      ),
+      buttonBackgroundColor: _primary,
+      height: 65,
+      animationDuration: const Duration(milliseconds: 300),
+      animationCurve: Curves.easeOutCubic,
+      index: _tab,
+      items: [
+        Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Icon(Icons.home_rounded,
+                size: 26,
+                color: _tab == 0 ? Colors.white : Colors.grey.shade500)),
+        Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Icon(Icons.description_rounded,
+                size: 26,
+                color: _tab == 1 ? Colors.white : Colors.grey.shade500)),
+        Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Icon(Icons.insights_rounded,
+                size: 26,
+                color: _tab == 2 ? Colors.white : Colors.grey.shade500)),
+        Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Icon(Icons.image_rounded,
+                size: 26,
+                color: _tab == 3 ? Colors.white : Colors.grey.shade500)),
+        Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Icon(Icons.picture_as_pdf_rounded,
+                size: 26,
+                color: _tab == 4 ? Colors.white : Colors.grey.shade500)),
+      ],
+      onTap: (index) {
+        setState(() => _tab = index);
+      },
     );
   }
 
-  Widget _navBtn(IconData icon, String label, int idx) {
-    final sel = _tab == idx;
-    return Expanded(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () => setState(() => _tab = idx),
-        child: SizedBox(
-          height: 54,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              AnimatedPositioned(
-                duration: const Duration(milliseconds: 380),
-                curve: Curves.easeOutBack,
-                top: sel ? 6 : 11,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 380),
-                  curve: Curves.easeOutCubic,
-                  width: sel ? 44 : 0,
-                  height: sel ? 30 : 0,
+  Widget _buildStatsTab() {
+    final w = EscPosHelper.charsPerLine(_paperSize);
+    final paperLabel = switch (_paperSize) {
+      PaperSize.mm58 => '58mm',
+      PaperSize.mm80 => '80mm',
+      PaperSize.mm100 => '100mm'
+    };
+    final printLogs = _logs
+        .where((l) =>
+            l.contains('print') ||
+            l.contains('Print') ||
+            l.contains('cetak') ||
+            l.contains('dicetak'))
+        .toList();
+
+    const double bottomPad = 16.0;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, bottomPad),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            const Icon(Icons.analytics_rounded, color: _primary, size: 22),
+            const SizedBox(width: 8),
+            Text(S.isEn ? 'Print Statistics' : 'Statistik Cetak',
+                style: const TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.w800, color: _dark)),
+          ]),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3))
+                ]),
+            child: Row(children: [
+              Expanded(
+                  child: _statItem(S.isEn ? 'Total Printed' : 'Total Dicetak',
+                      '$_printCount', Icons.receipt_long_rounded)),
+              Container(width: 1, height: 40, color: Colors.grey.shade200),
+              Expanded(
+                  child: _statItem(S.isEn ? 'Paper' : 'Kertas', paperLabel,
+                      Icons.description_rounded)),
+              Container(width: 1, height: 40, color: Colors.grey.shade200),
+              Expanded(
+                  child: _statItem(S.isEn ? 'Chars' : 'Karakter', '${w}kar',
+                      Icons.text_fields_rounded)),
+            ]),
+          ),
+          const SizedBox(height: 24),
+          Text(S.isEn ? 'Recent Print Activity' : 'Aktivitas Cetak Terbaru',
+              style: const TextStyle(
+                  fontSize: 14, fontWeight: FontWeight.w700, color: _dark)),
+          const SizedBox(height: 12),
+          if (printLogs.isEmpty)
+            Center(
+                child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Text(S.noActivity,
+                  style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
+            ))
+          else
+            ...printLogs.take(10).map((log) => Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: sel
-                        ? _primary.withValues(alpha: 0.14)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                ),
-              ),
-              AnimatedSlide(
-                duration: const Duration(milliseconds: 360),
-                curve: Curves.easeOutCubic,
-                offset: Offset(0, sel ? -0.12 : 0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TweenAnimationBuilder<double>(
-                      duration: const Duration(milliseconds: 360),
-                      curve: Curves.easeOutBack,
-                      tween: Tween(begin: 0, end: sel ? 1 : 0),
-                      builder: (context, t, child) {
-                        final scale = 1 + (0.13 * t);
-                        return Transform.scale(scale: scale, child: child);
-                      },
-                      child: Icon(
-                        icon,
-                        color: sel ? _primary : Colors.grey.shade500,
-                        size: 22,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    AnimatedOpacity(
-                      duration: const Duration(milliseconds: 260),
-                      opacity: sel ? 1 : 0.78,
-                      child: Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: sel ? 10.5 : 10,
-                          color: sel ? _primary : Colors.grey.shade500,
-                          fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-                          letterSpacing: sel ? 0.1 : 0,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFAB() {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: _primary.withValues(alpha: 0.22),
-            blurRadius: 16,
-            offset: const Offset(0, 5),
-          ),
+                  child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                            log.contains('✅')
+                                ? Icons.check_circle_rounded
+                                : log.contains('❌')
+                                    ? Icons.error_rounded
+                                    : Icons.print_rounded,
+                            size: 16,
+                            color: log.contains('✅')
+                                ? _success
+                                : log.contains('❌')
+                                    ? _danger
+                                    : Colors.grey),
+                        const SizedBox(width: 12),
+                        Expanded(
+                            child: Text(log,
+                                style: const TextStyle(
+                                    fontSize: 12, fontFamily: 'monospace'))),
+                      ]),
+                )),
         ],
-      ),
-      child: FloatingActionButton(
-        backgroundColor: _primary,
-        onPressed: _showPrintHistory,
-        elevation: 0,
-        child:
-            const Icon(Icons.insights_rounded, color: Colors.white, size: 26),
       ),
     );
   }
@@ -791,8 +837,11 @@ class _MainShellState extends State<MainShell> {
       PaperSize.mm80 => '80mm',
       PaperSize.mm100 => '100mm'
     };
+    // extendBody:false → Flutter sudah reserve ruang bottom bar otomatis.
+    // Padding bawah cukup 16px breathing room saja.
+    const double bottomPad = 16.0;
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 48),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, bottomPad),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         _statusCard(paperLabel),
         const SizedBox(height: 14),

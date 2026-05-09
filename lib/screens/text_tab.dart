@@ -8,7 +8,7 @@ import 'printer_settings_screen.dart';
 class TextTab extends StatefulWidget {
   final SdrBluetoothService btService;
   final PaperSize paperSize;
-  
+
   const TextTab({
     super.key,
     required this.btService,
@@ -25,7 +25,7 @@ class _TextTabState extends State<TextTab> {
   bool _isPrinting = false;
   int _alignMode = 0; // 0: Left, 1: Center, 2: Right
   bool _isBold = false;
-  
+
   @override
   void initState() {
     super.initState();
@@ -36,8 +36,12 @@ class _TextTabState extends State<TextTab> {
   Future<void> _loadLocalSettings() async {
     final p = await SharedPreferences.getInstance();
     final ps = p.getString('paper_size') ?? 'mm80';
-    final newSize = ps == 'mm58' ? PaperSize.mm58 : ps == 'mm100' ? PaperSize.mm100 : PaperSize.mm80;
-    
+    final newSize = ps == 'mm58'
+        ? PaperSize.mm58
+        : ps == 'mm100'
+            ? PaperSize.mm100
+            : PaperSize.mm80;
+
     // Also ensure EscPosHelper is updated with latest settings
     EscPosHelper.setCustomCharsPerLine(p.getInt('chars_per_line') ?? 0);
     EscPosHelper.setExtraFeed(p.getInt('extra_feed') ?? 3);
@@ -61,11 +65,12 @@ class _TextTabState extends State<TextTab> {
   Future<void> _print() async {
     if (_textCtrl.text.isEmpty) return;
     setState(() => _isPrinting = true);
-    
+
     // For justification, we send left-aligned commands but pre-justified text
     final cpl = EscPosHelper.charsPerLine(_paperSize);
     final printAlignMode = _alignMode == 3 ? 0 : _alignMode;
-    final wrappedText = _wrapText(_textCtrl.text, cpl, justify: _alignMode == 3);
+    final wrappedText =
+        _wrapText(_textCtrl.text, cpl, justify: _alignMode == 3);
 
     final data = EscPosHelper.textToEscPos(
       wrappedText,
@@ -86,12 +91,12 @@ class _TextTabState extends State<TextTab> {
         result.add('');
         continue;
       }
-      
+
       String currentLine = line;
       while (currentLine.length > width) {
         int cutIndex = currentLine.lastIndexOf(' ', width);
         if (cutIndex == -1) cutIndex = width;
-        
+
         String segment = currentLine.substring(0, cutIndex).trim();
         if (justify) {
           result.add(_justifyLine(segment, width));
@@ -108,16 +113,17 @@ class _TextTabState extends State<TextTab> {
   }
 
   String _justifyLine(String line, int width) {
-    final words = line.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    final words =
+        line.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
     if (words.length <= 1) return line.padRight(width);
-    
+
     int totalWordsLength = words.fold(0, (sum, word) => sum + word.length);
     int totalSpacesNeeded = width - totalWordsLength;
     int gaps = words.length - 1;
-    
+
     int spacePerGap = totalSpacesNeeded ~/ gaps;
     int extraSpaces = totalSpacesNeeded % gaps;
-    
+
     StringBuffer sb = StringBuffer();
     for (int i = 0; i < words.length; i++) {
       sb.write(words[i]);
@@ -131,12 +137,12 @@ class _TextTabState extends State<TextTab> {
 
   void _insertTestPattern() {
     const pattern = "TEST PRINT PATTERN\n"
-                    "================================\n"
-                    "ABCDEFG HIJKLMNOP QRSTUV WXYZ\n"
-                    "abcdefg hijklmnop qrstuv wxyz\n"
-                    "0123456789 !@#\$%^&*()_+-=\n"
-                    "--------------------------------\n"
-                    "dPrinter Mart - OK\n";
+        "================================\n"
+        "ABCDEFG HIJKLMNOP QRSTUV WXYZ\n"
+        "abcdefg hijklmnop qrstuv wxyz\n"
+        "0123456789 !@#\$%^&*()_+-=\n"
+        "--------------------------------\n"
+        "dPrinter Mart - OK\n";
     _textCtrl.text = pattern;
     setState(() {});
   }
@@ -144,7 +150,8 @@ class _TextTabState extends State<TextTab> {
   double _getCharWidth(int charsPerLine) {
     final textPainter = TextPainter(
       text: TextSpan(
-        text: 'W', // Use a wide character to be safe, though monospace should be equal
+        text:
+            'W', // Use a wide character to be safe, though monospace should be equal
         style: TextStyle(
           fontFamily: 'monospace',
           fontSize: 14,
@@ -162,11 +169,14 @@ class _TextTabState extends State<TextTab> {
     final charWidth = _getCharWidth(charsPerLine);
     // Add a 2px buffer to prevent the cursor from pushing text to the next line prematurely
     final paperContentWidth = (charWidth * charsPerLine) + 2.0;
-    
-    final textAlign = _alignMode == 0 ? TextAlign.left 
-                    : _alignMode == 1 ? TextAlign.center 
-                    : _alignMode == 2 ? TextAlign.right
-                    : TextAlign.justify;
+
+    final textAlign = _alignMode == 0
+        ? TextAlign.left
+        : _alignMode == 1
+            ? TextAlign.center
+            : _alignMode == 2
+                ? TextAlign.right
+                : TextAlign.justify;
 
     return Container(
       decoration: BoxDecoration(
@@ -180,7 +190,9 @@ class _TextTabState extends State<TextTab> {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 64),
+        // extendBody:false → Flutter sudah reserve ruang bottom bar.
+        // Padding bawah hanya 12px jarak tipis antara tombol dan tepi konten.
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
         child: Column(
           children: [
             // ── MODERN GLASS TOOLBAR ──
@@ -207,41 +219,44 @@ class _TextTabState extends State<TextTab> {
                       child: Row(
                         children: [
                           _formatBtn(
-                            icon: Icons.format_align_left_rounded, 
-                            isActive: _alignMode == 0, 
+                            icon: Icons.format_align_left_rounded,
+                            isActive: _alignMode == 0,
                             onTap: () => setState(() => _alignMode = 0),
                             tooltip: 'Rata Kiri',
                           ),
                           _formatBtn(
-                            icon: Icons.format_align_center_rounded, 
-                            isActive: _alignMode == 1, 
+                            icon: Icons.format_align_center_rounded,
+                            isActive: _alignMode == 1,
                             onTap: () => setState(() => _alignMode = 1),
                             tooltip: 'Rata Tengah',
                           ),
                           _formatBtn(
-                            icon: Icons.format_align_right_rounded, 
-                            isActive: _alignMode == 2, 
+                            icon: Icons.format_align_right_rounded,
+                            isActive: _alignMode == 2,
                             onTap: () => setState(() => _alignMode = 2),
                             tooltip: 'Rata Kanan',
                           ),
                           _formatBtn(
-                            icon: Icons.format_align_justify_rounded, 
-                            isActive: _alignMode == 3, 
+                            icon: Icons.format_align_justify_rounded,
+                            isActive: _alignMode == 3,
                             onTap: () => setState(() => _alignMode = 3),
                             tooltip: 'Rata Kanan Kiri',
                           ),
                           const SizedBox(width: 8),
-                          Container(width: 1.5, height: 24, color: Colors.grey.shade200),
+                          Container(
+                              width: 1.5,
+                              height: 24,
+                              color: Colors.grey.shade200),
                           const SizedBox(width: 8),
                           _formatBtn(
-                            icon: Icons.format_bold_rounded, 
-                            isActive: _isBold, 
+                            icon: Icons.format_bold_rounded,
+                            isActive: _isBold,
                             onTap: () => setState(() => _isBold = !_isBold),
                             tooltip: 'Tebal',
                           ),
                           _formatBtn(
-                            icon: Icons.text_fields_rounded, 
-                            isActive: false, 
+                            icon: Icons.text_fields_rounded,
+                            isActive: false,
                             onTap: _insertTestPattern,
                             tooltip: 'Teks Tes',
                             color: const Color(0xFF6C757D),
@@ -251,7 +266,8 @@ class _TextTabState extends State<TextTab> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Container(width: 1.5, height: 24, color: Colors.grey.shade200),
+                  Container(
+                      width: 1.5, height: 24, color: Colors.grey.shade200),
                   const SizedBox(width: 8),
                   // Settings button is now FIXED (always visible)
                   Material(
@@ -260,7 +276,8 @@ class _TextTabState extends State<TextTab> {
                       onTap: () async {
                         await Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const PrinterSettingsScreen()),
+                          MaterialPageRoute(
+                              builder: (_) => const PrinterSettingsScreen()),
                         );
                         await _loadLocalSettings();
                       },
@@ -271,14 +288,15 @@ class _TextTabState extends State<TextTab> {
                           color: const Color(0xFF2BBCC4).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.settings_suggest_rounded, size: 22, color: Color(0xFF2BBCC4)),
+                        child: const Icon(Icons.settings_suggest_rounded,
+                            size: 22, color: Color(0xFF2BBCC4)),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 20),
 
             // ── PREMIUM RECEIPT PREVIEW ──
@@ -308,10 +326,12 @@ class _TextTabState extends State<TextTab> {
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         decoration: BoxDecoration(
                           color: const Color(0xFF2BBCC4),
-                          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+                          borderRadius: const BorderRadius.vertical(
+                              bottom: Radius.circular(12)),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF2BBCC4).withValues(alpha: 0.3),
+                              color: const Color(0xFF2BBCC4)
+                                  .withValues(alpha: 0.3),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             )
@@ -321,8 +341,8 @@ class _TextTabState extends State<TextTab> {
                           child: Text(
                             '${_paperSize.name.replaceAll('mm', '')}mm • $charsPerLine CHARS',
                             style: const TextStyle(
-                              fontSize: 10, 
-                              color: Colors.white, 
+                              fontSize: 10,
+                              color: Colors.white,
                               fontWeight: FontWeight.w900,
                               letterSpacing: 1.2,
                             ),
@@ -336,7 +356,7 @@ class _TextTabState extends State<TextTab> {
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
                           child: Center(
                             child: Container(
-                              width: paperContentWidth + 24, 
+                              width: paperContentWidth + 24,
                               constraints: const BoxConstraints(minHeight: 450),
                               decoration: BoxDecoration(
                                 color: Colors.white,
@@ -358,7 +378,10 @@ class _TextTabState extends State<TextTab> {
                                 children: [
                                   // Paper texture/edge effect
                                   Positioned(
-                                    top: 0, left: 0, right: 0, height: 10,
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    height: 10,
                                     child: Container(
                                       decoration: BoxDecoration(
                                         gradient: LinearGradient(
@@ -373,7 +396,8 @@ class _TextTabState extends State<TextTab> {
                                     ),
                                   ),
                                   Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 24),
                                     child: TextField(
                                       controller: _textCtrl,
                                       maxLines: null,
@@ -382,7 +406,9 @@ class _TextTabState extends State<TextTab> {
                                       style: TextStyle(
                                         fontFamily: 'monospace',
                                         fontSize: 14,
-                                        fontWeight: _isBold ? FontWeight.w700 : FontWeight.w400,
+                                        fontWeight: _isBold
+                                            ? FontWeight.w700
+                                            : FontWeight.w400,
                                         color: const Color(0xFF1A1A1A),
                                         height: 1.1,
                                         letterSpacing: 0,
@@ -390,7 +416,7 @@ class _TextTabState extends State<TextTab> {
                                       decoration: InputDecoration(
                                         hintText: 'Ketik struk Anda di sini...',
                                         hintStyle: TextStyle(
-                                          color: Colors.grey.shade300, 
+                                          color: Colors.grey.shade300,
                                           fontFamily: 'sans-serif',
                                           fontSize: 13,
                                           fontStyle: FontStyle.italic,
@@ -412,9 +438,9 @@ class _TextTabState extends State<TextTab> {
                 ],
               ),
             ),
-            
-            const SizedBox(height: 20),
-            
+
+            const SizedBox(height: 12),
+
             // ── MODERN PRINT BUTTON ──
             Container(
               width: double.infinity,
@@ -438,18 +464,26 @@ class _TextTabState extends State<TextTab> {
                 onPressed: _isPrinting ? null : _print,
                 icon: _isPrinting
                     ? const SizedBox(
-                        width: 20, height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2.5, color: Colors.white))
                     : const Icon(Icons.print_rounded, size: 24),
                 label: Text(
-                  _isPrinting ? S.printing.toUpperCase() : S.printText.toUpperCase(),
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 1),
+                  _isPrinting
+                      ? S.printing.toUpperCase()
+                      : S.printText.toUpperCase(),
+                  style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   foregroundColor: Colors.white,
                   shadowColor: Colors.transparent,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18)),
                 ),
               ),
             ),
@@ -460,8 +494,8 @@ class _TextTabState extends State<TextTab> {
   }
 
   Widget _formatBtn({
-    required IconData icon, 
-    required bool isActive, 
+    required IconData icon,
+    required bool isActive,
     required VoidCallback onTap,
     required String tooltip,
     Color? color,
@@ -475,7 +509,9 @@ class _TextTabState extends State<TextTab> {
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeInOut,
           child: Material(
-            color: isActive ? themeColor.withValues(alpha: 0.15) : Colors.transparent,
+            color: isActive
+                ? themeColor.withValues(alpha: 0.15)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             child: InkWell(
               onTap: onTap,
@@ -485,13 +521,15 @@ class _TextTabState extends State<TextTab> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: isActive ? themeColor.withValues(alpha: 0.3) : Colors.transparent,
+                    color: isActive
+                        ? themeColor.withValues(alpha: 0.3)
+                        : Colors.transparent,
                     width: 1,
                   ),
                 ),
                 child: Icon(
-                  icon, 
-                  size: 22, 
+                  icon,
+                  size: 22,
                   color: isActive ? themeColor : Colors.grey.shade500,
                 ),
               ),

@@ -17,8 +17,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen>
-    with TickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final PrintServerService _serverService = PrintServerService();
   final SdrBluetoothService _btService = SdrBluetoothService();
 
@@ -321,8 +320,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _appBarBtn(
-      {required IconData icon, required VoidCallback onTap}) {
+  Widget _appBarBtn({required IconData icon, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -350,7 +348,8 @@ class _HomeScreenState extends State<HomeScreen>
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: (_serverRunning ? _success : _primary).withValues(alpha: 0.3),
+            color:
+                (_serverRunning ? _success : _primary).withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -374,10 +373,12 @@ class _HomeScreenState extends State<HomeScreen>
                       color: _serverRunning ? _success : Colors.grey,
                       shape: BoxShape.circle,
                       boxShadow: _serverRunning
-                          ? [BoxShadow(
-                          color: _success.withValues(alpha: 0.6),
-                          blurRadius: 8,
-                          spreadRadius: 2)]
+                          ? [
+                              BoxShadow(
+                                  color: _success.withValues(alpha: 0.6),
+                                  blurRadius: 8,
+                                  spreadRadius: 2)
+                            ]
                           : [],
                     ),
                   ),
@@ -401,8 +402,8 @@ class _HomeScreenState extends State<HomeScreen>
                     _showToast('URL disalin');
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
@@ -415,8 +416,8 @@ class _HomeScreenState extends State<HomeScreen>
                             color: Colors.white60, size: 12),
                         SizedBox(width: 4),
                         Text('Salin URL',
-                            style: TextStyle(
-                                color: Colors.white60, fontSize: 11)),
+                            style:
+                                TextStyle(color: Colors.white60, fontSize: 11)),
                       ],
                     ),
                   ),
@@ -460,22 +461,22 @@ class _HomeScreenState extends State<HomeScreen>
               Expanded(
                 child: _serverRunning
                     ? _heroBtn(
-                  label: 'Nonaktifkan',
-                  icon: Icons.stop_rounded,
-                  color: _danger,
-                  onTap: _stopServer,
-                )
+                        label: 'Nonaktifkan',
+                        icon: Icons.stop_rounded,
+                        color: _danger,
+                        onTap: _stopServer,
+                      )
                     : _heroBtn(
-                  label: _isConnectingBt
-                      ? 'Menghubungkan...'
-                      : 'Aktifkan Printer',
-                  icon: _isConnectingBt
-                      ? Icons.hourglass_top_rounded
-                      : Icons.play_arrow_rounded,
-                  color: _success,
-                  onTap: _isConnectingBt ? null : _startServer,
-                  isLoading: _isConnectingBt,
-                ),
+                        label: _isConnectingBt
+                            ? 'Menghubungkan...'
+                            : 'Aktifkan Printer',
+                        icon: _isConnectingBt
+                            ? Icons.hourglass_top_rounded
+                            : Icons.play_arrow_rounded,
+                        color: _success,
+                        onTap: _isConnectingBt ? null : _startServer,
+                        isLoading: _isConnectingBt,
+                      ),
               ),
             ],
           ),
@@ -500,10 +501,12 @@ class _HomeScreenState extends State<HomeScreen>
           color: onTap == null ? color.withValues(alpha: 0.4) : color,
           borderRadius: BorderRadius.circular(14),
           boxShadow: onTap != null
-              ? [BoxShadow(
-              color: color.withValues(alpha: 0.4),
-              blurRadius: 12,
-              offset: const Offset(0, 4))]
+              ? [
+                  BoxShadow(
+                      color: color.withValues(alpha: 0.4),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4))
+                ]
               : [],
         ),
         child: Row(
@@ -557,9 +560,7 @@ class _HomeScreenState extends State<HomeScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  hasPrinter
-                      ? _selectedPrinter!.name
-                      : 'Belum ada printer',
+                  hasPrinter ? _selectedPrinter!.name : 'Belum ada printer',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 15,
@@ -584,13 +585,11 @@ class _HomeScreenState extends State<HomeScreen>
                       _btConnected
                           ? 'Terhubung via Bluetooth'
                           : hasPrinter
-                          ? 'Belum terhubung'
-                          : 'Pilih printer terlebih dahulu',
+                              ? 'Belum terhubung'
+                              : 'Pilih printer terlebih dahulu',
                       style: TextStyle(
                           fontSize: 12,
-                          color: _btConnected
-                              ? _success
-                              : Colors.grey),
+                          color: _btConnected ? _success : Colors.grey),
                     ),
                   ],
                 ),
@@ -601,8 +600,7 @@ class _HomeScreenState extends State<HomeScreen>
           GestureDetector(
             onTap: _serverRunning ? null : _goToScan,
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 14, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
                 color: _serverRunning
                     ? Colors.grey.withValues(alpha: 0.1)
@@ -676,16 +674,15 @@ class _HomeScreenState extends State<HomeScreen>
                 if (onTap != null) ...[
                   const Spacer(),
                   const Icon(Icons.edit_rounded, // Added const
-                      size: 14, color: Colors.grey),
+                      size: 14,
+                      color: Colors.grey),
                 ],
               ],
             ),
             const SizedBox(height: 10),
             Text(value,
                 style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: color)),
+                    fontSize: 22, fontWeight: FontWeight.w800, color: color)),
             const SizedBox(height: 2),
             Text(label,
                 style: const TextStyle(
@@ -717,15 +714,13 @@ class _HomeScreenState extends State<HomeScreen>
               ),
               const SizedBox(width: 10),
               const Text('Aktivitas',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w700, fontSize: 14)),
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
               const Spacer(),
               if (_logs.isNotEmpty)
                 GestureDetector(
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(
-                        builder: (_) => LogScreen(logs: _logs)),
+                    MaterialPageRoute(builder: (_) => LogScreen(logs: _logs)),
                   ),
                   child: const Text('Lihat semua',
                       style: TextStyle(
@@ -744,23 +739,22 @@ class _HomeScreenState extends State<HomeScreen>
             ),
             child: _logs.isEmpty
                 ? const Center(
-                child: Text('Belum ada aktivitas',
-                    style: TextStyle(
-                        color: Colors.white38, fontSize: 12)))
+                    child: Text('Belum ada aktivitas',
+                        style: TextStyle(color: Colors.white38, fontSize: 12)))
                 : ListView.builder(
-              padding: const EdgeInsets.all(10),
-              itemCount: _logs.length > 10 ? 10 : _logs.length,
-              itemBuilder: (_, i) => Padding(
-                padding: const EdgeInsets.only(bottom: 2),
-                child: Text(
-                  _logs[i],
-                  style: const TextStyle(
-                      color: Color(0xFF7EE787),
-                      fontSize: 11,
-                      fontFamily: 'monospace'),
-                ),
-              ),
-            ),
+                    padding: const EdgeInsets.all(10),
+                    itemCount: _logs.length > 10 ? 10 : _logs.length,
+                    itemBuilder: (_, i) => Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Text(
+                        _logs[i],
+                        style: const TextStyle(
+                            color: Color(0xFF7EE787),
+                            fontSize: 11,
+                            fontFamily: 'monospace'),
+                      ),
+                    ),
+                  ),
           ),
         ],
       ),
@@ -778,7 +772,8 @@ class _HomeScreenState extends State<HomeScreen>
               color: _accent.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.bolt_rounded, color: _accent, size: 16), // Added const
+            child: const Icon(Icons.bolt_rounded,
+                color: _accent, size: 16), // Added const
           ),
           const SizedBox(width: 12),
           const Expanded(
@@ -786,11 +781,10 @@ class _HomeScreenState extends State<HomeScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Aktifkan Otomatis',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w700, fontSize: 14)),
-                Text('Printer langsung aktif saat app dibuka',
                     style:
-                    TextStyle(fontSize: 11, color: Colors.grey)),
+                        TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                Text('Printer langsung aktif saat app dibuka',
+                    style: TextStyle(fontSize: 11, color: Colors.grey)),
               ],
             ),
           ),
@@ -828,8 +822,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _showPortDialog() async {
-    final controller =
-    TextEditingController(text: _serverPort.toString());
+    final controller = TextEditingController(text: _serverPort.toString());
     final result = await showDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -849,8 +842,7 @@ class _HomeScreenState extends State<HomeScreen>
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Batal')),
+              onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: _primary,

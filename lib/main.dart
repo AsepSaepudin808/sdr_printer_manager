@@ -1,10 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Status bar transparan dengan icon terang (untuk AppBar teal).
+  // System nav bar (Back/Home/Recent) putih agar menyatu dengan CurvedNavigationBar.
+  // Tidak menggunakan edgeToEdge agar warna system nav bar bisa dikontrol penuh.
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    systemNavigationBarColor: Colors.white,
+    systemNavigationBarDividerColor: Colors.transparent,
+    systemNavigationBarIconBrightness: Brightness.dark,
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
+  ));
+
   await SharedPreferences.getInstance();
   runApp(const SdrPrinterApp());
 }
