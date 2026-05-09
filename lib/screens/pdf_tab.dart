@@ -32,7 +32,7 @@ class _PdfTabState extends State<PdfTab> {
   PaperSize? _overridePaperSize;
   double _contrast = 1.35;
   int _threshold = 160;
-  bool _useDither = true;
+  bool _useDither = false;
 
   PaperSize get _activePaperSize => _overridePaperSize ?? widget.paperSize;
 
@@ -95,7 +95,7 @@ class _PdfTabState extends State<PdfTab> {
       case PaperSize.mm58:
         return 384;
       case PaperSize.mm80:
-        return 512;
+        return 576;
       case PaperSize.mm100:
         return 768;
     }
@@ -103,16 +103,12 @@ class _PdfTabState extends State<PdfTab> {
 
   img.Image _enhanceForThermal(img.Image source) {
     img.Image out = img.grayscale(source);
-    out = img.adjustColor(out, contrast: _contrast);
 
     if (_useDither) {
+      out = img.adjustColor(out, contrast: _contrast);
       out = img.ditherImage(out);
     } else {
-      out = img.adjustColor(
-        out,
-        contrast: _threshold >= 160 ? 1.6 : 1.2,
-        brightness: _threshold >= 160 ? -0.05 : 0.0,
-      );
+      out = img.luminanceThreshold(out, threshold: _threshold / 255.0);
     }
 
     return out;
@@ -140,8 +136,8 @@ class _PdfTabState extends State<PdfTab> {
 
         final page = await document.getPage(i);
         final pageImage = await page.render(
-          width: (maxWidth * 2).toDouble(),
-          height: (page.height * (maxWidth * 2) / page.width),
+          width: maxWidth.toDouble(),
+          height: (page.height * maxWidth / page.width),
           format: PdfPageImageFormat.png,
           backgroundColor: '#FFFFFF',
         );
@@ -156,11 +152,7 @@ class _PdfTabState extends State<PdfTab> {
           throw Exception('Gagal decode image halaman $i');
         }
 
-        final resized = decoded.width > maxWidth
-            ? img.copyResize(decoded, width: maxWidth)
-            : decoded;
-
-        final processed = _enhanceForThermal(resized);
+        final processed = _enhanceForThermal(decoded);
 
         final List<int> buf = [];
         buf.addAll(EscPosHelper.init());
@@ -349,7 +341,7 @@ class _PdfTabState extends State<PdfTab> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 48),
       child: Column(
         children: [
           _buildPaperSelector(),

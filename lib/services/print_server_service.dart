@@ -51,7 +51,7 @@ class PrintServerService {
     router.get('/status', (Request req) {
       final body = jsonEncode({
         'status': 'ok',
-        'server': 'SDR Printer Manager',
+        'server': 'dPrinter Mart',
         'version': '1.0.0',
         'printer_connected': _btService?.isConnected ?? false,
       });
@@ -230,9 +230,19 @@ class PrintServerService {
         .addMiddleware(_corsMiddleware())
         .addHandler(router.call);
 
-    _server = await io.serve(handler, InternetAddress.anyIPv4, port);
-    onStatusChange?.call(true);
-    onLog?.call('🚀 HTTP Server aktif di port $port');
+    try {
+      if (_server != null) {
+        await _server?.close(force: true);
+        _server = null;
+      }
+      _server = await io.serve(handler, InternetAddress.anyIPv4, port, shared: true);
+      onStatusChange?.call(true);
+      onLog?.call('🚀 HTTP Server aktif di port $port');
+    } catch (e) {
+      onLog?.call('❌ Gagal memulai server: $e');
+      onStatusChange?.call(false);
+      rethrow;
+    }
   }
 
   Middleware _corsMiddleware() {

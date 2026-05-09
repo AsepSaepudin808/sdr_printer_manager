@@ -15,7 +15,7 @@ class SdrPrinterApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'dRetail Printer Manager',
+      title: 'dPrinter Mart',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(

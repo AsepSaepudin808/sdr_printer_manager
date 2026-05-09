@@ -90,14 +90,14 @@ class _SplashScreenState extends State<SplashScreen>
                           fontWeight: FontWeight.w900,
                           color: _primary)),
                   TextSpan(
-                      text: 'Retail',
+                      text: 'Printer Mart',
                       style: TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.w900,
                           color: Color(0xFF2C3E50))),
                 ])),
                 const SizedBox(height: 4),
-                const Text('Printer Manager',
+                const Text('Print Bridge for PoS',
                     style: TextStyle(
                         fontSize: 14,
                         color: Colors.grey,

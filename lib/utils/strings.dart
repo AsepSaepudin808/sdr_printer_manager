@@ -127,7 +127,7 @@ class S {
   }
 
   // ── App ──
-  static String get appName => 'dRetail Printer Manager';
+  static String get appName => 'dPrinter Mart';
 
   // ── Nav & Titles ──
   static String get home => withLang(

@@ -1,7 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:pdfx/pdfx.dart';
+import 'package:image/image.dart' as img;
 
 import '../services/print_server_service.dart';
 import '../services/bluetooth_service.dart';
@@ -24,6 +27,9 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> {
+  static const MethodChannel _printJobChannel =
+      MethodChannel('id.dretail.sdr_printer_manager/print_job');
+
   final PrintServerService _server = PrintServerService();
   final SdrBluetoothService _bt = SdrBluetoothService();
 
@@ -54,6 +60,149 @@ class _MainShellState extends State<MainShell> {
     _loadPrefs();
     _requestPerms();
     _setupListeners();
+    _setupPrintJobChannel();
+  }
+
+  void _setupPrintJobChannel() {
+    _printJobChannel.setMethodCallHandler((call) async {
+      if (call.method == 'onNewPrintJob') {
+        final path = call.arguments['path'] as String?;
+        final name = call.arguments['name'] as String?;
+        if (path != null) {
+          _processPdfJob(path, name ?? 'Document');
+        }
+      }
+    });
+    // Check if there is a pending job when app starts
+    _printJobChannel.invokeMethod('getPendingPrintJob').then((result) {
+      if (result != null) {
+        final map = Map<String, dynamic>.from(result as Map);
+        final path = map['path'] as String?;
+        final name = map['name'] as String?;
+        if (path != null) {
+          _processPdfJob(path, name ?? 'Document');
+        }
+      }
+    });
+  }
+
+  int _paperMaxWidth(PaperSize size) {
+    switch (size) {
+      case PaperSize.mm58:
+        return 384;
+      case PaperSize.mm80:
+        return 512;
+      case PaperSize.mm100:
+        return 768;
+    }
+  }
+
+  img.Image _enhanceForThermal(img.Image source) {
+    img.Image out = img.grayscale(source);
+    // Use strict luminance threshold for pure black and white without dither artifacts
+    out = img.luminanceThreshold(out, threshold: 160 / 255.0);
+    return out;
+  }
+
+  Future<void> _processPdfJob(String path, String name) async {
+    final file = File(path);
+    if (!await file.exists()) {
+      _addLog('❌ File PDF tidak ditemukan: $path');
+      return;
+    }
+
+    setState(() {
+      _isPrinting = true;
+      _printStatus = '🖨️ Memproses $name...';
+    });
+    _addLog('🖨️ Menerima Print Job: $name');
+
+    // Ensure connected
+    final connected = await _bt.checkConnection();
+    if (!connected) {
+      final a = _bt.lastAddress ?? _printer?.address;
+      if (a != null && a.isNotEmpty) {
+        _addLog(S.reconnecting);
+        setState(() => _printStatus = S.reconnecting);
+        final reconOk = await _bt.connect(a);
+        if (!reconOk) {
+          _addLog(S.printerDisconnected);
+          setState(() {
+            _isPrinting = false;
+            _printStatus = S.printerDisconnected;
+          });
+          return;
+        }
+        _addLog(S.printerConnected);
+        setState(() => _btConnected = true);
+      } else {
+        _addLog(S.printerNotConnected);
+        setState(() {
+          _isPrinting = false;
+          _printStatus = S.printerNotConnected;
+        });
+        return;
+      }
+    }
+
+    PdfDocument? document;
+    try {
+      final bytes = await file.readAsBytes();
+      document = await PdfDocument.openData(bytes);
+      final totalPages = document.pagesCount;
+      final maxWidth = _paperMaxWidth(_paperSize);
+
+      for (int i = 1; i <= totalPages; i++) {
+        if (!mounted) return;
+        setState(() {
+          _printStatus = '🖨️ Mencetak halaman $i/$totalPages...';
+        });
+
+        final page = await document.getPage(i);
+        final pageImage = await page.render(
+          width: maxWidth.toDouble(),
+          height: (page.height * maxWidth / page.width),
+          format: PdfPageImageFormat.png,
+          backgroundColor: '#FFFFFF',
+        );
+        await page.close();
+
+        if (pageImage == null) throw Exception('Gagal render halaman $i');
+
+        final decoded = img.decodeImage(pageImage.bytes);
+        if (decoded == null) throw Exception('Gagal decode image halaman $i');
+
+        final processed = _enhanceForThermal(decoded);
+
+        final List<int> buf = [];
+        buf.addAll(EscPosHelper.init());
+        buf.addAll(EscPosHelper.align(1));
+        buf.addAll(EscPosHelper.imageEsc(processed, _paperSize));
+        buf.addAll(EscPosHelper.feed(2));
+
+        final ok = await _bt.sendRaw(Uint8List.fromList(buf));
+        if (!ok) throw Exception('Printer gagal menerima data di halaman $i');
+      }
+
+      _addLog(S.printSuccess(name));
+      setState(() {
+        _printStatus = S.printSuccess(name);
+        _printCount++;
+      });
+      SharedPreferences.getInstance()
+          .then((p) => p.setInt('print_count', _printCount));
+          
+      // Clean up temp file
+      try {
+        await file.delete();
+      } catch (_) {}
+    } catch (e) {
+      _addLog('❌ Error mencetak $name: $e');
+      setState(() => _printStatus = '❌ Error: $e');
+    } finally {
+      await document?.close();
+      setState(() => _isPrinting = false);
+    }
   }
 
   @override
@@ -134,6 +283,10 @@ class _MainShellState extends State<MainShell> {
       _toast(S.selectPrinterToast, err: true);
       return;
     }
+    if (_serverRunning) {
+      _toast('Server sudah berjalan');
+      return;
+    }
     setState(() => _connecting = true);
     final ok = await _bt.connect(_printer!.address);
     setState(() => _connecting = false);
@@ -146,11 +299,16 @@ class _MainShellState extends State<MainShell> {
     _addLog(S.printerConnected);
     final ip = await _server.getLocalIp();
     setState(() => _localIp = ip);
-    await _server.start(
-        port: _serverPort, bluetoothService: _bt, paperSize: _paperSize);
-    setState(() => _serverRunning = true);
-    _addLog(S.serverReady);
-    _toast(S.printerReady);
+    try {
+      await _server.start(
+          port: _serverPort, bluetoothService: _bt, paperSize: _paperSize);
+      setState(() => _serverRunning = true);
+      _addLog(S.serverReady);
+      _toast(S.printerReady);
+    } catch (e) {
+      _toast('Gagal mengaktifkan layanan: $e', err: true);
+      setState(() => _serverRunning = false);
+    }
   }
 
   Future<void> _stopServer() async {
@@ -451,12 +609,12 @@ class _MainShellState extends State<MainShell> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('dRetail Mart',
+                  Text('dPrinter Mart',
                       style: TextStyle(
                           color: Colors.white,
                           fontSize: 18,
                           fontWeight: FontWeight.w800)),
-                  Text('Printer Manager',
+                  Text('Print Bridge for PoS',
                       style: TextStyle(color: Colors.white60, fontSize: 12)),
                 ]),
           ]),
@@ -635,7 +793,7 @@ class _MainShellState extends State<MainShell> {
       PaperSize.mm100 => '100mm'
     };
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 48),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         _statusCard(paperLabel),
         const SizedBox(height: 14),

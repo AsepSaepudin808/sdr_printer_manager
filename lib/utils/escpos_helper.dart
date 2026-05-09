@@ -59,7 +59,7 @@ class EscPosHelper {
   static Uint8List imageEsc(img.Image src, PaperSize paperSize) {
     int maxW = switch (paperSize) {
       PaperSize.mm58 => 384,
-      PaperSize.mm80 => 512,
+      PaperSize.mm80 => 576,
       PaperSize.mm100 => 768,
     };
 
@@ -178,9 +178,9 @@ class EscPosHelper {
     final List<int> b = [];
     b.addAll(align(1));
     b.addAll(bold(true));
-    b.addAll(txt('dRetail Mart'));
+    b.addAll(txt('dPrinter Mart'));
     b.addAll(bold(false));
-    b.addAll(txt('Printer Manager'));
+    b.addAll(txt('Print Service'));
     b.addAll(divider(size));
     b.addAll(align(0));
     return b;
@@ -190,7 +190,7 @@ class EscPosHelper {
     final List<int> b = [];
     b.addAll(align(1));
     b.addAll(feed(1));
-    b.addAll(txt('Powered by dRetail'));
+    b.addAll(txt('Powered by dPrinter Mart'));
     b.addAll(align(0));
     return b;
   }

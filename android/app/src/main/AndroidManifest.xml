@@ -18,7 +18,8 @@
     <application
         android:label="dPrinter Mart"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:enableOnBackInvokedCallback="true">
 
         <activity
             android:name=".MainActivity"
@@ -45,6 +46,7 @@
         <service
             android:name=".SdrPrintService"
             android:permission="android.permission.BIND_PRINT_SERVICE"
+            android:label="dPrinter Mart Service"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.printservice.PrintService" />

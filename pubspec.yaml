@@ -13,7 +13,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   shelf: ^1.4.1
   shelf_router: ^1.1.4
-  print_bluetooth_thermal: ^1.1.9
+  print_bluetooth_thermal:
+    path: ./packages/print_bluetooth_thermal
   shared_preferences: ^2.3.2
   permission_handler: ^11.3.1
   network_info_plus: ^6.0.1
