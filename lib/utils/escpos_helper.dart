@@ -212,15 +212,18 @@ class EscPosHelper {
     final storeName = (company['name'] as String? ?? 'Toko').trim();
     final storePhone = company['phone'] as String? ?? '';
     final storeEmail = company['email'] as String? ?? '';
-    final storeAddress = company['address'] as String? ?? '';
+    final storeStreet = company['street'] as String? ?? '';
     b.addAll(align(1));
     b.addAll(bold(true));
     b.addAll(txt(storeName));
     b.addAll(bold(false));
     if (storePhone.isNotEmpty) b.addAll(txt(storePhone));
     if (storeEmail.isNotEmpty) b.addAll(txt(storeEmail));
-    if (storeAddress.isNotEmpty) {
-      b.addAll(txt(storeAddress));
+    // Street address: cetak per-baris, tetap rata tengah
+    if (storeStreet.isNotEmpty) {
+      for (final line in storeStreet.split('\n')) {
+        if (line.trim().isNotEmpty) b.addAll(txt(line.trim()));
+      }
     }
     b.addAll(align(0));
     b.addAll(divider(size, char: '='));
@@ -346,15 +349,24 @@ class EscPosHelper {
     _applyFontConfig(b);
     final company = d['company'] as Map<String, dynamic>? ?? {};
     final storeName = (company['name'] as String? ?? 'Toko').trim();
+    final storePhone = company['phone'] as String? ?? '';
+    final storeStreet = company['street'] as String? ?? '';
     final orderName = d['name'] as String? ?? '-';
     final totalVal = (d['total_with_tax'] ?? 0).toDouble();
     final paidVal = (d['total_paid'] ?? totalVal).toDouble();
     final changeVal = (d['change'] ?? (paidVal - totalVal)).toDouble();
     final dateRaw = d['date'] as String? ?? '';
+    final footer = d['footer_messages'] as String? ?? 'Terima kasih!\nSampai jumpa lagi.';
     b.addAll(align(1));
     b.addAll(bold(true));
     b.addAll(txt(storeName));
     b.addAll(bold(false));
+    if (storePhone.isNotEmpty) b.addAll(txt(storePhone));
+    if (storeStreet.isNotEmpty) {
+      for (final line in storeStreet.split('\n')) {
+        if (line.trim().isNotEmpty) b.addAll(txt(line.trim()));
+      }
+    }
     b.addAll(align(0));
     b.addAll(divider(size));
     b.addAll(rowLR('No.', orderName, size));
@@ -367,7 +379,9 @@ class EscPosHelper {
     b.addAll(rowLR('Kembali', 'Rp ${rp(changeVal.round())}', size));
     b.addAll(divider(size));
     b.addAll(align(1));
-    b.addAll(txt('Terima kasih!'));
+    for (final line in footer.split('\n')) {
+      if (line.trim().isNotEmpty) b.addAll(txt(line.trim()));
+    }
     b.addAll(align(0));
     b.addAll(poweredBy(size));
     b.addAll(finalize());
