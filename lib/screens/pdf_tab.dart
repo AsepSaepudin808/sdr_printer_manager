@@ -180,6 +180,71 @@ class _PdfTabState extends State<PdfTab> {
     }
   }
 
+  Widget _iconBtn({
+    IconData? icon,
+    required String label,
+    required Color color,
+    required bool outlined,
+    bool loading = false,
+    VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        decoration: BoxDecoration(
+          color: outlined
+              ? Colors.white
+              : (onTap == null ? color.withValues(alpha: 0.4) : color),
+          borderRadius: BorderRadius.circular(12),
+          border: outlined
+              ? Border.all(
+                  color: onTap == null ? Colors.grey.shade300 : color)
+              : null,
+          boxShadow: !outlined && onTap != null
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.25),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  )
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (loading)
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.white),
+              )
+            else if (icon != null)
+              Icon(icon,
+                  size: 18,
+                  color: outlined
+                      ? (onTap == null ? Colors.grey : color)
+                      : Colors.white),
+            if (icon != null || loading) const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: outlined
+                    ? (onTap == null ? Colors.grey : color)
+                    : Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildPaperSelector() {
     final current = _activePaperSize;
     return Container(
@@ -340,19 +405,30 @@ class _PdfTabState extends State<PdfTab> {
 
   @override
   Widget build(BuildContext context) {
+    // Responsive: handle safe area insets and landscape orientation
+    final viewPadding = MediaQuery.viewPaddingOf(context);
+    final safeBottom = viewPadding.bottom;
+    const bottomBarH = 65.0;
+    final totalBottomPad = bottomBarH + safeBottom;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      padding: EdgeInsets.fromLTRB(
+        16 + viewPadding.left,
+        16 + viewPadding.top,
+        16 + viewPadding.right,
+        16 + totalBottomPad,
+      ),
       child: Column(
         children: [
           _buildPaperSelector(),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           _buildQualityControls(),
           const SizedBox(height: 10),
+          // Preview area — Expanded to fill remaining space
           Expanded(
             child: GestureDetector(
               onTap: _pickPdf,
               child: Container(
-                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
@@ -362,20 +438,15 @@ class _PdfTabState extends State<PdfTab> {
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Row(children: [
             Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _pickPdf,
-                icon: const Icon(Icons.folder_open_rounded),
-                label: Text(S.selectPdf),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: _primary,
-                  side: const BorderSide(color: _primary),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
+              child: _iconBtn(
+                icon: Icons.folder_open_rounded,
+                label: S.selectPdf,
+                color: _primary,
+                outlined: true,
+                onTap: _pickPdf,
               ),
             ),
             const SizedBox(width: 8),
@@ -390,31 +461,20 @@ class _PdfTabState extends State<PdfTab> {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: ElevatedButton.icon(
-                onPressed:
-                    (_isPrinting || _pdfFile == null || _pdfBytes == null)
-                        ? null
-                        : _printPdfContent,
-                icon: _isPrinting
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.print_rounded),
-                label: Text(_isPrinting ? S.printing : S.print_),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
+              child: _iconBtn(
+                icon: _isPrinting ? null : Icons.print_rounded,
+                label: _isPrinting ? S.printing : S.print_,
+                color: _primary,
+                outlined: false,
+                loading: _isPrinting,
+                onTap: (_pdfFile == null || _pdfBytes == null || _isPrinting)
+                    ? null
+                    : _printPdfContent,
               ),
             ),
           ]),
           if (_status.isNotEmpty) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Text(
               _status,
               style: TextStyle(

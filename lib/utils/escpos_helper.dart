@@ -154,11 +154,15 @@ class EscPosHelper {
 
   static List<int> logoHeader(PaperSize size) {
     final List<int> b = [];
+    final label = size == PaperSize.mm58
+        ? 'dRetail Mart'
+        : size == PaperSize.mm80
+            ? 'dRetail Mart'
+            : 'dRetail Mart';
     b.addAll(align(1));
     b.addAll(bold(true));
-    b.addAll(txt('dRetail'));
+    b.addAll(txt(label));
     b.addAll(bold(false));
-    b.addAll(txt('Print Service'));
     b.addAll(divider(size));
     b.addAll(align(0));
     return b;
@@ -428,5 +432,177 @@ class EscPosHelper {
   static String _formatQty(double qty) {
     if (qty == qty.roundToDouble()) return qty.round().toString();
     return qty.toStringAsFixed(2);
+  }
+
+  // ── SESSION SUMMARY REPORT ─────────────────────────────────────────────────
+  static Uint8List buildSessionSummary(Map<String, dynamic> d, PaperSize size) {
+    final List<int> b = [];
+    b.addAll(init());
+    _applyFontConfig(b);
+
+
+    // ── HEADER ────────────────────────────────────────────────────────────────
+    b.addAll(align(1));
+    b.addAll(bold(true));
+    b.addAll(setFontB(false)); // Font normal untuk header
+    b.addAll(txt('SESSION SUMMARY REPORT'));
+    b.addAll(bold(false));
+    b.addAll(divider(size, char: '='));
+    b.addAll(divider(size, char: '-'));
+
+    // ── SESSION INFO ────────────────────────────────────────────────────────
+    final posName = d['pos_name'] as String? ?? '-';
+    final sessionName = d['session_name'] as String? ?? '-';
+    final cashierName = d['cashier_name'] as String? ?? '-';
+    final startAt = d['start_at'] as String? ?? '-';
+    final stopAt = d['stop_at'] as String? ?? '-';
+
+    b.addAll(align(0));
+    b.addAll(rowLR('PoS Name', posName, size));
+    b.addAll(rowLR('Session ID', sessionName, size));
+    b.addAll(rowLR('Cashier', cashierName, size));
+    b.addAll(rowLR('Opening Date', startAt, size));
+    b.addAll(rowLR('Closing Date', stopAt, size));
+
+    // ── SALES SUMMARY ───────────────────────────────────────────────────────
+    b.addAll(divider(size, char: '-'));
+    b.addAll(align(1));
+    b.addAll(bold(true));
+    b.addAll(txt('------ SALES SUMMARY ------'));
+    b.addAll(bold(false));
+    b.addAll(align(0));
+
+    final grossSales = (d['gross_sales'] ?? 0).toDouble();
+    final totalDiscount = (d['total_discount'] ?? 0).toDouble();
+    final refundUntaxed = (d['refund_amount_untaxed'] ?? 0).toDouble();
+    final netSalesBeforeTax = (d['net_sales_before_tax'] ?? 0).toDouble();
+    final totalTaxes = (d['total_taxes'] ?? 0).toDouble();
+    final totalSales = (d['total_sales'] ?? 0).toDouble();
+
+    b.addAll(rowLR('Gross Sales', 'Rp ${rp(grossSales.round())}', size));
+    b.addAll(rowLR('Discounts', '-Rp ${rp(totalDiscount.round())}', size));
+    b.addAll(rowLR('Returns/Refunds', '-Rp ${rp(refundUntaxed.round())}', size));
+    b.addAll(divider(size, char: '.'));
+    b.addAll(rowLR('Net Sales', 'Rp ${rp(netSalesBeforeTax.round())}', size));
+    b.addAll(rowLR('Taxes', 'Rp ${rp(totalTaxes.round())}', size));
+    b.addAll(divider(size, char: '.'));
+    b.addAll(bold(true));
+    b.addAll(rowLR('Total Sales', 'Rp ${rp(totalSales.round())}', size));
+    b.addAll(bold(false));
+
+    // ── RETURNS/REFUNDS ──────────────────────────────────────────────────────
+    final refundAmount = (d['refund_amount'] ?? 0).toDouble();
+    if (refundAmount > 0) {
+      b.addAll(divider(size, char: '-'));
+      b.addAll(align(1));
+      b.addAll(bold(true));
+      b.addAll(txt('----- RETURNS/REFUNDS -----'));
+      b.addAll(bold(false));
+      b.addAll(align(0));
+      b.addAll(rowLR('Total Refund Amount', 'Rp ${rp(refundAmount.round())}', size));
+    }
+
+    // ── PAYMENT METHOD ───────────────────────────────────────────────────────
+    b.addAll(divider(size, char: '-'));
+    b.addAll(align(1));
+    b.addAll(bold(true));
+    b.addAll(txt('------ PAYMENT METHOD -----'));
+    b.addAll(bold(false));
+    b.addAll(align(0));
+
+    final payments = d['payments'] as List<dynamic>? ?? [];
+    for (final pay in payments) {
+      final p = pay as Map<String, dynamic>;
+      final payName = (p['method'] as String? ?? 'Payment').toUpperCase();
+      final payAmt = (p['amount'] ?? 0).toDouble();
+      b.addAll(rowLR(payName, 'Rp ${rp(payAmt.round())}', size));
+    }
+    final totalPayment = (d['total_payment_amount'] ?? 0).toDouble();
+    b.addAll(divider(size, char: '.'));
+    b.addAll(bold(true));
+    b.addAll(rowLR('Total Payments', 'Rp ${rp(totalPayment.round())}', size));
+    b.addAll(bold(false));
+
+    // ── CASH DRAWER SUMMARY ─────────────────────────────────────────────────
+    final startingCash = (d['starting_cash'] ?? 0).toDouble();
+    final cashSales = (d['cash_sales'] ?? 0).toDouble();
+    final cashIn = (d['cash_in'] ?? 0).toDouble();
+    final cashOut = (d['cash_out'] ?? 0).toDouble();
+    final expectedCash = (d['expected_cash'] ?? 0).toDouble();
+
+    b.addAll(divider(size, char: '-'));
+    b.addAll(align(1));
+    b.addAll(bold(true));
+    b.addAll(txt('--- CASH DRAWER SUMMARY ---'));
+    b.addAll(bold(false));
+    b.addAll(align(0));
+
+    b.addAll(rowLR('Opening Cash', 'Rp ${rp(startingCash.round())}', size));
+    b.addAll(rowLR('(+) Cash Sales', 'Rp ${rp(cashSales.round())}', size));
+    if (cashIn > 0) {
+      b.addAll(rowLR('(+) Cash In', 'Rp ${rp(cashIn.round())}', size));
+    }
+    if (cashOut > 0) {
+      b.addAll(rowLR('(-) Cash Out', 'Rp ${rp(cashOut.round())}', size));
+    }
+    b.addAll(divider(size, char: '.'));
+    b.addAll(bold(true));
+    b.addAll(rowLR('Total', 'Rp ${rp(expectedCash.round())}', size));
+    b.addAll(bold(false));
+
+    // ── SESSION TRANSACTIONS ────────────────────────────────────────────────
+    final totalTransactions = d['total_transactions'] ?? 0;
+    final salesTransactions = d['sales_transactions'] ?? 0;
+    final refundTransactions = d['refund_transactions'] ?? 0;
+    final totalQtySold = d['total_qty_sold'] ?? 0;
+
+    b.addAll(divider(size, char: '-'));
+    b.addAll(align(1));
+    b.addAll(bold(true));
+    b.addAll(txt('-- SESSION TRANSACTIONS --'));
+    b.addAll(bold(false));
+    b.addAll(align(0));
+
+    b.addAll(rowLR('Total Transactions', totalTransactions.toString(), size));
+    b.addAll(rowLR('Sales Transactions', salesTransactions.toString(), size));
+    b.addAll(rowLR('Returns/Refunds', refundTransactions.toString(), size));
+    b.addAll(rowLR('Items Sold', totalQtySold.toString(), size));
+
+    // ── EXPECTED VS CLOSING BALANCE ───────────────────────────────────────
+    final countedCash = (d['counted_cash'] ?? 0).toDouble();
+    final differenceCash = (d['difference_cash'] ?? 0).toDouble();
+    final totalCreditAmount = (d['total_credit_amount'] ?? 0).toDouble();
+
+    b.addAll(divider(size, char: '='));
+    b.addAll(bold(true));
+    b.addAll(rowLR('Expected Balance:', 'Rp ${rp(expectedCash.round())}', size));
+    b.addAll(rowLR('Closing Balance:', 'Rp ${rp(countedCash.round())}', size));
+    b.addAll(bold(false));
+
+    final diffStr = differenceCash >= 0
+        ? 'Rp ${rp(differenceCash.round())}'
+        : '-Rp ${rp(differenceCash.abs().round())}';
+    if (differenceCash != 0) {
+      b.addAll(bold(true));
+      b.addAll(rowLR('Difference:', diffStr, size));
+      b.addAll(bold(false));
+    }
+
+    // Credit info if any
+    if (totalCreditAmount > 0) {
+      b.addAll(divider(size, char: '.'));
+      b.addAll(rowLR('* Credit(piutang):', 'Rp ${rp(totalCreditAmount.round())}', size));
+    }
+
+    // ── FOOTER ─────────────────────────────────────────────────────────────
+    b.addAll(divider(size, char: '='));
+    b.addAll(align(1));
+    final printDate = d['print_date'] as String? ?? _formatDate(DateTime.now().toIso8601String());
+    b.addAll(txt('Printed at: $printDate'));
+    b.addAll(txt('Powered by dRetail'));
+    b.addAll(align(0));
+
+    b.addAll(finalize());
+    return Uint8List.fromList(b);
   }
 }

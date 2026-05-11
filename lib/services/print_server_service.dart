@@ -98,9 +98,6 @@ class PrintServerService {
     });
 
     // ── OPTIONS preflight ────────────────────────────────────────────────────
-    // PENTING: 'Access-Control-Allow-Private-Network: true' wajib ada agar
-    // Chrome 98+ mengizinkan request dari HTTPS page (mis. odoo-dev.dretail.id)
-    // ke server lokal (http://127.0.0.1:8080) — Private Network Access policy.
     router.options('/print', (Request req) {
       return Response.ok('', headers: const {
         'Access-Control-Allow-Origin': '*',
@@ -136,7 +133,19 @@ class PrintServerService {
           final format = json['format'] as String? ?? 'escpos';
           final dataField = json['data'];
 
-          if (format == 'odoo_json') {
+          // Handle Session Summary format specifically
+          if (format == 'session_summary') {
+            Map<String, dynamic> summaryData;
+            if (dataField is Map<String, dynamic>) {
+              summaryData = dataField;
+            } else if (dataField is String) {
+              summaryData = jsonDecode(dataField) as Map<String, dynamic>;
+            } else {
+              summaryData = {};
+            }
+            printData = EscPosHelper.buildSessionSummary(summaryData, _paperSize);
+            onLog?.call('🖨️ Terima job Session Summary Report (${printData.length}B)');
+          } else if (format == 'odoo_json') {
             Map<String, dynamic> orderData;
             if (dataField is Map<String, dynamic>) {
               orderData = dataField;
@@ -254,8 +263,6 @@ class PrintServerService {
             'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
             'Access-Control-Allow-Headers':
                 'Content-Type, X-Print-Format, X-Print-Source, Authorization',
-            // Wajib untuk Chrome 98+ Private Network Access:
-            // Mengizinkan HTTPS page mengakses server lokal (127.0.0.1)
             'Access-Control-Allow-Private-Network': 'true',
           });
         }

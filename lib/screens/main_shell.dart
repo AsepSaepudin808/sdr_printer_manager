@@ -33,6 +33,8 @@ class _MainShellState extends State<MainShell> {
 
   final PrintServerService _server = PrintServerService();
   final SdrBluetoothService _bt = SdrBluetoothService();
+  final GlobalKey<ScaffoldState> _scaffoldKey =
+      GlobalKey<ScaffoldState>();
 
   int _tab = 0;
   bool _serverRunning = false;
@@ -583,85 +585,106 @@ class _MainShellState extends State<MainShell> {
       systemNavigationBarIconBrightness: Brightness.dark,
     ));
 
-    return Scaffold(
-      backgroundColor: _bg,
-      extendBody: false,
-      resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        backgroundColor: _primary,
-        foregroundColor: Colors.white,
-        title: Text(titles[_tab],
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-        elevation: 0,
+    return SafeArea(
+      bottom: false,
+      child: Scaffold(
+        key: _scaffoldKey,
+        backgroundColor: _bg,
+        extendBody: false,
+        resizeToAvoidBottomInset: true,
+        drawerEnableOpenDragGesture: false,
+        appBar: AppBar(
+          backgroundColor: _primary,
+          foregroundColor: Colors.white,
+          title: Text(titles[_tab],
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          leadingWidth: 56,
+          leading: GestureDetector(
+            onTap: () => _scaffoldKey.currentState?.openDrawer(),
+            behavior: HitTestBehavior.opaque,
+            child: const SizedBox(
+              width: 56,
+              height: 56,
+              child: Icon(Icons.menu_rounded, color: Colors.white),
+            ),
+          ),
+        ),
+        drawer: _buildDrawer(),
+        body: _buildBody(),
+        bottomNavigationBar: isKeyboardVisible ? null : _buildBottomBar(),
       ),
-      drawer: _buildDrawer(),
-      body: _buildBody(),
-      bottomNavigationBar: isKeyboardVisible ? null : _buildBottomBar(),
     );
   }
 
   Widget _buildDrawer() {
     return Drawer(
-      child: Column(children: [
-        DrawerHeader(
-          decoration: const BoxDecoration(color: _primary),
-          child: Row(children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12)),
-              child: const Icon(Icons.print_rounded,
-                  color: Colors.white, size: 28),
-            ),
-            const SizedBox(width: 12),
-            const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('dPrinter Mart',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800)),
-                  Text('Print Bridge for PoS',
-                      style: TextStyle(color: Colors.white60, fontSize: 12)),
-                ]),
-          ]),
-        ),
-        _drawerItem(Icons.home_rounded, S.home, () {
-          Navigator.pop(context);
-          setState(() => _tab = 0);
-        }),
-        _drawerItem(Icons.history_rounded, S.activityHistory, () {
-          Navigator.pop(context);
-          Navigator.push(context,
-              MaterialPageRoute(builder: (_) => LogScreen(logs: _logs)));
-        }),
-        const Divider(),
-        _drawerItem(Icons.settings_rounded, S.settings, () async {
-          Navigator.pop(context);
-          await _goSettings();
-        }),
-        _drawerItem(Icons.print_outlined, S.printerSize, () async {
-          Navigator.pop(context);
-          await _goPrinterSettings();
-        }),
-        _drawerItem(Icons.info_outline_rounded, S.aboutApp, () {
-          Navigator.pop(context);
-          showAboutDialog(
-              context: context,
-              applicationName: S.appName,
-              applicationVersion: '1.0.0',
-              applicationIcon:
-                  const Icon(Icons.print_rounded, color: _primary, size: 40));
-        }),
-        const Spacer(),
-        const Divider(),
-        _drawerItem(
-            Icons.exit_to_app_rounded, S.exit, () => SystemNavigator.pop()),
-        const SizedBox(height: 16),
-      ]),
+      child: SafeArea(
+        child: Column(children: [
+          DrawerHeader(
+            decoration: const BoxDecoration(color: _primary),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.print_rounded,
+                    color: Colors.white, size: 28),
+              ),
+              const SizedBox(width: 12),
+              const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('dPrinter Mart',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800)),
+                    Text('Print Bridge for PoS',
+                        style: TextStyle(color: Colors.white60, fontSize: 12)),
+                  ]),
+            ]),
+          ),
+          Expanded(child: SingleChildScrollView(
+            child: Column(children: [
+              _drawerItem(Icons.home_rounded, S.home, () {
+                Navigator.pop(context);
+                setState(() => _tab = 0);
+              }),
+              _drawerItem(Icons.history_rounded, S.activityHistory, () {
+                Navigator.pop(context);
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => LogScreen(logs: _logs)));
+              }),
+              const Divider(),
+              _drawerItem(Icons.settings_rounded, S.settings, () async {
+                Navigator.pop(context);
+                await _goSettings();
+              }),
+              _drawerItem(Icons.print_outlined, S.printerSize, () async {
+                Navigator.pop(context);
+                await _goPrinterSettings();
+              }),
+              _drawerItem(Icons.info_outline_rounded, S.aboutApp, () {
+                Navigator.pop(context);
+                showAboutDialog(
+                    context: context,
+                    applicationName: S.appName,
+                    applicationVersion: '1.0.0',
+                    applicationIcon:
+                        const Icon(Icons.print_rounded, color: _primary, size: 40));
+              }),
+            ]),
+          )),
+          const Divider(),
+          _drawerItem(
+              Icons.exit_to_app_rounded, S.exit, () => SystemNavigator.pop()),
+          const SizedBox(height: 16),
+        ]),
+      ),
     );
   }
 

@@ -109,10 +109,83 @@ class _ImageTabState extends State<ImageTab> {
     return Uint8List.fromList(buf);
   }
 
+  Widget _imgBtn({
+    IconData? icon,
+    required String label,
+    required Color color,
+    required bool outlined,
+    bool loading = false,
+    VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        decoration: BoxDecoration(
+          color: outlined
+              ? Colors.white
+              : (onTap == null ? color.withValues(alpha: 0.4) : color),
+          borderRadius: BorderRadius.circular(12),
+          border: outlined
+              ? Border.all(color: onTap == null ? Colors.grey.shade300 : color)
+              : null,
+          boxShadow: !outlined && onTap != null
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.25),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  )
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (loading)
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.white),
+              )
+            else if (icon != null)
+              Icon(icon,
+                  size: 18,
+                  color:
+                      outlined ? (onTap == null ? Colors.grey : color) : Colors.white),
+            if (icon != null || loading) const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color:
+                    outlined ? (onTap == null ? Colors.grey : color) : Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Responsive: handle safe area insets
+    final viewPadding = MediaQuery.viewPaddingOf(context);
+    final safeBottom = viewPadding.bottom;
+    const bottomBarH = 65.0;
+    final totalBottomPad = bottomBarH + safeBottom;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      padding: EdgeInsets.fromLTRB(
+        16 + viewPadding.left,
+        16 + viewPadding.top,
+        16 + viewPadding.right,
+        16 + totalBottomPad,
+      ),
       child: Column(children: [
         Expanded(
           child: GestureDetector(
@@ -144,44 +217,28 @@ class _ImageTabState extends State<ImageTab> {
         const SizedBox(height: 12),
         Row(children: [
           Expanded(
-            child: OutlinedButton.icon(
-              onPressed: _pickImage,
-              icon: const Icon(Icons.folder_open_rounded),
-              label: Text(S.selectImage),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: _primary,
-                side: const BorderSide(color: _primary),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
+            child: _imgBtn(
+              icon: Icons.folder_open_rounded,
+              label: S.selectImage,
+              color: _primary,
+              outlined: true,
+              onTap: _pickImage,
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: ElevatedButton.icon(
-              onPressed:
-                  (_isPrinting || _imageFile == null) ? null : _printImage,
-              icon: _isPrinting
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.print_rounded),
-              label: Text(_isPrinting ? S.printing : S.print_),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
+            child: _imgBtn(
+              icon: _isPrinting ? null : Icons.print_rounded,
+              label: _isPrinting ? S.printing : S.print_,
+              color: _primary,
+              outlined: false,
+              loading: _isPrinting,
+              onTap: (_isPrinting || _imageFile == null) ? null : _printImage,
             ),
           ),
         ]),
         if (_status.isNotEmpty) ...[
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Text(_status,
               style: TextStyle(
                 color: _status.startsWith('✅')
