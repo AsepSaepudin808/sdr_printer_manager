@@ -670,12 +670,7 @@ class _MainShellState extends State<MainShell> {
               }),
               _drawerItem(Icons.info_outline_rounded, S.aboutApp, () {
                 Navigator.pop(context);
-                showAboutDialog(
-                    context: context,
-                    applicationName: S.appName,
-                    applicationVersion: '1.0.0',
-                    applicationIcon:
-                        const Icon(Icons.print_rounded, color: _primary, size: 40));
+                _showCustomAboutDialog(context);
               }),
             ]),
           )),
@@ -1440,4 +1435,155 @@ class _MainShellState extends State<MainShell> {
       ),
     ]));
   }
+
+  // ── CUSTOM ABOUT DIALOG ──────────────────────────────────────────────────
+  void _showCustomAboutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 400),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // App Icon
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: _primary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.print_rounded, size: 48, color: _primary),
+              ),
+              const SizedBox(height: 16),
+              // App Name
+              const Text(
+                'dPrinter Mart',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 4),
+              // Version
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  'Versi V1.0.0.1',
+                  style: TextStyle(fontSize: 12, color: _primary, fontWeight: FontWeight.w600),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Print Bridge for PoS',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 20),
+              const Divider(),
+              const SizedBox(height: 12),
+              // Description
+              const Text(
+                'Aplikasi pengelola koneksi printer Bluetooth thermal untuk PoS dRetail Mart.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: Colors.grey),
+              ),
+              const SizedBox(height: 20),
+              // Buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _showLicenseDialog(context);
+                    },
+                    child: const Text('Lisensi', style: TextStyle(color: _primary)),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text('Tutup', style: TextStyle(color: Colors.grey.shade600)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showLicenseDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 400, maxHeight: 500),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.description_rounded, color: _primary),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Lisensi',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const Divider(),
+              const Expanded(
+                child: SingleChildScrollView(
+                  child: Text(
+                    _licenseText,
+                    style: TextStyle(fontSize: 12, height: 1.5),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static const String _licenseText = '''
+LISENSI PENGGUNA AKHIR (EULA)
+
+Copyright (c) 2025 dRetail Mart
+Hak Cipta Dilindungi Undang-Undang
+
+Dengan mengunduh, menginstal, atau menggunakan aplikasi "dPrinter Mart", Anda setuju untuk terikat dengan syarat-syarat berikut:
+
+1. LISENSI PENGGUNAAN
+   Aplikasi ini diberikan lisensi non-eksklusif dan tidak dapat dipindahtangankan. Aplikasi ini hanya untuk penggunaan internal pada bisnis Anda.
+
+2. LARANGAN
+   Dilarang keras:
+   • Mengubah, membongkar, atau membuat turunan dari aplikasi ini
+   • Menjual atau mendistribusikan ulang aplikasi ini
+   • Menggunakan aplikasi untuk tujuan ilegal
+
+3. PENUNJANGAN (DISCLAIMER)
+   Aplikasi ini disediakan "SEBAGAIMANA ADANYA" tanpa jaminan dalam bentuk apa pun. Kami tidak bertanggung jawab atas kerusakan atau kehilangan data akibat penggunaan aplikasi ini.
+
+4. KONEKSI PERANGKAT
+   Aplikasi memerlukan koneksi Bluetooth ke printer thermal yang didukung. Koneksi Wi-Fi digunakan untuk fitur Print Bridge.
+
+5. PEMBARUAN SYARAT
+   Kami berhak memperbarui syarat lisensi ini sewaktu-waktu. Penggunaan berkelanjutan berarti Anda setuju dengan syarat baru.
+
+6. HUBUNGI KAMI
+   Untuk pertanyaan: support@dretail.id
+''';
 }

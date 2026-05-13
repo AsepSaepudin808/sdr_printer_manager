@@ -208,7 +208,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // 7. Versi
           _section(S.version,
               child: const Center(
-                child: Text('1.0.0',
+                child: Text('V1.0.0.1',
                     style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
