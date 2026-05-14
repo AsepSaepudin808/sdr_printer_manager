@@ -15,13 +15,13 @@ class EscPosHelper {
   static int _customCharsPerLine = 0;
   static int _extraFeed = 3;
   static bool _autoCut = false;
-  static bool _useFontB = false; // Pengaturan dinamis untuk Font B
+  static bool _useFontB = false;
   static void setCustomCharsPerLine(int value) => _customCharsPerLine = value;
   static void setExtraFeed(int value) => _extraFeed = value;
   static void setAutoCut(bool value) => _autoCut = value;
   static void setUseFontB(bool value) => _useFontB = value;
   static int defaultCharsPerLine(PaperSize size) => switch (size) {
-        PaperSize.mm58 => 32, // Standar hardware 58mm Font A adalah 32
+        PaperSize.mm58 => 32,
         PaperSize.mm80 => 48,
         PaperSize.mm100 => 64,
       };
@@ -29,8 +29,12 @@ class EscPosHelper {
       _customCharsPerLine > 0 ? _customCharsPerLine : defaultCharsPerLine(size);
   static List<int> finalize() {
     final List<int> b = [];
-    if (_extraFeed > 0) b.addAll(feed(_extraFeed));
-    if (_autoCut) b.addAll(cut());
+    if (_extraFeed > 0) {
+      b.addAll(feed(_extraFeed));
+    }
+    if (_autoCut) {
+      b.addAll(cut());
+    }
     return b;
   }
 
@@ -44,39 +48,130 @@ class EscPosHelper {
   // Command untuk mengubah ukuran font: Font B (huruf lebih kecil)
   static Uint8List setFontB(bool on) =>
       Uint8List.fromList([escCmd, 0x21, on ? 1 : 0]);
+
+  // Double-height + double-width untuk nama toko (GS ! n)
+  // n=0x11 = double height+width, n=0x00 = normal
+  static Uint8List doubleSize(bool on) =>
+      Uint8List.fromList([0x1D, 0x21, on ? 0x11 : 0x00]);
+
+  // Hanya double-height (GS ! 0x01)
+  static Uint8List doubleHeight(bool on) =>
+      Uint8List.fromList([0x1D, 0x21, on ? 0x01 : 0x00]);
   static Uint8List imageEsc(img.Image src, PaperSize paperSize) {
+    // Logo dibatasi 50% lebar kertas agar proporsional dan tidak terlalu dominan.
+    // Lebar kertas penuh (dots): 58mm=384, 80mm=576, 100mm=768
+    // 50% dari lebar penuh: 58mm=192, 80mm=288, 100mm=384
     int maxW = switch (paperSize) {
-      PaperSize.mm58 => 384,
-      PaperSize.mm80 => 576,
-      PaperSize.mm100 => 768,
+      PaperSize.mm58 => 192,
+      PaperSize.mm80 => 288,
+      PaperSize.mm100 => 384,
     };
     img.Image resized = src;
-    if (src.width > maxW) {
-      resized = img.copyResize(src, width: maxW);
-    }
-    final List<int> bytes = [];
-    final int width = resized.width;
-    final int height = resized.height;
-    final int widthBytes = (width + 7) ~/ 8;
-    bytes.addAll([gsCmd, 0x76, 0x30, 0x00]);
-    bytes.addAll([widthBytes % 256, widthBytes ~/ 256]);
-    bytes.addAll([height % 256, height ~/ 256]);
-    for (int y = 0; y < height; y++) {
-      for (int x = 0; x < widthBytes; x++) {
-        int byte = 0;
-        for (int b = 0; b < 8; b++) {
-          int pixelX = x * 8 + b;
-          if (pixelX < width) {
-            final pixel = resized.getPixel(pixelX, y);
-            if (pixel.luminance < 0.5) {
-              byte |= (1 << (7 - b));
-            }
-          }
+
+    // Convert RGBA to RGB first (handle transparency)
+    // Bug fix: variabel pixel 'p' tidak pernah didefinisikan sebelumnya,
+    // sehingga alpha blending gagal dan loop tidak berjalan sama sekali.
+    // Perbaikan: gunakan src.getPixel(x, y) untuk mendapatkan pixel.
+    if (src.numChannels == 4) {
+      // RGBA to RGB: flatten to white background
+      final rgbImage =
+          img.Image(width: src.width, height: src.height, numChannels: 3);
+      for (int y = 0; y < src.height; y++) {
+        for (int x = 0; x < src.width; x++) {
+          final p =
+              src.getPixel(x, y); // <-- FIX: definisikan pixel dari sumber
+          final r = p.r.toInt();
+          final g = p.g.toInt();
+          final bVal = p.b.toInt();
+          final a = p.a.toInt();
+          // Alpha blend with white background: white * (1-alpha) + color * alpha
+          final double alpha = a / 255.0;
+          final int blendedR =
+              (r * alpha + 255 * (1 - alpha)).round().clamp(0, 255);
+          final int blendedG =
+              (g * alpha + 255 * (1 - alpha)).round().clamp(0, 255);
+          final int blendedB =
+              (bVal * alpha + 255 * (1 - alpha)).round().clamp(0, 255);
+          rgbImage.setPixelRgb(x, y, blendedR, blendedG, blendedB);
         }
-        bytes.add(byte);
+      }
+      resized = rgbImage;
+    }
+
+    // Resize if larger than max width
+    if (resized.width > maxW) {
+      resized = img.copyResize(resized, width: maxW);
+    }
+
+    final int imgWidth = resized.width;
+    final int imgHeight = resized.height;
+    final int widthBytes = (imgWidth + 7) ~/ 8;
+
+    // ── Step 1: Build grayscale float buffer untuk Floyd-Steinberg dithering ──
+    // Ini jauh lebih baik dari simple threshold karena detail logo tetap terjaga.
+    // Simple threshold (< 0.5) menyebabkan area abu2 dan gradient menjadi
+    // sepenuhnya hitam atau putih tanpa transisi, sehingga detail logo hilang.
+    final List<double> gray = List<double>.filled(imgWidth * imgHeight, 0.0);
+    for (int y = 0; y < imgHeight; y++) {
+      for (int x = 0; x < imgWidth; x++) {
+        final pixel = resized.getPixel(x, y);
+        // Luminance perceptual (Rec. 601)
+        gray[y * imgWidth + x] =
+            (0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b) / 255.0;
       }
     }
-    return Uint8List.fromList(bytes);
+
+    // ── Step 2: Floyd-Steinberg dithering in-place ────────────────────────────
+    // Error didistribusikan ke tetangga kanan, bawah-kiri, bawah, bawah-kanan
+    // sehingga halftone alami terbentuk dan detail gambar tetap terlihat.
+    final List<bool> bw = List<bool>.filled(imgWidth * imgHeight, false);
+    for (int y = 0; y < imgHeight; y++) {
+      for (int x = 0; x < imgWidth; x++) {
+        final idx = y * imgWidth + x;
+        final oldVal = gray[idx].clamp(0.0, 1.0);
+        final newVal = oldVal < 0.5 ? 0.0 : 1.0; // quantize
+        bw[idx] = newVal == 0.0; // true = pixel hitam (cetak)
+        final err = oldVal - newVal;
+        // Distribusi error (Floyd-Steinberg weights: 7/16, 3/16, 5/16, 1/16)
+        if (x + 1 < imgWidth) {
+          gray[idx + 1] += err * (7.0 / 16.0);
+        }
+        if (y + 1 < imgHeight) {
+          if (x - 1 >= 0) {
+            gray[(y + 1) * imgWidth + (x - 1)] += err * (3.0 / 16.0);
+          }
+          gray[(y + 1) * imgWidth + x] += err * (5.0 / 16.0);
+          if (x + 1 < imgWidth) {
+            gray[(y + 1) * imgWidth + (x + 1)] += err * (1.0 / 16.0);
+          }
+        }
+      }
+    }
+
+    // ── Step 3: Pack bits dan buat ESC/POS raster command ─────────────────────
+    final List<int> output = [];
+    // ESC/POS raster bit image command: GS v 0 m xL xH yL yH [data]
+    output.addAll([gsCmd, 0x76, 0x30, 0x00]); // m=0 (normal density)
+    output.addAll([widthBytes % 256, widthBytes ~/ 256]); // xL, xH
+    output.addAll([imgHeight % 256, imgHeight ~/ 256]); // yL, yH
+
+    for (int y = 0; y < imgHeight; y++) {
+      for (int byteX = 0; byteX < widthBytes; byteX++) {
+        int byte = 0;
+        for (int bit = 0; bit < 8; bit++) {
+          final pixelX = byteX * 8 + bit;
+          if (pixelX >= imgWidth) {
+            continue;
+          }
+          if (bw[y * imgWidth + pixelX]) {
+            byte |= 1 << (7 - bit);
+          }
+        }
+        output.add(byte);
+      }
+    }
+
+    return Uint8List.fromList(output);
   }
 
   // ── HELPER TEXT ─────────────────────────────────────────────────────────────
@@ -98,10 +193,14 @@ class EscPosHelper {
   static List<int> rowLR(String left, String right, PaperSize size,
       {bool boldRight = false}) {
     final w = charsPerLine(size);
-    if (right.length >= w) return txt(right.substring(0, w));
+    if (right.length >= w) {
+      return txt(right.substring(0, w));
+    }
     int effectiveRightLen = right.length;
     // Bold characters are slightly wider on MPT-II, so we reserve 1 extra space to prevent wrap
-    if (boldRight) effectiveRightLen += 1;
+    if (boldRight) {
+      effectiveRightLen += 1;
+    }
     int spaceLeft = w - effectiveRightLen;
     if (left.length > spaceLeft) {
       left = '${left.substring(0, spaceLeft > 0 ? spaceLeft - 1 : 0)} ';
@@ -134,7 +233,9 @@ class EscPosHelper {
     final buf = StringBuffer();
     int count = 0;
     for (int i = s.length - 1; i >= 0; i--) {
-      if (count > 0 && count % 3 == 0) buf.write('.');
+      if (count > 0 && count % 3 == 0) {
+        buf.write('.');
+      }
       buf.write(s[i]);
       count++;
     }
@@ -143,12 +244,16 @@ class EscPosHelper {
   }
 
   static String fixLen(String s, int width) {
-    if (s.length >= width) return s.substring(0, width);
+    if (s.length >= width) {
+      return s.substring(0, width);
+    }
     return s.padRight(width);
   }
 
   static String fixLenR(String s, int width) {
-    if (s.length >= width) return s.substring(0, width);
+    if (s.length >= width) {
+      return s.substring(0, width);
+    }
     return s.padLeft(width);
   }
 
@@ -194,200 +299,380 @@ class EscPosHelper {
   }
 
   // ── FULL RECEIPT ────────────────────────────────────────────────────────────
+  // Berdasarkan desain Odoo 18:
+  // - Logo + Header (nama, telp, tax id, email, website)
+  // - Slogan/Custom Header
+  // - Kasir info
+  // - Orderlines (dengan harga, subtotal, diskon, customer note)
+  // - Tax breakdown (DPP + PPN)
+  // - TOTAL, Payment, Change
+  // - Diskon Total
+  // - QR Code info
+  // - Footer + Order reference + date
   static Uint8List _buildFullReceipt(Map<String, dynamic> d, PaperSize size) {
     final List<int> b = [];
     b.addAll(init());
-    _applyFontConfig(b); // Setel font dinamis sebelum mencetak text
+    _applyFontConfig(b);
     final company = d['company'] as Map<String, dynamic>? ?? {};
     final logoBase64 = company['logo'] as String? ?? '';
+    final storeName = (company['name'] as String? ?? 'Toko').trim();
+    final storePhone = company['phone'] as String? ?? '';
+    final storeEmail = company['email'] as String? ?? '';
+    final storeStreet = company['street'] as String? ?? '';
+    final orderName = d['name'] as String? ?? '-';
+    final dateRaw = d['date'] as String? ?? '';
+    final cashier = d['cashier'] as String? ?? '-';
+    final footer =
+        d['footer_messages'] as String? ?? 'Terima kasih!\nSampai jumpa lagi.';
+
+    // ── LOGO (centered, max 50% lebar kertas) ────────────────────────────
     if (logoBase64.isNotEmpty) {
       try {
         final bytes = base64Decode(
             logoBase64.contains(',') ? logoBase64.split(',')[1] : logoBase64);
         final image = img.decodeImage(bytes);
         if (image != null) {
-          b.addAll(align(1));
+          b.addAll(align(1)); // center
           b.addAll(imageEsc(image, size));
-          b.addAll(feed(1));
           b.addAll(align(0));
         }
       } catch (_) {}
     }
-    final storeName = (company['name'] as String? ?? 'Toko').trim();
-    final storePhone = company['phone'] as String? ?? '';
-    final storeEmail = company['email'] as String? ?? '';
-    final storeStreet = company['street'] as String? ?? '';
+
+    // ── HEADER: Nama Toko (CENTERED, double-size) ─────────────────────────
     b.addAll(align(1));
+    b.addAll(doubleSize(true)); // nama toko besar & mencolok
     b.addAll(bold(true));
     b.addAll(txt(storeName));
     b.addAll(bold(false));
-    if (storePhone.isNotEmpty) b.addAll(txt(storePhone));
-    if (storeEmail.isNotEmpty) b.addAll(txt(storeEmail));
-    // Street address: cetak per-baris, tetap rata tengah
+    b.addAll(doubleSize(false)); // kembali normal
+
+    // ── Info kontak toko (CENTERED, font normal) ──────────────────────────
+    if (storePhone.isNotEmpty) {
+      b.addAll(txt('Tel: $storePhone'));
+    }
+    if (company['vat'] != null && (company['vat'] as String).isNotEmpty) {
+      b.addAll(txt('Tax ID: ${company['vat']}'));
+    }
+    if (storeEmail.isNotEmpty) {
+      b.addAll(txt(storeEmail));
+    }
+    if (company['website'] != null &&
+        (company['website'] as String).isNotEmpty) {
+      b.addAll(txt(company['website'] as String));
+    }
     if (storeStreet.isNotEmpty) {
       for (final line in storeStreet.split('\n')) {
-        if (line.trim().isNotEmpty) b.addAll(txt(line.trim()));
+        if (line.trim().isNotEmpty) {
+          b.addAll(txt(line.trim()));
+        }
       }
     }
     b.addAll(align(0));
-    b.addAll(divider(size, char: '='));
-    final orderName = d['name'] as String? ?? '-';
-    final dateRaw = d['date'] as String? ?? '';
-    final cashier = d['cashier'] as String? ?? '-';
-    b.addAll(rowLR('No.', orderName, size));
-    if (dateRaw.isNotEmpty) {
-      b.addAll(rowLR('Tanggal', _formatDate(dateRaw), size));
+
+    // ── CUSTOM HEADER / SLOGAN (CENTERED, diapit garis tipis) ─────────────
+    final customHeader =
+        d['receipt_header'] as String? ?? 'Selamat Datang di Toko Kami!';
+    if (customHeader.isNotEmpty) {
+      b.addAll(divider(size, char: '-'));
+      b.addAll(align(1));
+      b.addAll(txt(customHeader));
+      b.addAll(align(0));
     }
-    b.addAll(rowLR('Kasir', cashier, size));
-    b.addAll(divider(size));
+
+    b.addAll(divider(size, char: '-'));
+
+    final orderNumberClean = orderName
+        .toString()
+        .replaceFirst(RegExp(r'^Order\s*', caseSensitive: false), '');
+    final dateFormatted = dateRaw.isNotEmpty ? _formatDate(dateRaw) : '';
+
+    b.addAll(rowLR('Reff        :', orderNumberClean, size));
+    b.addAll(rowLR('Tanggal     :', dateFormatted, size));
+    b.addAll(rowLR('Kasir       :', cashier, size));
+
+    b.addAll(divider(size, char: '='));
+
+    // ── ORDERLINES (dengan harga, diskon, customer note) ─────────────────
     final lines = d['orderlines'] as List<dynamic>? ?? [];
-    final w = charsPerLine(size);
     for (final line in lines) {
       final m = line as Map<String, dynamic>;
       final rawName = m['product_name'] as String? ?? '';
       final name = rawName.replaceAll('\n', ' ').trim();
       final qty = (m['qty'] ?? 1).toDouble();
-      final discountAmt = (m['discount_amount'] ?? 0).toDouble();
+      final unitPrice = (m['price'] ?? 0).toDouble();
+      final subtotal = (m['price_with_tax'] ?? unitPrice * qty).toDouble();
       final discountPct = (m['discount'] ?? 0).toDouble();
-      final discType =
-          m['discount_type']?.toString() ?? (discountPct > 0 ? '%' : 'Rp');
-      final basePrice = (m['price'] ?? 0).toDouble();
-      final origPrice = (m['original_price'] ?? 0).toDouble();
-      final unitPrice = (origPrice > basePrice) ? origPrice : basePrice;
-      final subtotal = (origPrice > basePrice)
-          ? (unitPrice * qty)
-          : (m['price_with_tax'] ?? unitPrice * qty).toDouble();
+      final customerNote = m['customer_note'] as String? ?? '';
+
+      // Nama produk (bold)
       b.addAll(bold(true));
-      int start = 0;
-      while (start < name.length) {
-        int end = start + w;
-        if (end > name.length) end = name.length;
-        String lineName = name.substring(start, end);
-        if (start > 0) lineName = lineName.trimLeft();
-        b.addAll(txt(lineName));
-        start += w;
-      }
+      b.addAll(txt(name));
       b.addAll(bold(false));
-      final qtyStr = '${_formatQty(qty)} x Rp ${rp(unitPrice.round())}';
-      final subtotalStr = 'Rp ${rp(subtotal.round())}';
-      b.addAll(rowLR(qtyStr, subtotalStr, size, boldRight: true));
-      // Diskon Item
-      if (discountAmt > 0 || discountPct > 0) {
-        bool isPercent = discType == '%' ||
-            discType == 'percentage' ||
-            (discountPct > 0 && discountAmt == 0);
-        String discLabel =
-            isPercent ? 'Disc(${_formatQty(discountPct)}%)' : 'Disc(Rp)';
-        double nominalAmt = discountAmt > 0
-            ? discountAmt
-            : (basePrice * qty * (discountPct / 100));
-        if (discountAmt <= 0 && discountPct > 0) {
-          nominalAmt = unitPrice * qty * (discountPct / 100);
-        }
-        b.addAll(rowLR(discLabel, 'Rp ${rp(nominalAmt.round())}', size));
+
+      final qtyStr = '${_formatQty(qty)} Pcs x ${rp(unitPrice.round())}';
+      final subtotalStr = rp(subtotal.round());
+      b.addAll(rowLR('  $qtyStr', subtotalStr, size, boldRight: true));
+
+      // Diskon per item
+      if (discountPct > 0) {
+        b.addAll(rowLR('  Disc(${_formatQty(discountPct)}%)', '', size));
+      }
+
+      // Customer note
+      if (customerNote.isNotEmpty) {
+        b.addAll(txt('  * $customerNote'));
       }
     }
-    b.addAll(divider(size));
+    b.addAll(divider(size, char: '-'));
+
+    // ── TAX BREAKDOWN ──────────────────────────────────────────────────────
     final subtotalVal = (d['total_without_tax'] ?? 0).toDouble();
     final taxVal = (d['total_tax'] ?? 0).toDouble();
     final totalVal = (d['total_with_tax'] ?? 0).toDouble();
     final paidVal = (d['total_paid'] ?? totalVal).toDouble();
     final changeVal = (d['change'] ?? (paidVal - totalVal)).toDouble();
-    // Diskon Global
-    final globalDiscType = d['global_discount_type']?.toString();
-    final globalDiscAmt = (d['global_discount_amount'] ?? 0).toDouble();
-    final globalDiscPct = (d['global_discount'] ?? 0).toDouble();
     final totalDiscount = (d['total_discount'] ?? 0).toDouble();
-    final displaySubtotal = subtotalVal + totalDiscount;
-    b.addAll(rowLR('Subtotal', 'Rp ${rp(displaySubtotal.round())}', size));
-    if (globalDiscAmt > 0 || globalDiscPct > 0) {
-      String gDiscLabel = globalDiscType == '%'
-          ? 'Diskon Global (${_formatQty(globalDiscPct)}%)'
-          : 'Diskon Global (Rp)';
-      double gNominal = globalDiscAmt > 0 ? globalDiscAmt : totalDiscount;
-      b.addAll(rowLR(gDiscLabel, 'Rp ${rp(gNominal.round())}', size));
-    } else if (totalDiscount > 0) {
-      b.addAll(rowLR('Total Diskon', 'Rp ${rp(totalDiscount.round())}', size));
+
+    // DPP (Dasar Pengenaan Pajak)
+    if (subtotalVal > 0) {
+      b.addAll(rowLR(
+          'Dasar Pengenaan Pajak', 'Rp ${rp(subtotalVal.round())}', size));
     }
+    // PPN
     if (taxVal > 0) {
-      b.addAll(rowLR('Pajak', 'Rp ${rp(taxVal.round())}', size));
+      b.addAll(rowLR('PPN 11% on ${rp(subtotalVal.round())}',
+          'Rp ${rp(taxVal.round())}', size));
     }
-    b.addAll(divider(size));
+    b.addAll(divider(size, char: '-'));
+
+    // ── TOTAL, PAYMENT, CHANGE ────────────────────────────────────────────
     b.addAll(bold(true));
-    final totalStr = 'Rp ${rp(totalVal.round())}';
-    int spaceTot = w - 5 - totalStr.length - 1;
-    if (spaceTot < 1) spaceTot = 1;
-    b.addAll(txt('TOTAL${" " * spaceTot}$totalStr'));
+    b.addAll(rowLR('TOTAL', 'Rp ${rp(totalVal.round())}', size));
     b.addAll(bold(false));
-    b.addAll(divider(size));
+    b.addAll(divider(size, char: '-'));
+
     final payments = d['paymentlines'] as List<dynamic>? ?? [];
     for (final pay in payments) {
       final p = pay as Map<String, dynamic>;
-      final payName = p['name'] as String? ?? 'Bayar';
+      final payName = p['name'] as String? ?? 'Cash';
       final payAmt = (p['amount'] ?? 0).toDouble();
       b.addAll(rowLR(payName, 'Rp ${rp(payAmt.round())}', size));
     }
-    if (payments.isEmpty) {
-      b.addAll(rowLR('Bayar', 'Rp ${rp(paidVal.round())}', size));
+    if (payments.isEmpty && paidVal > 0) {
+      b.addAll(rowLR('Cash', 'Rp ${rp(paidVal.round())}', size));
     }
+
     b.addAll(bold(true));
-    b.addAll(rowLR('Kembali', 'Rp ${rp(changeVal.round())}', size));
+    b.addAll(rowLR('CHANGE', 'Rp ${rp(changeVal.round())}', size));
     b.addAll(bold(false));
+
+    // ── DISKON TOTAL ──────────────────────────────────────────────────────
+    if (totalDiscount > 0) {
+      b.addAll(rowLR('Diskon Total', 'Rp ${rp(totalDiscount.round())}', size));
+    }
+
+    // ── QR CODE / PORTAL INFO ─────────────────────────────────────────────
+    // Unique code dan portal URL jika ada
+    if (d['unique_code'] != null || d['portal_url'] != null) {
+      b.addAll(divider(size, char: '-'));
+      b.addAll(align(1));
+      b.addAll(txt('Need an invoice for your purchase?'));
+      // QR placeholder jika ada
+      b.addAll(txt('[QR CODE]'));
+      if (d['unique_code'] != null) {
+        b.addAll(txt('Unique Code: ${d['unique_code']}'));
+      }
+      if (d['portal_url'] != null) {
+        b.addAll(txt('Portal URL: ${d['portal_url']}'));
+      }
+      b.addAll(align(0));
+    }
+
+    // ── FOOTER (CENTERED) ───────────────────────────────────────────────────────
     b.addAll(divider(size, char: '='));
-    final footer =
-        d['footer_messages'] as String? ?? 'Terima kasih!\nSampai jumpa lagi.';
     b.addAll(align(1));
     for (final line in footer.split('\n')) {
-      if (line.trim().isNotEmpty) b.addAll(txt(line.trim()));
+      if (line.trim().isNotEmpty) {
+        b.addAll(txt(line.trim()));
+      }
     }
     b.addAll(align(0));
-    b.addAll(poweredBy(size));
+
+    // ── EXPECTED DELIVERY (CENTERED, JIKA ADA) ─────────────────────────────
+    if (d['shipping_date'] != null &&
+        (d['shipping_date'] as String).isNotEmpty) {
+      b.addAll(align(1));
+      b.addAll(txt('Expected delivery: ${d['shipping_date']}'));
+      b.addAll(align(0));
+    }
+
+    // ── POWERED BY (CENTERED) ────────────────────────────────────
+    // Hapus Order number dan tanggal karena sudah ada di section Reff atas
+    b.addAll(align(1));
+    b.addAll(bold(true));
+    b.addAll(txt('Powered by dRetail'));
+    b.addAll(bold(false));
+    b.addAll(align(0));
+
     b.addAll(finalize());
     return Uint8List.fromList(b);
   }
 
   // ── BASIC RECEIPT ────────────────────────────────────────────────────────────
+  // Berdasarkan desain Odoo 18:
+  // Basic Receipt menampilkan:
+  // - Logo + Header (nama, telp, tax id, email, website, slogan)
+  // - Order info (Reff, Tanggal, Kasir)
+  // - Orderlines (tanpa harga - nama + qty + customer note)
+  // - Footer + Order reference + date
+  // Yang DIHILANGKAN:
+  // - Detail pajak, harga, diskon
+  // - Payment lines, change
+  // - QR code, portal URL
   static Uint8List _buildBasicReceipt(Map<String, dynamic> d, PaperSize size) {
     final List<int> b = [];
     b.addAll(init());
     _applyFontConfig(b);
     final company = d['company'] as Map<String, dynamic>? ?? {};
+    final logoBase64 = company['logo'] as String? ?? '';
     final storeName = (company['name'] as String? ?? 'Toko').trim();
     final storePhone = company['phone'] as String? ?? '';
+    final storeEmail = company['email'] as String? ?? '';
     final storeStreet = company['street'] as String? ?? '';
     final orderName = d['name'] as String? ?? '-';
-    final totalVal = (d['total_with_tax'] ?? 0).toDouble();
-    final paidVal = (d['total_paid'] ?? totalVal).toDouble();
-    final changeVal = (d['change'] ?? (paidVal - totalVal)).toDouble();
     final dateRaw = d['date'] as String? ?? '';
-    final footer = d['footer_messages'] as String? ?? 'Terima kasih!\nSampai jumpa lagi.';
+    final cashier = d['cashier'] as String? ?? '-';
+    final footer =
+        d['footer_messages'] as String? ?? 'Terima kasih!\nSampai jumpa lagi.';
+
+    // ── LOGO (centered, max 50% lebar kertas) ──────────────────────────
+    if (logoBase64.isNotEmpty) {
+      try {
+        final bytes = base64Decode(
+            logoBase64.contains(',') ? logoBase64.split(',')[1] : logoBase64);
+        final image = img.decodeImage(bytes);
+        if (image != null) {
+          b.addAll(align(1)); // center
+          b.addAll(imageEsc(image, size));
+          b.addAll(align(0));
+        }
+      } catch (_) {}
+    }
+
+    // ── HEADER: Nama Toko (CENTERED, double-size) ─────────────────────────
     b.addAll(align(1));
+    b.addAll(doubleSize(true)); // nama toko besar & mencolok
     b.addAll(bold(true));
     b.addAll(txt(storeName));
     b.addAll(bold(false));
-    if (storePhone.isNotEmpty) b.addAll(txt(storePhone));
+    b.addAll(doubleSize(false)); // kembali normal
+
+    // ── Info kontak toko (CENTERED, font normal) ──────────────────────────
+    if (storePhone.isNotEmpty) {
+      b.addAll(txt('Tel: $storePhone'));
+    }
+    // Tax ID jika ada
+    if (company['vat'] != null && (company['vat'] as String).isNotEmpty) {
+      b.addAll(txt('Tax ID: ${company['vat']}'));
+    }
+    if (storeEmail.isNotEmpty) {
+      b.addAll(txt(storeEmail));
+    }
+    // Website jika ada
+    if (company['website'] != null &&
+        (company['website'] as String).isNotEmpty) {
+      b.addAll(txt(company['website'] as String));
+    }
     if (storeStreet.isNotEmpty) {
       for (final line in storeStreet.split('\n')) {
-        if (line.trim().isNotEmpty) b.addAll(txt(line.trim()));
+        if (line.trim().isNotEmpty) {
+          b.addAll(txt(line.trim()));
+        }
       }
     }
     b.addAll(align(0));
-    b.addAll(divider(size));
-    b.addAll(rowLR('No.', orderName, size));
-    if (dateRaw.isNotEmpty) b.addAll(rowLR('Tgl', _formatDate(dateRaw), size));
-    b.addAll(divider(size));
-    b.addAll(bold(true));
-    b.addAll(rowLR('TOTAL', 'Rp ${rp(totalVal.round())}', size));
-    b.addAll(bold(false));
-    b.addAll(rowLR('Bayar', 'Rp ${rp(paidVal.round())}', size));
-    b.addAll(rowLR('Kembali', 'Rp ${rp(changeVal.round())}', size));
-    b.addAll(divider(size));
+
+    // ── CUSTOM HEADER / SLOGAN (CENTERED, diapit garis tipis) ─────────────
+    final customHeader =
+        d['receipt_header'] as String? ?? 'Selamat Datang di Toko Kami!';
+    if (customHeader.isNotEmpty) {
+      b.addAll(divider(size, char: '-'));
+      b.addAll(align(1));
+      b.addAll(txt(customHeader));
+      b.addAll(align(0));
+    }
+
+    b.addAll(divider(size, char: '-'));
+
+    // ── ORDER INFO ROWS (Reff, Tanggal, Kasir) ──────────────────────────────
+    final orderNumberClean = orderName
+        .toString()
+        .replaceFirst(RegExp(r'^Order\s*', caseSensitive: false), '');
+    final dateFormatted = dateRaw.isNotEmpty ? _formatDate(dateRaw) : '';
+
+    // Reff row: "Reff        :" left, "Order XXXX-XXX-XXXX" right
+    b.addAll(rowLR('Reff        :', orderNumberClean, size));
+    // Tanggal row: "Tanggal     :" left, "DD/MM/YYYY HH:mm" right
+    b.addAll(rowLR('Tanggal     :', dateFormatted, size));
+    // Kasir row: "Kasir       :" left, "Nama Kasir" right
+    b.addAll(rowLR('Kasir       :', cashier, size));
+
+    b.addAll(divider(size, char: '='));
+
+    // ── ORDERLINES (tanpa harga - nama + qty + customer note) ──────────
+    final lines = d['orderlines'] as List<dynamic>? ?? [];
+    if (lines.isNotEmpty) {
+      for (final line in lines) {
+        final m = line as Map<String, dynamic>;
+        final rawName = m['product_name'] as String? ?? '';
+        final name = rawName.replaceAll('\n', ' ').trim();
+        final qty = (m['qty'] ?? 1).toDouble();
+        final customerNote = m['customer_note'] as String? ?? '';
+
+        // Nama produk (bold)
+        b.addAll(bold(true));
+        b.addAll(txt(name));
+        b.addAll(bold(false));
+
+        // Qty dengan satuan
+        final qtyStr = '${_formatQty(qty)} Pcs';
+        b.addAll(txt('  $qtyStr'));
+
+        // Customer note
+        if (customerNote.isNotEmpty) {
+          b.addAll(txt('  * $customerNote'));
+        }
+      }
+      b.addAll(divider(size, char: '='));
+    }
+
+    // ── FOOTER (CENTERED) ────────────────────────────────────────────────────────
     b.addAll(align(1));
     for (final line in footer.split('\n')) {
-      if (line.trim().isNotEmpty) b.addAll(txt(line.trim()));
+      if (line.trim().isNotEmpty) {
+        b.addAll(txt(line.trim()));
+      }
     }
     b.addAll(align(0));
-    b.addAll(poweredBy(size));
+
+    // ── EXPECTED DELIVERY (CENTERED, JIKA ADA) ─────────────────────────────
+    if (d['shipping_date'] != null &&
+        (d['shipping_date'] as String).isNotEmpty) {
+      b.addAll(align(1));
+      b.addAll(txt('Expected delivery: ${d['shipping_date']}'));
+      b.addAll(align(0));
+    }
+
+    // ── POWERED BY (CENTERED) ────────────────────────────────────
+    // Hapus Order number dan tanggal karena sudah ada di section Reff atas
+    b.addAll(divider(size, char: '='));
+    b.addAll(align(1));
+    b.addAll(bold(true));
+    b.addAll(txt('Powered by dRetail'));
+    b.addAll(bold(false));
+    b.addAll(align(0));
+
     b.addAll(finalize());
     return Uint8List.fromList(b);
   }
@@ -402,13 +687,17 @@ class EscPosHelper {
     final lines = text.split('\n');
     for (int i = 0; i < lines.length; i++) {
       b.addAll(align(alignMode));
-      if (isBold) b.addAll(bold(true));
+      if (isBold) {
+        b.addAll(bold(true));
+      }
       final line = lines[i];
       for (int j = 0; j < line.length; j++) {
         int c = line.codeUnitAt(j);
         b.add(c < 256 ? c : 0x3F);
       }
-      if (isBold) b.addAll(bold(false));
+      if (isBold) {
+        b.addAll(bold(false));
+      }
       b.add(lfCmd);
     }
     b.addAll(finalize());
@@ -430,7 +719,9 @@ class EscPosHelper {
   }
 
   static String _formatQty(double qty) {
-    if (qty == qty.roundToDouble()) return qty.round().toString();
+    if (qty == qty.roundToDouble()) {
+      return qty.round().toString();
+    }
     return qty.toStringAsFixed(2);
   }
 
@@ -439,7 +730,6 @@ class EscPosHelper {
     final List<int> b = [];
     b.addAll(init());
     _applyFontConfig(b);
-
 
     // ── HEADER ────────────────────────────────────────────────────────────────
     b.addAll(align(1));
@@ -481,7 +771,8 @@ class EscPosHelper {
 
     b.addAll(rowLR('Gross Sales', 'Rp ${rp(grossSales.round())}', size));
     b.addAll(rowLR('Discounts', '-Rp ${rp(totalDiscount.round())}', size));
-    b.addAll(rowLR('Returns/Refunds', '-Rp ${rp(refundUntaxed.round())}', size));
+    b.addAll(
+        rowLR('Returns/Refunds', '-Rp ${rp(refundUntaxed.round())}', size));
     b.addAll(divider(size, char: '.'));
     b.addAll(rowLR('Net Sales', 'Rp ${rp(netSalesBeforeTax.round())}', size));
     b.addAll(rowLR('Taxes', 'Rp ${rp(totalTaxes.round())}', size));
@@ -499,7 +790,8 @@ class EscPosHelper {
       b.addAll(txt('----- RETURNS/REFUNDS -----'));
       b.addAll(bold(false));
       b.addAll(align(0));
-      b.addAll(rowLR('Total Refund Amount', 'Rp ${rp(refundAmount.round())}', size));
+      b.addAll(
+          rowLR('Total Refund Amount', 'Rp ${rp(refundAmount.round())}', size));
     }
 
     // ── PAYMENT METHOD ───────────────────────────────────────────────────────
@@ -575,7 +867,8 @@ class EscPosHelper {
 
     b.addAll(divider(size, char: '='));
     b.addAll(bold(true));
-    b.addAll(rowLR('Expected Balance:', 'Rp ${rp(expectedCash.round())}', size));
+    b.addAll(
+        rowLR('Expected Balance:', 'Rp ${rp(expectedCash.round())}', size));
     b.addAll(rowLR('Closing Balance:', 'Rp ${rp(countedCash.round())}', size));
     b.addAll(bold(false));
 
@@ -591,13 +884,15 @@ class EscPosHelper {
     // Credit info if any
     if (totalCreditAmount > 0) {
       b.addAll(divider(size, char: '.'));
-      b.addAll(rowLR('* Credit(piutang):', 'Rp ${rp(totalCreditAmount.round())}', size));
+      b.addAll(rowLR(
+          '* Credit(piutang):', 'Rp ${rp(totalCreditAmount.round())}', size));
     }
 
     // ── FOOTER ─────────────────────────────────────────────────────────────
     b.addAll(divider(size, char: '='));
     b.addAll(align(1));
-    final printDate = d['print_date'] as String? ?? _formatDate(DateTime.now().toIso8601String());
+    final printDate = d['print_date'] as String? ??
+        _formatDate(DateTime.now().toIso8601String());
     b.addAll(txt('Printed at: $printDate'));
     b.addAll(txt('Powered by dRetail'));
     b.addAll(align(0));
