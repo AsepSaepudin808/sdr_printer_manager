@@ -76,7 +76,6 @@ class EscPosHelper {
           final bVal = p.b.toInt();
           final a = p.a.toInt();
 
-          // Alpha blend with white background: white * (1-alpha) + color * alpha
           final double alpha = a / 255.0;
           final int blendedR =
               (r * alpha + 255 * (1 - alpha)).round().clamp(0, 255);
@@ -98,28 +97,24 @@ class EscPosHelper {
     final int imgHeight = resized.height;
     final int widthBytes = (imgWidth + 7) ~/ 8;
 
-    // ── Step 1: Build grayscale float buffer untuk Floyd-Steinberg dithering ──
     final List<double> gray = List<double>.filled(imgWidth * imgHeight, 0.0);
     for (int y = 0; y < imgHeight; y++) {
       for (int x = 0; x < imgWidth; x++) {
         final pixel = resized.getPixel(x, y);
-        // Luminance perceptual (Rec. 601)
         gray[y * imgWidth + x] =
             (0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b) / 255.0;
       }
     }
 
-    // ── Step 2: Floyd-Steinberg dithering in-place ────────────────────────────
     final List<bool> bw = List<bool>.filled(imgWidth * imgHeight, false);
     for (int y = 0; y < imgHeight; y++) {
       for (int x = 0; x < imgWidth; x++) {
         final idx = y * imgWidth + x;
         final oldVal = gray[idx].clamp(0.0, 1.0);
         final newVal = oldVal < 0.5 ? 0.0 : 1.0;
-        bw[idx] = newVal == 0.0; // true = pixel hitam
+        bw[idx] = newVal == 0.0;
         final err = oldVal - newVal;
 
-        // Distribusi error (Floyd-Steinberg weights: 7/16, 3/16, 5/16, 1/16)
         if (x + 1 < imgWidth) {
           gray[idx + 1] += err * (7.0 / 16.0);
         }
@@ -135,9 +130,7 @@ class EscPosHelper {
       }
     }
 
-    // ── Step 3: Pack bits dan buat ESC/POS raster command ─────────────────────
     final List<int> output = [];
-    // ESC/POS raster bit image command: GS v 0 m xL xH yL yH [data]
     output.addAll([gsCmd, 0x76, 0x30, 0x00]);
     output.addAll([widthBytes % 256, widthBytes ~/ 256]);
     output.addAll([imgHeight % 256, imgHeight ~/ 256]);
@@ -162,9 +155,6 @@ class EscPosHelper {
   }
 
   // ── HELPER TEXT ─────────────────────────────────────────────────────────────
-
-  /// Word-wrap: pecah string panjang menjadi List<String> dengan lebar max [w].
-  /// Memotong di batas kata (spasi) agar tidak terpotong di tengah kata.
   static List<String> _wordWrap(String text, int w) {
     final words = text.split(' ');
     final lines = <String>[];
@@ -213,7 +203,6 @@ class EscPosHelper {
     }
     int effectiveRightLen = right.length;
 
-    // Bold characters are slightly wider on MPT-II, reserve 1 extra space
     if (boldRight) {
       effectiveRightLen += 1;
     }
@@ -692,7 +681,6 @@ class EscPosHelper {
     b.addAll(init());
     _applyFontConfig(b);
 
-    // Split by newline to apply alignment and bolding per-line
     final lines = text.split('\n');
     for (int i = 0; i < lines.length; i++) {
       b.addAll(align(alignMode));
