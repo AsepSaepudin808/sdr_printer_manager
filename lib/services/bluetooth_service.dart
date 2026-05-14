@@ -73,8 +73,7 @@ class SdrBluetoothService {
 
       await Future.delayed(const Duration(milliseconds: 200));
 
-      // Send all bytes at once to let the Android Bluetooth socket handle flow control
-      // Manual chunking with delays causes MPT-II printers to flush the buffer and insert random newlines.
+      // Send all bytes at once to let the Android Bluetooth socket handle flow control.
       bool ok = await PrintBluetoothThermal.writeBytes(bytes);
       
       if (!ok) {

@@ -186,21 +186,17 @@ class _TextTabState extends State<TextTab> {
                 ? TextAlign.right
                 : TextAlign.justify;
 
-    // Responsive: detect orientation
     final orientation = MediaQuery.orientationOf(context);
     final isLandscape = orientation == Orientation.landscape;
 
-    // Safe area insets for notched devices in landscape
     final viewPadding = MediaQuery.viewPaddingOf(context);
     final safeTop = viewPadding.top;
     final safeBottom = viewPadding.bottom;
     final safeLeft = viewPadding.left;
 
-    // Bottom bar height (CurvedNavigationBar = 65)
     const bottomBarH = 65.0;
     final totalBottomPad = bottomBarH + safeBottom;
 
-    // Responsive padding: landscape uses safeLeft, portrait uses fixed 20
     final horPad = isLandscape ? (safeLeft + 24) : (20 + safeLeft);
 
     return Container(
@@ -223,12 +219,10 @@ class _TextTabState extends State<TextTab> {
         ),
         child: Column(
           children: [
-            // ── MODERN GLASS TOOLBAR (always visible, compact in landscape) ──
             _buildToolbar(isLandscape),
 
             const SizedBox(height: 16),
 
-            // ── PREMIUM RECEIPT PREVIEW ──
             Expanded(
               child: _buildReceiptPreview(
                 charsPerLine,
@@ -240,7 +234,6 @@ class _TextTabState extends State<TextTab> {
 
             const SizedBox(height: 12),
 
-            // ── MODERN PRINT BUTTON ──
             GestureDetector(
               onTap: _isPrinting ? null : _print,
               behavior: HitTestBehavior.opaque,
@@ -296,7 +289,7 @@ class _TextTabState extends State<TextTab> {
     );
   }
 
-  // ── TOOLBAR ────────────────────────────────────────────────────────────────
+  // TOOLBAR
   Widget _buildToolbar(bool isLandscape) {
     const themeColor = Color(0xFF2BBCC4);
 
@@ -367,7 +360,7 @@ class _TextTabState extends State<TextTab> {
     );
   }
 
-  // ── FORMAT BUTTON ─────────────────────────────────────────────────────────
+  // FORMAT BUTTON
   Widget _formatBtn(IconData icon, bool isActive, VoidCallback onTap,
       String tooltip, Color themeColor) {
     return Tooltip(
@@ -390,7 +383,7 @@ class _TextTabState extends State<TextTab> {
     );
   }
 
-  // ── RECEIPT PREVIEW ────────────────────────────────────────────────────────
+  // RECEIPT PREVIEW
   Widget _buildReceiptPreview(int charsPerLine, double paperContentWidth,
       TextAlign textAlign, bool isLandscape) {
     return Stack(

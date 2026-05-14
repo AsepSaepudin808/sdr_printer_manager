@@ -405,7 +405,6 @@ class _PdfTabState extends State<PdfTab> {
 
   @override
   Widget build(BuildContext context) {
-    // Responsive: handle safe area insets and landscape orientation
     final viewPadding = MediaQuery.viewPaddingOf(context);
     final safeBottom = viewPadding.bottom;
     const bottomBarH = 65.0;
@@ -424,7 +423,6 @@ class _PdfTabState extends State<PdfTab> {
           const SizedBox(height: 8),
           _buildQualityControls(),
           const SizedBox(height: 10),
-          // Preview area — Expanded to fill remaining space
           Expanded(
             child: GestureDetector(
               onTap: _pickPdf,

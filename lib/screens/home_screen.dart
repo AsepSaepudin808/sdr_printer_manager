@@ -300,7 +300,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         ],
                       ),
                       const Spacer(),
-                      // Tombol log
                       _appBarBtn(
                         icon: Icons.history_rounded,
                         onTap: () => Navigator.push(
@@ -673,7 +672,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
                 if (onTap != null) ...[
                   const Spacer(),
-                  const Icon(Icons.edit_rounded, // Added const
+                  const Icon(Icons.edit_rounded,
                       size: 14,
                       color: Colors.grey),
                 ],
@@ -773,7 +772,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(Icons.bolt_rounded,
-                color: _accent, size: 16), // Added const
+                color: _accent, size: 16),
           ),
           const SizedBox(width: 12),
           const Expanded(

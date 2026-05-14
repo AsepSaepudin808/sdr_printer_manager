@@ -62,7 +62,6 @@ class _SplashScreenState extends State<SplashScreen>
             child: Transform.scale(
               scale: _scaleAnim.value,
               child: Column(mainAxisSize: MainAxisSize.min, children: [
-                // Logo icon
                 Container(
                   width: 100,
                   height: 100,
@@ -80,7 +79,6 @@ class _SplashScreenState extends State<SplashScreen>
                       color: Colors.white, size: 52),
                 ),
                 const SizedBox(height: 24),
-                // App name
                 RichText(
                     text: const TextSpan(children: [
                   TextSpan(

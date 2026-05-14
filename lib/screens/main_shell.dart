@@ -576,9 +576,6 @@ class _MainShellState extends State<MainShell> {
     ];
     final isKeyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
 
-    // System nav bar (Back/Home/Recent) dibuat putih agar menyatu dengan bottom bar.
-    // extendBody: false → Flutter otomatis reservasi ruang untuk bottomNavigationBar,
-    // sehingga konten tab tidak perlu menghitung padding manual yang kompleks.
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       systemNavigationBarColor: Colors.white,
       systemNavigationBarDividerColor: Colors.transparent,
