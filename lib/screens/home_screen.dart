@@ -333,7 +333,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ── HERO STATUS ──────────────────────────────────────────────────
+  // HERO STATUS
   Widget _buildStatusHero() {
     return Container(
       decoration: BoxDecoration(
@@ -532,7 +532,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ── PRINTER CARD ─────────────────────────────────────────────────
+  // PRINTER CARD
   Widget _buildPrinterCard() {
     final hasPrinter = _selectedPrinter != null;
     return _buildCard(
@@ -621,7 +621,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ── STATS ROW ────────────────────────────────────────────────────
+  // STATS ROW
   Widget _buildStatsRow() {
     return Row(
       children: [
@@ -694,7 +694,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ── LOG CARD ─────────────────────────────────────────────────────
+  // LOG CARD
   Widget _buildLogCard() {
     return _buildCard(
       child: Column(
@@ -760,7 +760,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ── AUTO START ROW ───────────────────────────────────────────────
+  // AUTO START ROW
   Widget _buildAutoStartRow() {
     return _buildCard(
       child: Row(
@@ -801,7 +801,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ── HELPERS ──────────────────────────────────────────────────────
+  // HELPERS
   Widget _buildCard({required Widget child}) {
     return Container(
       padding: const EdgeInsets.all(16),

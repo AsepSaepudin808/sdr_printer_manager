@@ -126,10 +126,10 @@ class S {
     });
   }
 
-  // ── App ──
+  // App
   static String get appName => 'dPrinter Mart';
 
-  // ── Nav & Titles ──
+  // Nav & Titles
   static String get home => withLang(
         id: 'Beranda',
         en: 'Home',
@@ -195,7 +195,7 @@ class S {
         ar: 'خروج',
       );
 
-  // ── Home ──
+  // Home
   static String get printerActive => withLang(
         id: 'Printer Aktif',
         en: 'Printer Active',
@@ -398,7 +398,7 @@ class S {
         ms: '❌ Pencetak belum disambung!',
       );
 
-  // ── Settings ──
+  // Settings
   static String get language => withLang(
         id: 'Bahasa',
         en: 'Language',
@@ -480,7 +480,7 @@ class S {
         ms: 'Perubahan dibatalkan',
       );
 
-  // ── Tabs ──
+  // Tabs
   static String get typeTextHere => withLang(
         id: 'Ketik teks di sini...',
         en: 'Type text here...',

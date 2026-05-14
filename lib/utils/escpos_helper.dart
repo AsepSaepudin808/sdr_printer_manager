@@ -42,7 +42,7 @@ class EscPosHelper {
     return b;
   }
 
-  // ── COMMANDS DASAR ──────────────────────────────────────────────────────────
+  // COMMANDS
   static Uint8List init() => Uint8List.fromList([escCmd, 0x40]);
   static Uint8List cut() => Uint8List.fromList([gsCmd, 0x56, 0x41, 0x00]);
   static Uint8List bold(bool on) =>
@@ -154,7 +154,7 @@ class EscPosHelper {
     return Uint8List.fromList(output);
   }
 
-  // ── HELPER TEXT ─────────────────────────────────────────────────────────────
+  // HELPERS
   static List<String> _wordWrap(String text, int w) {
     final words = text.split(' ');
     final lines = <String>[];
@@ -291,7 +291,7 @@ class EscPosHelper {
     b.addAll(setFontB(_useFontB));
   }
 
-  // ── BUILD DARI DATA ORDER ODOO ──────────────────────────────────────────────
+  // BUILD FROM ODOO ORDER DATA
   static Uint8List buildFromOdooData(
     Map<String, dynamic> data,
     PaperSize size, {
@@ -303,7 +303,7 @@ class EscPosHelper {
     return _buildFullReceipt(data, size);
   }
 
-  // ── FULL RECEIPT ────────────────────────────────────────────────────────────
+  // FULL RECEIPT
   static Uint8List _buildFullReceipt(Map<String, dynamic> d, PaperSize size) {
     final List<int> b = [];
     b.addAll(init());
@@ -321,7 +321,7 @@ class EscPosHelper {
     final footer =
         d['footer_messages'] as String? ?? 'Terima kasih!\nSampai jumpa lagi.';
 
-    // ── LOGO ──────────────────────────────────────────────────────────────────
+    // LOGO
     if (logoBase64.isNotEmpty) {
       try {
         final bytes = base64Decode(
@@ -335,7 +335,7 @@ class EscPosHelper {
       } catch (_) {}
     }
 
-    // ── HEADER: Nama Toko ─────────────────────────────────────────────────────
+    // STORE NAME
     b.addAll(align(1));
     b.addAll(bold(true));
     final storeNameW = charsPerLine(size);
@@ -349,7 +349,7 @@ class EscPosHelper {
     }
     b.addAll(bold(false));
 
-    // ── Info Kontak Toko ──────────────────────────────────────────────────────
+    // CONTACT INFO
     if (storePhone.isNotEmpty) {
       b.addAll(txt('Tel: $storePhone'));
     }
@@ -372,7 +372,7 @@ class EscPosHelper {
     }
     b.addAll(align(0));
 
-    // ── CUSTOM HEADER / SLOGAN ───────────────────────────────────────────────
+    // CUSTOM HEADER / SLOGAN
     final customHeader = (d['receipt_header'] as String? ?? '').trim();
     if (customHeader.isNotEmpty) {
       b.addAll(divider(size, char: '-'));
@@ -394,7 +394,7 @@ class EscPosHelper {
 
     b.addAll(divider(size, char: '='));
 
-    // ── ORDERLINES ────────────────────────────────────────────────────────────
+    // ORDERLINES
     final lines = d['orderlines'] as List<dynamic>? ?? [];
     for (final line in lines) {
       final m = line as Map<String, dynamic>;
@@ -428,7 +428,7 @@ class EscPosHelper {
     }
     b.addAll(divider(size, char: '-'));
 
-    // ── TAX BREAKDOWN ─────────────────────────────────────────────────────────
+    // TAX BREAKDOWN
     final subtotalVal = (d['total_without_tax'] ?? 0).toDouble();
     final taxVal = (d['total_tax'] ?? 0).toDouble();
     final totalVal = (d['total_with_tax'] ?? 0).toDouble();
@@ -444,7 +444,7 @@ class EscPosHelper {
           'Rp ${rp(taxVal.round())}', size));
     }
 
-    // ── TOTAL ─────────────────────────────────────────────────────────────────
+    // TOTAL
     b.addAll(divider(size, char: '-'));
     b.addAll(doubleHeight(true));
     b.addAll(bold(true));
@@ -452,7 +452,7 @@ class EscPosHelper {
     b.addAll(bold(false));
     b.addAll(doubleHeight(false));
 
-    // ── PAYMENT METHOD ────────────────────────────────────────────────────────
+    // PAYMENT METHOD
     final payments = d['paymentlines'] as List<dynamic>? ?? [];
     for (final pay in payments) {
       final p = pay as Map<String, dynamic>;
@@ -468,12 +468,12 @@ class EscPosHelper {
     b.addAll(rowLR('CHANGE', 'Rp ${rp(changeVal.round())}', size));
     b.addAll(bold(false));
 
-    // ── DISKON TOTAL ──────────────────────────────────────────────────────────
+    // TOTAL DISCOUNT
     if (totalDiscount > 0) {
       b.addAll(rowLR('Diskon Total', 'Rp ${rp(totalDiscount.round())}', size));
     }
 
-    // ── QR CODE / PORTAL INFO ─────────────────────────────────────────────────
+    // QR / PORTAL INFO
     if (d['unique_code'] != null || d['portal_url'] != null) {
       b.addAll(divider(size, char: '-'));
       b.addAll(align(1));
@@ -488,7 +488,7 @@ class EscPosHelper {
       b.addAll(align(0));
     }
 
-    // ── FOOTER ────────────────────────────────────────────────────────────────
+    // FOOTER
     b.addAll(divider(size, char: '='));
     final footerLines =
         footer.split('\n').where((l) => l.trim().isNotEmpty).toList();
@@ -501,7 +501,7 @@ class EscPosHelper {
       b.addAll(align(0));
     }
 
-    // ── EXPECTED DELIVERY ─────────────────────────────────────────────────────
+    // EXPECTED DELIVERY
     if (d['shipping_date'] != null &&
         (d['shipping_date'] as String).isNotEmpty) {
       b.addAll(align(1));
@@ -509,7 +509,7 @@ class EscPosHelper {
       b.addAll(align(0));
     }
 
-    // ── POWERED BY ────────────────────────────────────────────────────────────
+    // POWERED BY
     b.addAll(feed(1));
     b.addAll(align(1));
     b.addAll(bold(true));
@@ -521,7 +521,7 @@ class EscPosHelper {
     return Uint8List.fromList(b);
   }
 
-  // ── BASIC RECEIPT ───────────────────────────────────────────────────────────
+  // BASIC RECEIPT
   static Uint8List _buildBasicReceipt(Map<String, dynamic> d, PaperSize size) {
     final List<int> b = [];
     b.addAll(init());
@@ -539,7 +539,7 @@ class EscPosHelper {
     final footer =
         d['footer_messages'] as String? ?? 'Terima kasih!\nSampai jumpa lagi.';
 
-    // ── LOGO ──────────────────────────────────────────────────────────────────
+    // LOGO
     if (logoBase64.isNotEmpty) {
       try {
         final bytes = base64Decode(
@@ -553,7 +553,7 @@ class EscPosHelper {
       } catch (_) {}
     }
 
-    // ── HEADER: Nama Toko ─────────────────────────────────────────────────────
+    // STORE NAME
     b.addAll(align(1));
     b.addAll(bold(true));
     final storeNameW = charsPerLine(size);
@@ -567,7 +567,7 @@ class EscPosHelper {
     }
     b.addAll(bold(false));
 
-    // ── Info Kontak Toko ──────────────────────────────────────────────────────
+    // CONTACT INFO
     if (storePhone.isNotEmpty) {
       b.addAll(txt('Tel: $storePhone'));
     }
@@ -590,7 +590,7 @@ class EscPosHelper {
     }
     b.addAll(align(0));
 
-    // ── CUSTOM HEADER / SLOGAN ───────────────────────────────────────────────
+    // CUSTOM HEADER / SLOGAN
     final customHeader = (d['receipt_header'] as String? ?? '').trim();
     if (customHeader.isNotEmpty) {
       b.addAll(divider(size, char: '-'));
@@ -601,7 +601,7 @@ class EscPosHelper {
 
     b.addAll(divider(size, char: '-'));
 
-    // ── ORDER INFO ROWS ───────────────────────────────────────────────────────
+    // ORDER INFO ROWS
     final orderNumberClean = orderName
         .toString()
         .replaceFirst(RegExp(r'^Order\s*', caseSensitive: false), '');
@@ -613,7 +613,7 @@ class EscPosHelper {
 
     b.addAll(divider(size, char: '='));
 
-    // ── ORDERLINES ────────────────────────────────────────────────────────────
+    // ORDERLINES
     final lines = d['orderlines'] as List<dynamic>? ?? [];
     if (lines.isNotEmpty) {
       for (final line in lines) {
@@ -641,7 +641,7 @@ class EscPosHelper {
       b.addAll(divider(size, char: '='));
     }
 
-    // ── FOOTER ────────────────────────────────────────────────────────────────
+    // FOOTER
     b.addAll(divider(size, char: '='));
     final footerLines =
         footer.split('\n').where((l) => l.trim().isNotEmpty).toList();
@@ -654,7 +654,7 @@ class EscPosHelper {
       b.addAll(align(0));
     }
 
-    // ── EXPECTED DELIVERY ─────────────────────────────────────────────────────
+    // EXPECTED DELIVERY
     if (d['shipping_date'] != null &&
         (d['shipping_date'] as String).isNotEmpty) {
       b.addAll(align(1));
@@ -662,7 +662,7 @@ class EscPosHelper {
       b.addAll(align(0));
     }
 
-    // ── POWERED BY ────────────────────────────────────────────────────────────
+    // POWERED BY
     b.addAll(feed(1));
     b.addAll(align(1));
     b.addAll(bold(true));
@@ -674,7 +674,7 @@ class EscPosHelper {
     return Uint8List.fromList(b);
   }
 
-  // ── CONVERT TEXT KE ESCPOS ──────────────────────────────────────────────────
+  // CONVERT TEXT TO ESCPOS
   static Uint8List textToEscPos(String text, PaperSize size,
       {bool isBold = false, int alignMode = 0}) {
     final List<int> b = [];
@@ -701,7 +701,7 @@ class EscPosHelper {
     return Uint8List.fromList(b);
   }
 
-  // ── HELPERS INTERNAL ────────────────────────────────────────────────────────
+  // INTERNAL HELPERS
   static String _formatDate(String raw) {
     try {
       final dt = DateTime.parse(raw).toLocal();
@@ -722,13 +722,13 @@ class EscPosHelper {
     return qty.toStringAsFixed(2);
   }
 
-  // ── SESSION SUMMARY REPORT ──────────────────────────────────────────────────
+  // SESSION SUMMARY
   static Uint8List buildSessionSummary(Map<String, dynamic> d, PaperSize size) {
     final List<int> b = [];
     b.addAll(init());
     _applyFontConfig(b);
 
-    // ── HEADER ────────────────────────────────────────────────────────────────
+    // HEADER
     b.addAll(align(1));
     b.addAll(bold(true));
     b.addAll(setFontB(false));
@@ -737,7 +737,7 @@ class EscPosHelper {
     b.addAll(divider(size, char: '='));
     b.addAll(divider(size, char: '-'));
 
-    // ── SESSION INFO ──────────────────────────────────────────────────────────
+    // SESSION INFO
     final posName = d['pos_name'] as String? ?? '-';
     final sessionName = d['session_name'] as String? ?? '-';
     final cashierName = d['cashier_name'] as String? ?? '-';
@@ -751,7 +751,7 @@ class EscPosHelper {
     b.addAll(rowLR('Opening Date', startAt, size));
     b.addAll(rowLR('Closing Date', stopAt, size));
 
-    // ── SALES SUMMARY ─────────────────────────────────────────────────────────
+    // SALES SUMMARY
     b.addAll(divider(size, char: '-'));
     b.addAll(align(1));
     b.addAll(bold(true));
@@ -778,7 +778,7 @@ class EscPosHelper {
     b.addAll(rowLR('Total Sales', 'Rp ${rp(totalSales.round())}', size));
     b.addAll(bold(false));
 
-    // ── RETURNS/REFUNDS ───────────────────────────────────────────────────────
+    // RETURNS / REFUNDS
     final refundAmount = (d['refund_amount'] ?? 0).toDouble();
     if (refundAmount > 0) {
       b.addAll(divider(size, char: '-'));
@@ -791,7 +791,7 @@ class EscPosHelper {
           rowLR('Total Refund Amount', 'Rp ${rp(refundAmount.round())}', size));
     }
 
-    // ── PAYMENT METHOD ────────────────────────────────────────────────────────
+    // PAYMENT METHOD
     b.addAll(divider(size, char: '-'));
     b.addAll(align(1));
     b.addAll(bold(true));
@@ -812,7 +812,7 @@ class EscPosHelper {
     b.addAll(rowLR('Total Payments', 'Rp ${rp(totalPayment.round())}', size));
     b.addAll(bold(false));
 
-    // ── CASH DRAWER SUMMARY ───────────────────────────────────────────────────
+    // CASH DRAWER SUMMARY
     final startingCash = (d['starting_cash'] ?? 0).toDouble();
     final cashSales = (d['cash_sales'] ?? 0).toDouble();
     final cashIn = (d['cash_in'] ?? 0).toDouble();
@@ -839,7 +839,7 @@ class EscPosHelper {
     b.addAll(rowLR('Total', 'Rp ${rp(expectedCash.round())}', size));
     b.addAll(bold(false));
 
-    // ── SESSION TRANSACTIONS ──────────────────────────────────────────────────
+    // SESSION TRANSACTIONS
     final totalTransactions = d['total_transactions'] ?? 0;
     final salesTransactions = d['sales_transactions'] ?? 0;
     final refundTransactions = d['refund_transactions'] ?? 0;
@@ -857,7 +857,7 @@ class EscPosHelper {
     b.addAll(rowLR('Returns/Refunds', refundTransactions.toString(), size));
     b.addAll(rowLR('Items Sold', totalQtySold.toString(), size));
 
-    // ── EXPECTED VS CLOSING BALANCE ───────────────────────────────────────────
+    // EXPECTED VS CLOSING BALANCE
     final countedCash = (d['counted_cash'] ?? 0).toDouble();
     final differenceCash = (d['difference_cash'] ?? 0).toDouble();
     final totalCreditAmount = (d['total_credit_amount'] ?? 0).toDouble();
@@ -884,7 +884,7 @@ class EscPosHelper {
           '* Credit(piutang):', 'Rp ${rp(totalCreditAmount.round())}', size));
     }
 
-    // ── FOOTER ────────────────────────────────────────────────────────────────
+    // FOOTER
     b.addAll(divider(size, char: '='));
     b.addAll(align(1));
     final printDate = d['print_date'] as String? ??

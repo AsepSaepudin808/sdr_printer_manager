@@ -75,13 +75,11 @@ class SdrBluetoothService {
 
       // Send all bytes at once to let the Android Bluetooth socket handle flow control.
       bool ok = await PrintBluetoothThermal.writeBytes(bytes);
-      
       if (!ok) {
         debugPrint('[SDR-BT] FAILED to send data');
         _isConnected = false;
         return false;
       }
-      
       debugPrint('[SDR-BT] All ${bytes.length} bytes sent successfully');
       return true;
     } catch (e) {

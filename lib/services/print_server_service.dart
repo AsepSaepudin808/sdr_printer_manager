@@ -47,7 +47,7 @@ class PrintServerService {
 
     final router = Router();
 
-    // ── GET /status ──────────────────────────────────────────────────────────
+    // GET /status
     router.get('/status', (Request req) {
       final body = jsonEncode({
         'status': 'ok',
@@ -61,7 +61,7 @@ class PrintServerService {
       });
     });
 
-    // ── GET /test-print ──────────────────────────────────────────────────────
+    // GET /test-print
     router.get('/test-print', (Request req) async {
       final action = req.url.queryParameters['type'] ?? 'test_short';
       final size = _paperSize;
@@ -97,7 +97,7 @@ class PrintServerService {
       }
     });
 
-    // ── OPTIONS preflight ────────────────────────────────────────────────────
+    // OPTIONS preflight
     router.options('/print', (Request req) {
       return Response.ok('', headers: const {
         'Access-Control-Allow-Origin': '*',
@@ -117,7 +117,7 @@ class PrintServerService {
       });
     });
 
-    // ── POST /print ──────────────────────────────────────────────────────────
+    // POST /print
     router.post('/print', (Request req) async {
       onLog?.call('📥 Request masuk dari Odoo!');
 
@@ -133,7 +133,7 @@ class PrintServerService {
           final format = json['format'] as String? ?? 'escpos';
           final dataField = json['data'];
 
-          // Handle Session Summary format specifically
+          // Handle Session Summary format
           if (format == 'session_summary') {
             Map<String, dynamic> summaryData;
             if (dataField is Map<String, dynamic>) {

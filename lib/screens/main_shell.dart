@@ -76,7 +76,6 @@ class _MainShellState extends State<MainShell> {
         }
       }
     });
-    // Check if there is a pending job when app starts
     _printJobChannel.invokeMethod('getPendingPrintJob').then((result) {
       if (result != null) {
         final map = Map<String, dynamic>.from(result as Map);
@@ -443,7 +442,7 @@ class _MainShellState extends State<MainShell> {
       PaperSize.mm80 => '80mm',
       PaperSize.mm100 => '100mm'
     };
-    // Filter logs yang berisi print
+    // Filter print logs
     final printLogs = _logs
         .where((l) =>
             l.contains('print') ||
@@ -845,7 +844,7 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  // ── HOME TAB ──
+  // HOME TAB
   Widget _buildHomeTab() {
     final paperLabel = switch (_paperSize) {
       PaperSize.mm58 => '58mm',
@@ -1433,7 +1432,7 @@ class _MainShellState extends State<MainShell> {
     ]));
   }
 
-  // ── CUSTOM ABOUT DIALOG ──────────────────────────────────────────────────
+  // CUSTOM ABOUT DIALOG
   void _showCustomAboutDialog(BuildContext context) {
     showDialog(
       context: context,
