@@ -15,13 +15,13 @@ class EscPosHelper {
   static int _customCharsPerLine = 0;
   static int _extraFeed = 3;
   static bool _autoCut = false;
-  static bool _useFontB = false;
+  static bool _useFontB = false; // Pengaturan dinamis untuk Font B
   static void setCustomCharsPerLine(int value) => _customCharsPerLine = value;
   static void setExtraFeed(int value) => _extraFeed = value;
   static void setAutoCut(bool value) => _autoCut = value;
   static void setUseFontB(bool value) => _useFontB = value;
   static int defaultCharsPerLine(PaperSize size) => switch (size) {
-        PaperSize.mm58 => 32,
+        PaperSize.mm58 => 32, // Standar hardware 58mm Font A adalah 32
         PaperSize.mm80 => 48,
         PaperSize.mm100 => 64,
       };
@@ -45,15 +45,22 @@ class EscPosHelper {
       Uint8List.fromList([escCmd, 0x45, on ? 1 : 0]);
   static Uint8List align(int a) => Uint8List.fromList([escCmd, 0x61, a]);
   static Uint8List feed(int n) => Uint8List.fromList([escCmd, 0x64, n]);
+  // Command untuk mengubah ukuran font: Font B (huruf lebih kecil)
   static Uint8List setFontB(bool on) =>
       Uint8List.fromList([escCmd, 0x21, on ? 1 : 0]);
 
+  // Double-height + double-width untuk nama toko (GS ! n)
+  // n=0x11 = double height+width, n=0x00 = normal
   static Uint8List doubleSize(bool on) =>
       Uint8List.fromList([0x1D, 0x21, on ? 0x11 : 0x00]);
 
+  // Hanya double-height (GS ! 0x01)
   static Uint8List doubleHeight(bool on) =>
       Uint8List.fromList([0x1D, 0x21, on ? 0x01 : 0x00]);
   static Uint8List imageEsc(img.Image src, PaperSize paperSize) {
+    // Logo dibatasi 50% lebar kertas agar proporsional dan tidak terlalu dominan.
+    // Lebar kertas penuh (dots): 58mm=384, 80mm=576, 100mm=768
+    // 50% dari lebar penuh: 58mm=192, 80mm=288, 100mm=384
     int maxW = switch (paperSize) {
       PaperSize.mm58 => 192,
       PaperSize.mm80 => 288,
@@ -61,16 +68,23 @@ class EscPosHelper {
     };
     img.Image resized = src;
 
+    // Convert RGBA to RGB first (handle transparency)
+    // Bug fix: variabel pixel 'p' tidak pernah didefinisikan sebelumnya,
+    // sehingga alpha blending gagal dan loop tidak berjalan sama sekali.
+    // Perbaikan: gunakan src.getPixel(x, y) untuk mendapatkan pixel.
     if (src.numChannels == 4) {
+      // RGBA to RGB: flatten to white background
       final rgbImage =
           img.Image(width: src.width, height: src.height, numChannels: 3);
       for (int y = 0; y < src.height; y++) {
         for (int x = 0; x < src.width; x++) {
-          final p = src.getPixel(x, y);
+          final p =
+              src.getPixel(x, y); // <-- FIX: definisikan pixel dari sumber
           final r = p.r.toInt();
           final g = p.g.toInt();
           final bVal = p.b.toInt();
           final a = p.a.toInt();
+          // Alpha blend with white background: white * (1-alpha) + color * alpha
           final double alpha = a / 255.0;
           final int blendedR =
               (r * alpha + 255 * (1 - alpha)).round().clamp(0, 255);
@@ -84,6 +98,7 @@ class EscPosHelper {
       resized = rgbImage;
     }
 
+    // Resize if larger than max width
     if (resized.width > maxW) {
       resized = img.copyResize(resized, width: maxW);
     }
@@ -92,24 +107,32 @@ class EscPosHelper {
     final int imgHeight = resized.height;
     final int widthBytes = (imgWidth + 7) ~/ 8;
 
+    // ── Step 1: Build grayscale float buffer untuk Floyd-Steinberg dithering ──
+    // Ini jauh lebih baik dari simple threshold karena detail logo tetap terjaga.
+    // Simple threshold (< 0.5) menyebabkan area abu2 dan gradient menjadi
+    // sepenuhnya hitam atau putih tanpa transisi, sehingga detail logo hilang.
     final List<double> gray = List<double>.filled(imgWidth * imgHeight, 0.0);
     for (int y = 0; y < imgHeight; y++) {
       for (int x = 0; x < imgWidth; x++) {
         final pixel = resized.getPixel(x, y);
+        // Luminance perceptual (Rec. 601)
         gray[y * imgWidth + x] =
             (0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b) / 255.0;
       }
     }
 
-    // Floyd-Steinberg dithering
+    // ── Step 2: Floyd-Steinberg dithering in-place ────────────────────────────
+    // Error didistribusikan ke tetangga kanan, bawah-kiri, bawah, bawah-kanan
+    // sehingga halftone alami terbentuk dan detail gambar tetap terlihat.
     final List<bool> bw = List<bool>.filled(imgWidth * imgHeight, false);
     for (int y = 0; y < imgHeight; y++) {
       for (int x = 0; x < imgWidth; x++) {
         final idx = y * imgWidth + x;
         final oldVal = gray[idx].clamp(0.0, 1.0);
-        final newVal = oldVal < 0.5 ? 0.0 : 1.0;
-        bw[idx] = newVal == 0.0;
+        final newVal = oldVal < 0.5 ? 0.0 : 1.0; // quantize
+        bw[idx] = newVal == 0.0; // true = pixel hitam (cetak)
         final err = oldVal - newVal;
+        // Distribusi error (Floyd-Steinberg weights: 7/16, 3/16, 5/16, 1/16)
         if (x + 1 < imgWidth) {
           gray[idx + 1] += err * (7.0 / 16.0);
         }
@@ -125,11 +148,12 @@ class EscPosHelper {
       }
     }
 
-    // Pack bits and build ESC/POS raster command
+    // ── Step 3: Pack bits dan buat ESC/POS raster command ─────────────────────
     final List<int> output = [];
-    output.addAll([gsCmd, 0x76, 0x30, 0x00]);
-    output.addAll([widthBytes % 256, widthBytes ~/ 256]);
-    output.addAll([imgHeight % 256, imgHeight ~/ 256]);
+    // ESC/POS raster bit image command: GS v 0 m xL xH yL yH [data]
+    output.addAll([gsCmd, 0x76, 0x30, 0x00]); // m=0 (normal density)
+    output.addAll([widthBytes % 256, widthBytes ~/ 256]); // xL, xH
+    output.addAll([imgHeight % 256, imgHeight ~/ 256]); // yL, yH
 
     for (int y = 0; y < imgHeight; y++) {
       for (int byteX = 0; byteX < widthBytes; byteX++) {
@@ -151,6 +175,35 @@ class EscPosHelper {
   }
 
   // ── HELPER TEXT ─────────────────────────────────────────────────────────────
+
+  /// Word-wrap: pecah string panjang menjadi List<String> dengan lebar max [w].
+  /// Memotong di batas kata (spasi), bukan di tengah kata, sehingga tidak
+  /// terjadi "Minuman Teh 35\n0 ml" yang terlihat buruk di struk.
+  static List<String> _wordWrap(String text, int w) {
+    final words = text.split(' ');
+    final lines = <String>[];
+    final buf = StringBuffer();
+    for (final word in words) {
+      if (word.isEmpty) {
+        continue;
+      }
+      if (buf.isEmpty) {
+        buf.write(word);
+      } else if (buf.length + 1 + word.length <= w) {
+        buf.write(' ');
+        buf.write(word);
+      } else {
+        lines.add(buf.toString());
+        buf.clear();
+        buf.write(word);
+      }
+    }
+    if (buf.isNotEmpty) {
+      lines.add(buf.toString());
+    }
+    return lines.isEmpty ? [''] : lines;
+  }
+
   static List<int> txt(String s) {
     final bytes = <int>[];
     for (int i = 0; i < s.length; i++) {
@@ -275,6 +328,16 @@ class EscPosHelper {
   }
 
   // ── FULL RECEIPT ────────────────────────────────────────────────────────────
+  // Berdasarkan desain Odoo 18:
+  // - Logo + Header (nama, telp, tax id, email, website)
+  // - Slogan/Custom Header
+  // - Kasir info
+  // - Orderlines (dengan harga, subtotal, diskon, customer note)
+  // - Tax breakdown (DPP + PPN)
+  // - TOTAL, Payment, Change
+  // - Diskon Total
+  // - QR Code info
+  // - Footer + Order reference + date
   static Uint8List _buildFullReceipt(Map<String, dynamic> d, PaperSize size) {
     final List<int> b = [];
     b.addAll(init());
@@ -291,26 +354,39 @@ class EscPosHelper {
     final footer =
         d['footer_messages'] as String? ?? 'Terima kasih!\nSampai jumpa lagi.';
 
+    // ── LOGO (centered, max 50% lebar kertas) ────────────────────────────
     if (logoBase64.isNotEmpty) {
       try {
         final bytes = base64Decode(
             logoBase64.contains(',') ? logoBase64.split(',')[1] : logoBase64);
         final image = img.decodeImage(bytes);
         if (image != null) {
-          b.addAll(align(1));
+          b.addAll(align(1)); // center
           b.addAll(imageEsc(image, size));
           b.addAll(align(0));
         }
       } catch (_) {}
     }
 
+    // ── HEADER: Nama Toko (CENTERED, ukuran font DINAMIS) ───────────────────
+    // Logika: doubleSize jika nama muat dalam setengah lebar kertas,
+    // normal bold jika nama lebih panjang — sehingga selalu 1 baris & tetap bold.
     b.addAll(align(1));
-    b.addAll(doubleSize(true));
     b.addAll(bold(true));
-    b.addAll(txt(storeName));
+    final storeNameW = charsPerLine(size);
+    final halfW = storeNameW ~/ 2;
+    if (storeName.length <= halfW) {
+      // Nama pendek → double-size (2x lebar & tinggi), sangat mencolok
+      b.addAll(doubleSize(true));
+      b.addAll(txt(storeName));
+      b.addAll(doubleSize(false));
+    } else {
+      // Nama panjang → normal size tapi bold, dijamin 1 baris
+      b.addAll(txt(storeName));
+    }
     b.addAll(bold(false));
-    b.addAll(doubleSize(false));
 
+    // ── Info kontak toko (CENTERED, font normal) ──────────────────────────
     if (storePhone.isNotEmpty) {
       b.addAll(txt('Tel: $storePhone'));
     }
@@ -333,9 +409,10 @@ class EscPosHelper {
     }
     b.addAll(align(0));
 
-    // CUSTOM HEADER / SLOGAN (centered)
-    final customHeader =
-        d['receipt_header'] as String? ?? 'Selamat Datang di Toko Kami!';
+    // ── CUSTOM HEADER / SLOGAN ───────────────────────────────────────────────
+    // POIN 2: Nilai bisa kosong → jika kosong, garis "----" di atas TIDAK
+    // ditampilkan dan konten Reff langsung mengikuti tanpa celah kosong.
+    final customHeader = (d['receipt_header'] as String? ?? '').trim();
     if (customHeader.isNotEmpty) {
       b.addAll(divider(size, char: '-'));
       b.addAll(align(1));
@@ -356,7 +433,7 @@ class EscPosHelper {
 
     b.addAll(divider(size, char: '='));
 
-    // ORDERLINES (with price, discount, customer note)
+    // ── ORDERLINES (dengan harga, diskon, customer note) ─────────────────
     final lines = d['orderlines'] as List<dynamic>? ?? [];
     for (final line in lines) {
       final m = line as Map<String, dynamic>;
@@ -368,25 +445,33 @@ class EscPosHelper {
       final discountPct = (m['discount'] ?? 0).toDouble();
       final customerNote = m['customer_note'] as String? ?? '';
 
+      // Nama produk: word-wrap agar tidak terpotong di tengah kata
+      final w = charsPerLine(size);
+      final nameLines = _wordWrap(name, w);
       b.addAll(bold(true));
-      b.addAll(txt(name));
+      for (final nl in nameLines) {
+        b.addAll(txt(nl));
+      }
       b.addAll(bold(false));
 
-      final qtyStr = '${_formatQty(qty)} Pcs x ${rp(unitPrice.round())}';
-      final subtotalStr = rp(subtotal.round());
+      // Baris qty × harga = subtotal (indent 2 spasi, subtotal bold-right + "Rp")
+      final qtyStr = '${_formatQty(qty)} Pcs x Rp ${rp(unitPrice.round())}';
+      final subtotalStr = 'Rp ${rp(subtotal.round())}';
       b.addAll(rowLR('  $qtyStr', subtotalStr, size, boldRight: true));
 
+      // Diskon per item
       if (discountPct > 0) {
         b.addAll(rowLR('  Disc(${_formatQty(discountPct)}%)', '', size));
       }
 
+      // Customer note
       if (customerNote.isNotEmpty) {
         b.addAll(txt('  * $customerNote'));
       }
     }
     b.addAll(divider(size, char: '-'));
 
-    // TAX BREAKDOWN
+    // ── TAX BREAKDOWN ──────────────────────────────────────────────────────
     final subtotalVal = (d['total_without_tax'] ?? 0).toDouble();
     final taxVal = (d['total_tax'] ?? 0).toDouble();
     final totalVal = (d['total_with_tax'] ?? 0).toDouble();
@@ -394,24 +479,31 @@ class EscPosHelper {
     final changeVal = (d['change'] ?? (paidVal - totalVal)).toDouble();
     final totalDiscount = (d['total_discount'] ?? 0).toDouble();
 
-    // DPP (Dasar Pengenaan Pajak)
+    // ── TAX LINES ────────────────────────────────────────────────────────────
+    // POIN 4: "Dasar Pengenaan Pajak" → singkatan "DPP" agar muat di baris
+    // POIN 5: semua nominal wajib ada prefix "Rp"
     if (subtotalVal > 0) {
-      b.addAll(rowLR(
-          'Dasar Pengenaan Pajak', 'Rp ${rp(subtotalVal.round())}', size));
+      b.addAll(rowLR('DPP', 'Rp ${rp(subtotalVal.round())}', size));
     }
-    // PPN
+    // POIN 6: hapus divider '-' di bawah PPN (tidak perlu, terlalu ramai)
     if (taxVal > 0) {
       b.addAll(rowLR('PPN 11% on ${rp(subtotalVal.round())}',
           'Rp ${rp(taxVal.round())}', size));
     }
-    b.addAll(divider(size, char: '-'));
+    // Tidak ada divider di sini (POIN 6)
 
-    // TOTAL, PAYMENT, CHANGE
+    // ── TOTAL ─────────────────────────────────────────────────────────────
+    // POIN 7: tidak ada '===' di atas maupun di bawah TOTAL
+    // POIN 9: tidak ada jarak antar TOTAL/Payment/CHANGE, dibedakan via bold
+    b.addAll(divider(size, char: '-'));
+    b.addAll(doubleHeight(true));
     b.addAll(bold(true));
     b.addAll(rowLR('TOTAL', 'Rp ${rp(totalVal.round())}', size));
     b.addAll(bold(false));
-    b.addAll(divider(size, char: '-'));
+    b.addAll(doubleHeight(false));
 
+    // ── PAYMENT METHOD ────────────────────────────────────────────────────
+    // POIN 9: langsung di bawah TOTAL tanpa divider
     final payments = d['paymentlines'] as List<dynamic>? ?? [];
     for (final pay in payments) {
       final p = pay as Map<String, dynamic>;
@@ -423,20 +515,24 @@ class EscPosHelper {
       b.addAll(rowLR('Cash', 'Rp ${rp(paidVal.round())}', size));
     }
 
+    // POIN 8: tidak ada divider '-' di bawah Cash
+    // POIN 9: CHANGE langsung mengikuti tanpa jarak
     b.addAll(bold(true));
     b.addAll(rowLR('CHANGE', 'Rp ${rp(changeVal.round())}', size));
     b.addAll(bold(false));
 
-    // DISKON TOTAL
+    // ── DISKON TOTAL ──────────────────────────────────────────────────────
     if (totalDiscount > 0) {
       b.addAll(rowLR('Diskon Total', 'Rp ${rp(totalDiscount.round())}', size));
     }
 
-    // QR CODE / PORTAL INFO
+    // ── QR CODE / PORTAL INFO ─────────────────────────────────────────────
+    // Unique code dan portal URL jika ada
     if (d['unique_code'] != null || d['portal_url'] != null) {
       b.addAll(divider(size, char: '-'));
       b.addAll(align(1));
       b.addAll(txt('Need an invoice for your purchase?'));
+      // QR placeholder jika ada
       b.addAll(txt('[QR CODE]'));
       if (d['unique_code'] != null) {
         b.addAll(txt('Unique Code: ${d['unique_code']}'));
@@ -447,17 +543,22 @@ class EscPosHelper {
       b.addAll(align(0));
     }
 
-    // FOOTER (centered)
+    // ── FOOTER (CENTERED) ────────────────────────────────────────────────────
+    // Jika footer kosong, tidak ada feed maupun teks, sehingga tidak ada
+    // baris kosong yang percuma sebelum "Powered by dRetail".
     b.addAll(divider(size, char: '='));
-    b.addAll(align(1));
-    for (final line in footer.split('\n')) {
-      if (line.trim().isNotEmpty) {
+    final footerLines =
+        footer.split('\n').where((l) => l.trim().isNotEmpty).toList();
+    if (footerLines.isNotEmpty) {
+      b.addAll(feed(1));
+      b.addAll(align(1));
+      for (final line in footerLines) {
         b.addAll(txt(line.trim()));
       }
+      b.addAll(align(0));
     }
-    b.addAll(align(0));
 
-    // EXPECTED DELIVERY (centered, if available)
+    // ── EXPECTED DELIVERY (CENTERED, JIKA ADA) ─────────────────────────────
     if (d['shipping_date'] != null &&
         (d['shipping_date'] as String).isNotEmpty) {
       b.addAll(align(1));
@@ -465,7 +566,10 @@ class EscPosHelper {
       b.addAll(align(0));
     }
 
-    // POWERED BY (centered)
+    // ── POWERED BY ────────────────────────────────────────────────────────────
+    // Jika footer kosong, feed(1) tetap memberi jarak yang cukup.
+    // Jika footer ada isinya, feed(1) di atas sudah cukup memisahkan keduanya.
+    b.addAll(feed(1));
     b.addAll(align(1));
     b.addAll(bold(true));
     b.addAll(txt('Powered by dRetail'));
@@ -476,7 +580,17 @@ class EscPosHelper {
     return Uint8List.fromList(b);
   }
 
-  // Basic Receipt: Logo, Header, Orderlines (name + qty only), Footer
+  // ── BASIC RECEIPT ────────────────────────────────────────────────────────────
+  // Berdasarkan desain Odoo 18:
+  // Basic Receipt menampilkan:
+  // - Logo + Header (nama, telp, tax id, email, website, slogan)
+  // - Order info (Reff, Tanggal, Kasir)
+  // - Orderlines (tanpa harga - nama + qty + customer note)
+  // - Footer + Order reference + date
+  // Yang DIHILANGKAN:
+  // - Detail pajak, harga, diskon
+  // - Payment lines, change
+  // - QR code, portal URL
   static Uint8List _buildBasicReceipt(Map<String, dynamic> d, PaperSize size) {
     final List<int> b = [];
     b.addAll(init());
@@ -493,39 +607,46 @@ class EscPosHelper {
     final footer =
         d['footer_messages'] as String? ?? 'Terima kasih!\nSampai jumpa lagi.';
 
-    // LOGO (centered, max 50% width)
+    // ── LOGO (centered, max 50% lebar kertas) ──────────────────────────
     if (logoBase64.isNotEmpty) {
       try {
         final bytes = base64Decode(
             logoBase64.contains(',') ? logoBase64.split(',')[1] : logoBase64);
         final image = img.decodeImage(bytes);
         if (image != null) {
-          b.addAll(align(1));
+          b.addAll(align(1)); // center
           b.addAll(imageEsc(image, size));
           b.addAll(align(0));
         }
       } catch (_) {}
     }
 
-    // HEADER: Store name (centered, double-size)
+    // ── HEADER: Nama Toko (CENTERED, ukuran font DINAMIS) ───────────────────
     b.addAll(align(1));
-    b.addAll(doubleSize(true));
     b.addAll(bold(true));
-    b.addAll(txt(storeName));
+    final storeNameW = charsPerLine(size);
+    final halfW = storeNameW ~/ 2;
+    if (storeName.length <= halfW) {
+      b.addAll(doubleSize(true));
+      b.addAll(txt(storeName));
+      b.addAll(doubleSize(false));
+    } else {
+      b.addAll(txt(storeName));
+    }
     b.addAll(bold(false));
-    b.addAll(doubleSize(false));
 
+    // ── Info kontak toko (CENTERED, font normal) ──────────────────────────
     if (storePhone.isNotEmpty) {
       b.addAll(txt('Tel: $storePhone'));
     }
-    // Tax ID
+    // Tax ID jika ada
     if (company['vat'] != null && (company['vat'] as String).isNotEmpty) {
       b.addAll(txt('Tax ID: ${company['vat']}'));
     }
     if (storeEmail.isNotEmpty) {
       b.addAll(txt(storeEmail));
     }
-    // Website
+    // Website jika ada
     if (company['website'] != null &&
         (company['website'] as String).isNotEmpty) {
       b.addAll(txt(company['website'] as String));
@@ -539,9 +660,9 @@ class EscPosHelper {
     }
     b.addAll(align(0));
 
-    // CUSTOM HEADER / SLOGAN (centered)
-    final customHeader =
-        d['receipt_header'] as String? ?? 'Selamat Datang di Toko Kami!';
+    // ── CUSTOM HEADER / SLOGAN ───────────────────────────────────────────────
+    // POIN 2: Kosong → tidak ada garis "----" dan tidak ada celah kosong.
+    final customHeader = (d['receipt_header'] as String? ?? '').trim();
     if (customHeader.isNotEmpty) {
       b.addAll(divider(size, char: '-'));
       b.addAll(align(1));
@@ -551,19 +672,22 @@ class EscPosHelper {
 
     b.addAll(divider(size, char: '-'));
 
-    // ORDER INFO ROWS
+    // ── ORDER INFO ROWS (Reff, Tanggal, Kasir) ──────────────────────────────
     final orderNumberClean = orderName
         .toString()
         .replaceFirst(RegExp(r'^Order\s*', caseSensitive: false), '');
     final dateFormatted = dateRaw.isNotEmpty ? _formatDate(dateRaw) : '';
 
+    // Reff row: "Reff        :" left, "Order XXXX-XXX-XXXX" right
     b.addAll(rowLR('Reff        :', orderNumberClean, size));
+    // Tanggal row: "Tanggal     :" left, "DD/MM/YYYY HH:mm" right
     b.addAll(rowLR('Tanggal     :', dateFormatted, size));
+    // Kasir row: "Kasir       :" left, "Nama Kasir" right
     b.addAll(rowLR('Kasir       :', cashier, size));
 
     b.addAll(divider(size, char: '='));
 
-    // ORDERLINES (name + qty only)
+    // ── ORDERLINES (tanpa harga - nama + qty + customer note) ──────────
     final lines = d['orderlines'] as List<dynamic>? ?? [];
     if (lines.isNotEmpty) {
       for (final line in lines) {
@@ -573,13 +697,20 @@ class EscPosHelper {
         final qty = (m['qty'] ?? 1).toDouble();
         final customerNote = m['customer_note'] as String? ?? '';
 
+        // Nama produk: word-wrap agar tidak terpotong di tengah kata
+        final w = charsPerLine(size);
+        final nameLines = _wordWrap(name, w);
         b.addAll(bold(true));
-        b.addAll(txt(name));
+        for (final nl in nameLines) {
+          b.addAll(txt(nl));
+        }
         b.addAll(bold(false));
 
+        // Qty dengan satuan
         final qtyStr = '${_formatQty(qty)} Pcs';
         b.addAll(txt('  $qtyStr'));
 
+        // Customer note
         if (customerNote.isNotEmpty) {
           b.addAll(txt('  * $customerNote'));
         }
@@ -587,16 +718,21 @@ class EscPosHelper {
       b.addAll(divider(size, char: '='));
     }
 
-    // FOOTER (centered)
-    b.addAll(align(1));
-    for (final line in footer.split('\n')) {
-      if (line.trim().isNotEmpty) {
+    // ── FOOTER (CENTERED) ────────────────────────────────────────────────────────
+    // Jika footer kosong, tidak ada feed maupun teks.
+    b.addAll(divider(size, char: '='));
+    final footerLines =
+        footer.split('\n').where((l) => l.trim().isNotEmpty).toList();
+    if (footerLines.isNotEmpty) {
+      b.addAll(feed(1));
+      b.addAll(align(1));
+      for (final line in footerLines) {
         b.addAll(txt(line.trim()));
       }
+      b.addAll(align(0));
     }
-    b.addAll(align(0));
 
-    // EXPECTED DELIVERY (centered, if available)
+    // ── EXPECTED DELIVERY (CENTERED, JIKA ADA) ─────────────────────────────
     if (d['shipping_date'] != null &&
         (d['shipping_date'] as String).isNotEmpty) {
       b.addAll(align(1));
@@ -604,8 +740,8 @@ class EscPosHelper {
       b.addAll(align(0));
     }
 
-    // POWERED BY (centered)
-    b.addAll(divider(size, char: '='));
+    // ── POWERED BY ────────────────────────────────────────────────────────────
+    b.addAll(feed(1));
     b.addAll(align(1));
     b.addAll(bold(true));
     b.addAll(txt('Powered by dRetail'));
@@ -622,6 +758,7 @@ class EscPosHelper {
     final List<int> b = [];
     b.addAll(init());
     _applyFontConfig(b);
+    // Split by newline to apply alignment and bolding per-line for better consistency
     final lines = text.split('\n');
     for (int i = 0; i < lines.length; i++) {
       b.addAll(align(alignMode));
@@ -669,16 +806,16 @@ class EscPosHelper {
     b.addAll(init());
     _applyFontConfig(b);
 
-    // HEADER
+    // ── HEADER ────────────────────────────────────────────────────────────────
     b.addAll(align(1));
     b.addAll(bold(true));
-    b.addAll(setFontB(false));
+    b.addAll(setFontB(false)); // Font normal untuk header
     b.addAll(txt('SESSION SUMMARY REPORT'));
     b.addAll(bold(false));
     b.addAll(divider(size, char: '='));
     b.addAll(divider(size, char: '-'));
 
-    // SESSION INFO
+    // ── SESSION INFO ────────────────────────────────────────────────────────
     final posName = d['pos_name'] as String? ?? '-';
     final sessionName = d['session_name'] as String? ?? '-';
     final cashierName = d['cashier_name'] as String? ?? '-';
@@ -692,7 +829,7 @@ class EscPosHelper {
     b.addAll(rowLR('Opening Date', startAt, size));
     b.addAll(rowLR('Closing Date', stopAt, size));
 
-    // SALES SUMMARY
+    // ── SALES SUMMARY ───────────────────────────────────────────────────────
     b.addAll(divider(size, char: '-'));
     b.addAll(align(1));
     b.addAll(bold(true));
@@ -719,7 +856,7 @@ class EscPosHelper {
     b.addAll(rowLR('Total Sales', 'Rp ${rp(totalSales.round())}', size));
     b.addAll(bold(false));
 
-    // RETURNS/REFUNDS
+    // ── RETURNS/REFUNDS ──────────────────────────────────────────────────────
     final refundAmount = (d['refund_amount'] ?? 0).toDouble();
     if (refundAmount > 0) {
       b.addAll(divider(size, char: '-'));
@@ -732,7 +869,7 @@ class EscPosHelper {
           rowLR('Total Refund Amount', 'Rp ${rp(refundAmount.round())}', size));
     }
 
-    // PAYMENT METHOD
+    // ── PAYMENT METHOD ───────────────────────────────────────────────────────
     b.addAll(divider(size, char: '-'));
     b.addAll(align(1));
     b.addAll(bold(true));
@@ -753,7 +890,7 @@ class EscPosHelper {
     b.addAll(rowLR('Total Payments', 'Rp ${rp(totalPayment.round())}', size));
     b.addAll(bold(false));
 
-    // CASH DRAWER SUMMARY
+    // ── CASH DRAWER SUMMARY ─────────────────────────────────────────────────
     final startingCash = (d['starting_cash'] ?? 0).toDouble();
     final cashSales = (d['cash_sales'] ?? 0).toDouble();
     final cashIn = (d['cash_in'] ?? 0).toDouble();
@@ -780,7 +917,7 @@ class EscPosHelper {
     b.addAll(rowLR('Total', 'Rp ${rp(expectedCash.round())}', size));
     b.addAll(bold(false));
 
-    // SESSION TRANSACTIONS
+    // ── SESSION TRANSACTIONS ────────────────────────────────────────────────
     final totalTransactions = d['total_transactions'] ?? 0;
     final salesTransactions = d['sales_transactions'] ?? 0;
     final refundTransactions = d['refund_transactions'] ?? 0;
@@ -798,7 +935,7 @@ class EscPosHelper {
     b.addAll(rowLR('Returns/Refunds', refundTransactions.toString(), size));
     b.addAll(rowLR('Items Sold', totalQtySold.toString(), size));
 
-    // EXPECTED VS CLOSING BALANCE
+    // ── EXPECTED VS CLOSING BALANCE ───────────────────────────────────────
     final countedCash = (d['counted_cash'] ?? 0).toDouble();
     final differenceCash = (d['difference_cash'] ?? 0).toDouble();
     final totalCreditAmount = (d['total_credit_amount'] ?? 0).toDouble();
@@ -826,7 +963,7 @@ class EscPosHelper {
           '* Credit(piutang):', 'Rp ${rp(totalCreditAmount.round())}', size));
     }
 
-    // FOOTER
+    // ── FOOTER ─────────────────────────────────────────────────────────────
     b.addAll(divider(size, char: '='));
     b.addAll(align(1));
     final printDate = d['print_date'] as String? ??
