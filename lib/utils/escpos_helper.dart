@@ -249,7 +249,8 @@ class EscPosHelper {
     return txt('$left$padding$right');
   }
 
-  static String rp(int amount, {String symbol = 'Rp', int decimals = 0, bool positionAfter = false}) {
+  static String rp(int amount,
+      {String symbol = 'Rp', int decimals = 0, bool positionAfter = false}) {
     String prefix = symbol;
     String suffix = '';
     int value = amount.abs();
@@ -298,8 +299,10 @@ class EscPosHelper {
   static String currencyFmt(double amount, Map<String, dynamic> currency) {
     final symbol = currency['symbol'] as String? ?? 'Rp';
     final decimals = currency['decimal_places'] as int? ?? 0;
-    final positionAfter = (currency['position'] as String? ?? 'before') == 'after';
-    return rp(amount.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter);
+    final positionAfter =
+        (currency['position'] as String? ?? 'before') == 'after';
+    return rp(amount.round(),
+        symbol: symbol, decimals: decimals, positionAfter: positionAfter);
   }
 
   static String fixLen(String s, int width) {
@@ -318,7 +321,8 @@ class EscPosHelper {
 
   static String storeNameDoubleSize(String name, int w) {
     final maxChars = w ~/ 2;
-    final truncated = name.length > maxChars ? name.substring(0, maxChars) : name;
+    final truncated =
+        name.length > maxChars ? name.substring(0, maxChars) : name;
     return '\x1D\x21\x11$truncated\x1D\x21\x00';
   }
 
@@ -358,6 +362,9 @@ class EscPosHelper {
     return _buildFullReceipt(data, size);
   }
 
+  // ===========================================================================
+  // ========================== PRINT FULL RECEIPT =============================
+  // ===========================================================================
   static Uint8List _buildFullReceipt(Map<String, dynamic> d, PaperSize size) {
     final List<int> b = [];
     b.addAll(init());
@@ -396,7 +403,8 @@ class EscPosHelper {
     final w = charsPerLine(size);
     final maxChars = w ~/ 2;
     final truncatedName = storeName.length > maxChars
-        ? storeName.substring(0, maxChars) : storeName;
+        ? storeName.substring(0, maxChars)
+        : storeName;
     b.addAll(doubleSize(true));
     b.addAll(txt(truncatedName));
     b.addAll(doubleSize(false));
@@ -429,7 +437,8 @@ class EscPosHelper {
     b.addAll(rowLR('Kasir       :', cashier, size));
     b.addAll(divider(size, char: '='));
 
-    final currency = company['currency'] as Map<String, dynamic>? ?? {'symbol': 'Rp', 'decimal_places': 0};
+    final currency = company['currency'] as Map<String, dynamic>? ??
+        {'symbol': 'Rp', 'decimal_places': 0};
     final symbol = currency['symbol'] as String? ?? 'Rp';
     final decimals = currency['decimal_places'] as int? ?? 0;
 
@@ -461,13 +470,15 @@ class EscPosHelper {
 
       final uom = (m['uom'] as String? ?? '').trim();
       final uomLabel = uom.isNotEmpty ? uom : 'Pcs';
-      final qtyStr = '${_formatQty(qty)} $uomLabel x ${rp(unitPrice.round(), symbol: symbol, decimals: decimals)}';
+      final qtyStr =
+          '${_formatQty(qty)} $uomLabel x ${rp(unitPrice.round(), symbol: symbol, decimals: decimals)}';
       final totalStr = rp(subtotal.round(), symbol: symbol, decimals: decimals);
       b.addAll(rowLR(qtyStr, totalStr, size, boldRight: true));
 
       if (discountPct > 0) {
         final discLabel = '  Disc(${_formatQty(discountPct)}%)';
-        final discStr = rp(-discountAmt.round(), symbol: symbol, decimals: decimals);
+        final discStr =
+            rp(-discountAmt.round(), symbol: symbol, decimals: decimals);
         b.addAll(rowLR(discLabel, discStr, size));
       }
 
@@ -489,23 +500,28 @@ class EscPosHelper {
 
     // TOTAL BELANJA
     b.addAll(divider(size, char: '='));
-    b.addAll(rowLR('Total Belanja', rp(subtotalVal.round(), symbol: symbol, decimals: decimals), size));
+    b.addAll(rowLR('Total Belanja',
+        rp(subtotalVal.round(), symbol: symbol, decimals: decimals), size));
     if (allDiscount > 0) {
-      b.addAll(rowLR('Total Diskon', rp(-allDiscount.round(), symbol: symbol, decimals: decimals), size));
+      b.addAll(rowLR('Total Diskon',
+          rp(-allDiscount.round(), symbol: symbol, decimals: decimals), size));
     }
 
     // DPP & PPN
     b.addAll(divider(size, char: '.'));
     if (taxVal > 0) {
-      b.addAll(rowLR('DPP', rp(dppVal.round(), symbol: symbol, decimals: decimals), size));
-      b.addAll(rowLR('PPN 11%', rp(taxVal.round(), symbol: symbol, decimals: decimals), size));
+      b.addAll(rowLR(
+          'DPP', rp(dppVal.round(), symbol: symbol, decimals: decimals), size));
+      b.addAll(rowLR('PPN 11%',
+          rp(taxVal.round(), symbol: symbol, decimals: decimals), size));
     }
 
     // TOTAL BAYAR
     b.addAll(divider(size, char: '-'));
     b.addAll(doubleHeight(true));
     b.addAll(bold(true));
-    b.addAll(rowLR('TOTAL BAYAR', rp(totalVal.round(), symbol: symbol, decimals: decimals), size));
+    b.addAll(rowLR('TOTAL BAYAR',
+        rp(totalVal.round(), symbol: symbol, decimals: decimals), size));
     b.addAll(bold(false));
     b.addAll(doubleHeight(false));
 
@@ -515,15 +531,18 @@ class EscPosHelper {
       final p = pay as Map<String, dynamic>;
       final payName = p['name'] as String? ?? 'Cash';
       final payAmt = (p['amount'] ?? 0).toDouble();
-      b.addAll(rowLR(payName, rp(payAmt.round(), symbol: symbol, decimals: decimals), size));
+      b.addAll(rowLR(payName,
+          rp(payAmt.round(), symbol: symbol, decimals: decimals), size));
     }
     if (payments.isEmpty && paidVal > 0) {
-      b.addAll(rowLR('Cash', rp(paidVal.round(), symbol: symbol, decimals: decimals), size));
+      b.addAll(rowLR('Cash',
+          rp(paidVal.round(), symbol: symbol, decimals: decimals), size));
     }
 
     // CHANGE
     b.addAll(bold(true));
-    b.addAll(rowLR('CHANGE', rp(changeVal.round(), symbol: symbol, decimals: decimals), size));
+    b.addAll(rowLR('CHANGE',
+        rp(changeVal.round(), symbol: symbol, decimals: decimals), size));
     b.addAll(bold(false));
 
     // QR / PORTAL INFO
@@ -562,7 +581,8 @@ class EscPosHelper {
     b.addAll(txt('Powered by dRetail'));
     b.addAll(bold(false));
     final now = DateTime.now();
-    final printDt = '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year.toString().substring(2)} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    final printDt =
+        '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year.toString().substring(2)} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
     b.addAll(txt(printDt));
     b.addAll(align(0));
 
@@ -570,6 +590,9 @@ class EscPosHelper {
     return Uint8List.fromList(b);
   }
 
+  // ===========================================================================
+  // ========================= PRINT BASIC RECEIPT =============================
+  // ===========================================================================
   static Uint8List _buildBasicReceipt(Map<String, dynamic> d, PaperSize size) {
     final List<int> b = [];
     b.addAll(init());
@@ -606,7 +629,8 @@ class EscPosHelper {
     final w = charsPerLine(size);
     final maxChars = w ~/ 2;
     final truncatedName = storeName.length > maxChars
-        ? storeName.substring(0, maxChars) : storeName;
+        ? storeName.substring(0, maxChars)
+        : storeName;
     b.addAll(doubleSize(true));
     b.addAll(txt(truncatedName));
     b.addAll(doubleSize(false));
@@ -694,7 +718,8 @@ class EscPosHelper {
     b.addAll(txt('Powered by dRetail'));
     b.addAll(bold(false));
     final now = DateTime.now();
-    final printDt = '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year.toString().substring(2)} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    final printDt =
+        '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year.toString().substring(2)} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
     b.addAll(txt(printDt));
     b.addAll(align(0));
 
@@ -759,17 +784,21 @@ class EscPosHelper {
     }
   }
 
-  // SESSION SUMMARY
+  // ===========================================================================
+  // ============================ SUMMARY REPORT SESSION =======================
+  // ===========================================================================
   static Uint8List buildSessionSummary(Map<String, dynamic> d, PaperSize size) {
     final List<int> b = [];
     b.addAll(init());
     _applyFontConfig(b);
 
     final company = d['company'] as Map<String, dynamic>? ?? {};
-    final currency = company['currency'] as Map<String, dynamic>? ?? {'symbol': 'Rp', 'decimal_places': 0};
+    final currency = company['currency'] as Map<String, dynamic>? ??
+        {'symbol': 'Rp', 'decimal_places': 0};
     final symbol = currency['symbol'] as String? ?? 'Rp';
     final decimals = currency['decimal_places'] as int? ?? 0;
-    final positionAfter = (currency['position'] as String? ?? 'before') == 'after';
+    final positionAfter =
+        (currency['position'] as String? ?? 'before') == 'after';
 
     b.addAll(align(1));
     b.addAll(bold(true));
@@ -806,15 +835,39 @@ class EscPosHelper {
     final totalTaxes = (d['total_taxes'] ?? 0).toDouble();
     final totalSales = (d['total_sales'] ?? 0).toDouble();
 
-    b.addAll(rowLR('Gross Sales', rp(grossSales.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
-    b.addAll(rowLR('Discounts', rp(-totalDiscount.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
-    b.addAll(rowLR('Returns/Refunds', rp(-refundUntaxed.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
+    b.addAll(rowLR(
+        'Gross Sales',
+        rp(grossSales.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        size));
+    b.addAll(rowLR(
+        'Discounts',
+        rp(-totalDiscount.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        size));
+    b.addAll(rowLR(
+        'Returns/Refunds',
+        rp(-refundUntaxed.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        size));
     b.addAll(divider(size, char: '.'));
-    b.addAll(rowLR('Net Sales', rp(netSalesBeforeTax.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
-    b.addAll(rowLR('Taxes', rp(totalTaxes.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
+    b.addAll(rowLR(
+        'Net Sales',
+        rp(netSalesBeforeTax.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        size));
+    b.addAll(rowLR(
+        'Taxes',
+        rp(totalTaxes.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        size));
     b.addAll(divider(size, char: '.'));
     b.addAll(bold(true));
-    b.addAll(rowLR('Total Sales', rp(totalSales.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
+    b.addAll(rowLR(
+        'Total Sales',
+        rp(totalSales.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        size));
     b.addAll(bold(false));
 
     final refundAmount = (d['refund_amount'] ?? 0).toDouble();
@@ -825,7 +878,11 @@ class EscPosHelper {
       b.addAll(txt('----- RETURNS/REFUNDS -----'));
       b.addAll(bold(false));
       b.addAll(align(0));
-      b.addAll(rowLR('Total Refund Amount', rp(refundAmount.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
+      b.addAll(rowLR(
+          'Total Refund Amount',
+          rp(refundAmount.round(),
+              symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+          size));
     }
 
     b.addAll(divider(size, char: '-'));
@@ -840,12 +897,20 @@ class EscPosHelper {
       final p = pay as Map<String, dynamic>;
       final payName = (p['method'] as String? ?? 'Payment').toUpperCase();
       final payAmt = (p['amount'] ?? 0).toDouble();
-      b.addAll(rowLR(payName, rp(payAmt.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
+      b.addAll(rowLR(
+          payName,
+          rp(payAmt.round(),
+              symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+          size));
     }
     final totalPayment = (d['total_payment_amount'] ?? 0).toDouble();
     b.addAll(divider(size, char: '.'));
     b.addAll(bold(true));
-    b.addAll(rowLR('Total Payments', rp(totalPayment.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
+    b.addAll(rowLR(
+        'Total Payments',
+        rp(totalPayment.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        size));
     b.addAll(bold(false));
 
     final startingCash = (d['starting_cash'] ?? 0).toDouble();
@@ -861,17 +926,37 @@ class EscPosHelper {
     b.addAll(bold(false));
     b.addAll(align(0));
 
-    b.addAll(rowLR('Opening Cash', rp(startingCash.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
-    b.addAll(rowLR('(+) Cash Sales', rp(cashSales.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
+    b.addAll(rowLR(
+        'Opening Cash',
+        rp(startingCash.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        size));
+    b.addAll(rowLR(
+        '(+) Cash Sales',
+        rp(cashSales.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        size));
     if (cashIn > 0) {
-      b.addAll(rowLR('(+) Cash In', rp(cashIn.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
+      b.addAll(rowLR(
+          '(+) Cash In',
+          rp(cashIn.round(),
+              symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+          size));
     }
     if (cashOut > 0) {
-      b.addAll(rowLR('(-) Cash Out', rp(-cashOut.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
+      b.addAll(rowLR(
+          '(-) Cash Out',
+          rp(-cashOut.round(),
+              symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+          size));
     }
     b.addAll(divider(size, char: '.'));
     b.addAll(bold(true));
-    b.addAll(rowLR('Total', rp(expectedCash.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
+    b.addAll(rowLR(
+        'Total',
+        rp(expectedCash.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        size));
     b.addAll(bold(false));
 
     final totalTransactions = d['total_transactions'] ?? 0;
@@ -897,11 +982,20 @@ class EscPosHelper {
 
     b.addAll(divider(size, char: '='));
     b.addAll(bold(true));
-    b.addAll(rowLR('Expected Balance:', rp(expectedCash.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
-    b.addAll(rowLR('Closing Balance:', rp(countedCash.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
+    b.addAll(rowLR(
+        'Expected Balance:',
+        rp(expectedCash.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        size));
+    b.addAll(rowLR(
+        'Closing Balance:',
+        rp(countedCash.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        size));
     b.addAll(bold(false));
 
-    final diffStr = rp(differenceCash.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter);
+    final diffStr = rp(differenceCash.round(),
+        symbol: symbol, decimals: decimals, positionAfter: positionAfter);
     if (differenceCash != 0) {
       b.addAll(bold(true));
       b.addAll(rowLR('Difference:', diffStr, size));
@@ -910,7 +1004,11 @@ class EscPosHelper {
 
     if (totalCreditAmount > 0) {
       b.addAll(divider(size, char: '.'));
-      b.addAll(rowLR('* Credit(piutang):', rp(totalCreditAmount.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
+      b.addAll(rowLR(
+          '* Credit(piutang):',
+          rp(totalCreditAmount.round(),
+              symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+          size));
     }
 
     b.addAll(divider(size, char: '='));
