@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import '../utils/escpos_helper.dart';
 import '../utils/strings.dart';
+import '../utils/test_print_template.dart';
 
 class PrinterSettingsScreen extends StatefulWidget {
   const PrinterSettingsScreen({super.key});
@@ -57,6 +59,63 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
       _paperSize = s;
       _charsCtrl.text = EscPosHelper.defaultCharsPerLine(s).toString();
     });
+  }
+
+  /// Fungsi untuk melakukan Test Print langsung dari layar pengaturan
+  Future<void> _testPrint(bool isFull) async {
+    final isConnected = await PrintBluetoothThermal.connectionStatus;
+    if (!isConnected) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+            S.isEn ? 'Printer is not connected!' : 'Printer belum terhubung!'),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+
+    // SIMPAN nilai original sebelum di-overwrite sementara
+    final originalChars = EscPosHelper.customCharsPerLineSetting;
+    final originalFeed = EscPosHelper.extraFeedSetting;
+    final originalCut = EscPosHelper.autoCutSetting;
+
+    // APLIKASIKAN nilai dari UI ke EscPosHelper agar fungsi pembungkus kata (word-wrap)
+    // dalam EscPosHelper.rowLR bisa dihitung sesuai pengaturan saat ini (meski belum di-save)
+    final chars = int.tryParse(_charsCtrl.text.trim()) ??
+        EscPosHelper.defaultCharsPerLine(_paperSize);
+    final defaultChars = EscPosHelper.defaultCharsPerLine(_paperSize);
+    EscPosHelper.setCustomCharsPerLine(chars != defaultChars ? chars : 0);
+    EscPosHelper.setExtraFeed(_extraFeed);
+    EscPosHelper.setAutoCut(_autoCut);
+
+    try {
+      final bytes = isFull
+          ? TestPrintTemplate.buildTestLong(_paperSize)
+          : TestPrintTemplate.buildTestShort(_paperSize);
+
+      await PrintBluetoothThermal.writeBytes(bytes);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content:
+            Text(S.isEn ? 'Test print sent' : 'Test print berhasil dikirim'),
+        backgroundColor: const Color(0xFF06C270),
+        behavior: SnackBarBehavior.floating,
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Error: $e'),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+      ));
+    } finally {
+      // KEMBALIKAN ke nilai semula agar tidak auto-save jika user menekan tombol "Batal"
+      EscPosHelper.setCustomCharsPerLine(originalChars);
+      EscPosHelper.setExtraFeed(originalFeed);
+      EscPosHelper.setAutoCut(originalCut);
+    }
   }
 
   Future<void> _save() async {
@@ -210,7 +269,49 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                           TextStyle(fontSize: 11, color: Colors.grey.shade500)),
                 ],
               )),
+
+          // SECTION TEST PRINT
+          _section(
+              S.isEn
+                  ? 'Test Print (Current Layout)'
+                  : 'Cetak Percobaan (Layout Saat Ini)',
+              child: Row(children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _testPrint(false), // SHORT
+                    icon: const Icon(Icons.receipt_long, size: 18),
+                    label: Text(S.isEn ? 'Short' : 'Pendek'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.amber.shade700,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _testPrint(true), // FULL
+                    icon: const Icon(Icons.receipt, size: 18),
+                    label: Text(S.isEn ? 'Full' : 'Lengkap'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal.shade600,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+              ])),
+
           const SizedBox(height: 24),
+
+          // Action Buttons
           Row(children: [
             Expanded(
                 child: OutlinedButton(
@@ -240,6 +341,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                   style: const TextStyle(fontWeight: FontWeight.w700)),
             )),
           ]),
+          const SizedBox(height: 24), // Extra bottom padding
         ],
       ),
     );
@@ -251,7 +353,10 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
       child: InputDecorator(
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+          labelStyle: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w600),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           contentPadding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
         ),

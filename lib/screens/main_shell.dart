@@ -64,6 +64,8 @@ class _MainShellState extends State<MainShell> {
     _requestPerms();
     _setupListeners();
     _setupPrintJobChannel();
+    // Preload logo for test print templates
+    TestPrintTemplate.preloadLogo();
   }
 
   void _setupPrintJobChannel() {
