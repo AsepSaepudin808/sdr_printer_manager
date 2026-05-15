@@ -105,7 +105,7 @@ class TestPrintTemplate {
 
     // Financial summary dengan PPN 11%
     const subtotal = 34000;
-    const totalDiskonItem = 2500; // 1000 (Aqua) + 1500 (Roti 10%)
+    const totalDiskonItem = 2500;
     const dpp = subtotal - totalDiskonItem;
     final pajak = (dpp * 11 / 100).round();
     final total = dpp + pajak;
@@ -257,10 +257,9 @@ class TestPrintTemplate {
 
     // Financial summary — Total Diskon = Diskon Item + Diskon Nota
     const subtotal = 143100;
-    const totalDiskonItem = 3880; // Aqua5% + Roti500 + Sabun10% + Mie380
-    const totalDiskonNota = 0; // Diskon nota (jika ada)
-    const totalDiskon =
-        totalDiskonItem + totalDiskonNota + globalDiscAmt; // Total semua diskon
+    const totalDiskonItem = 3880;
+    const totalDiskonNota = 0;
+    const totalDiskon = totalDiskonItem + totalDiskonNota + globalDiscAmt;
     const dpp = subtotal - totalDiskon;
     final pajak = (dpp * 11 / 100).round();
     final total = dpp + pajak;
@@ -305,6 +304,7 @@ class TestPrintTemplate {
     b.addAll(EscPosHelper.bold(false));
     b.addAll(EscPosHelper.txt('Barang yang sudah dibeli'));
     b.addAll(EscPosHelper.txt('tidak dapat dikembalikan'));
+    b.addAll(EscPosHelper.txt('kecuali ada perjanjian khusus'));
     b.addAll(EscPosHelper.align(0));
 
     b.addAll(EscPosHelper.feed(1));
