@@ -1,102 +1,246 @@
 # 🖨️ dPrinter Mart
 
-**Versi 1.0.0.1** | Package: `id.dprinter.mart`
+**Versi 1.0.0+12** | Package: `id.dprinter.mart` | Dibuat oleh **Sarana Digital Retail**
 
-Aplikasi Android berbasis **Flutter** yang bertindak sebagai *Local Print Server* (Virtual IoT Box) untuk menjembatani sistem kasir **Odoo 18 Point of Sale (POS)** dengan **Printer Thermal Bluetooth**. Dibuat khusus untuk kebutuhan operasional dRetail Mart.
+Aplikasi Android berbasis **Flutter** yang berfungsi sebagai **Local Print Server** — menjembatani sistem kasir **Odoo 18 Point of Sale (POS)** dengan **Printer Thermal Bluetooth**, tanpa memerlukan perangkat keras IoT Box.
 
-Sistem ini memungkinkan kasir mencetak struk secara **langsung (Direct Print)** dari *browser* ke printer thermal tanpa memerlukan perangkat keras Odoo IoT Box yang mahal, serta memiliki fungsionalitas tambahan untuk mencetak teks bebas, gambar, dan dokumen PDF secara langsung dari aplikasi.
+Sistem ini bekerja bersama modul Odoo **`sdr_print_direct_pos`** (versi `18.0.1.2.0`) yang terpasang di Odoo 18 POS untuk mengirim perintah cetak langsung ke aplikasi ini melalui HTTP request lokal.
 
 ---
 
 ## ✨ Fitur Utama
 
-- 🚀 **Bypass Odoo IoT Box** — Mengubah HP/Tablet Android menjadi pelayan cetak (*Print Server*) mandiri untuk menghubungkan Odoo POS dengan Printer Thermal Bluetooth.
-- ⚡ **Auto-Print & Manual Print** — Mendukung cetak otomatis setelah validasi pembayaran, maupun cetak ulang manual dari Odoo POS.
-- 📄 **Cetak PDF, Gambar, dan Teks** — Dilengkapi dengan fitur bawaan untuk mencetak teks bebas (*Free Text*), Gambar (*Image*), dan Dokumen PDF langsung ke Printer Thermal.
-- 🔊 **Smart Error Notification** — Jika printer mati atau terputus, Odoo POS menampilkan popup notifikasi *Error* merah tanpa *crash/hang*.
-- 🖥️ **Print Service Terintegrasi** — Aplikasi terdaftar sebagai *Android Print Service*, memungkinkan mencetak dari aplikasi lain melalui sistem print Android.
-- 🔄 **Seamless Background Process** — Aplikasi menjalankan HTTP Server di latar belakang (port 8080) yang tetap berjalan meskipun aplikasi di-*minimize*.
-- 📱 **Portrait Only** — Aplikasi dikunci dalam mode portrait untuk pengalaman kasir yang konsisten.
-- 🧻 **Auto-Scaling ESC/POS** — Menggunakan perintah *byte commands* asli yang secara otomatis menyesuaikan kerapatan karakter printer (Mendukung ukuran kertas 58mm, 80mm, dan 100mm).
+| Fitur | Deskripsi |
+|-------|-----------|
+| 🚀 **Bypass IoT Box** | Mengubah HP/Tablet Android menjadi print server mandiri |
+| 🧾 **Full & Basic Receipt** | Dua mode struk — lengkap (detail item, diskon, pajak) dan ringkas (nama produk & qty saja) |
+| 📊 **Session Summary Report** | Cetak laporan ringkasan sesi kasir (Gross Sales, DPP, PPN, Pembayaran, Kas) |
+| ⚡ **Auto-Print** | Cetak otomatis setelah validasi pembayaran di Odoo POS |
+| 📝 **Free Text Print** | Cetak teks bebas langsung dari aplikasi (tab Teks) |
+| 🖼️ **Image Print** | Cetak gambar dari galeri ke printer thermal (tab Gambar) |
+| 📑 **PDF Print** | Render dan cetak dokumen PDF halaman per halaman (tab PDF) |
+| 🔄 **HTTP Server Background** | Server berjalan di port `8080`, tetap aktif saat aplikasi di-minimize |
+| 🔊 **Error Notification** | Odoo POS menampilkan notifikasi merah jika printer offline — tidak crash |
+| 🖥️ **Android Print Service** | Terdaftar sebagai layanan cetak sistem Android |
+| ⚙️ **Printer Settings** | Konfigurasi ukuran kertas (58mm/80mm/100mm), chars per baris, auto-cut, extra feed |
+| 🌐 **Multi-Bahasa** | Mendukung Bahasa Indonesia dan English |
 
 ---
 
 ## 🛠️ Topologi & Skema Penggunaan
 
-Aplikasi ini sangat fleksibel dan mendukung 2 skema operasional:
-
 ```mermaid
 graph TD
     subgraph Skema_1 ["SKEMA 1: Standalone (1 Perangkat)"]
-        T1["📱 Tablet/HP Kasir"] --> W1("🌐 Odoo POS (Browser)")
+        T1["📱 Tablet/HP Kasir"] --> W1("🌐 Odoo 18 POS (Browser)")
         T1 --> A1("⚙️ dPrinter Mart")
-        W1 -- "Kirim JSON (localhost:8080)" --> A1
-        A1 -- "Kirim Bytes (Bluetooth)" --> P1(("🖨️ Printer Thermal BT"))
+        W1 -- "POST JSON (localhost:8080/print)" --> A1
+        A1 -- "ESC/POS Bytes (Bluetooth)" --> P1(("🖨️ Printer Thermal"))
     end
 
     subgraph Skema_2 ["SKEMA 2: Client-Server (2 Perangkat)"]
-        C2["💻 PC/Laptop Kasir"] --> W2("🌐 Odoo POS (Browser)")
-        H2["📱 HP Android (Server)"] --> A2("⚙️ dPrinter Mart")
-        W2 -- "Kirim JSON (IP_Lokal:8080)" --> A2
-        A2 -- "Kirim Bytes (Bluetooth)" --> P2(("🖨️ Printer Thermal BT"))
+        C2["💻 PC/Laptop Kasir"] --> W2("🌐 Odoo 18 POS (Browser)")
+        H2["📱 HP Android"] --> A2("⚙️ dPrinter Mart")
+        W2 -- "POST JSON (192.168.x.x:8080/print)" --> A2
+        A2 -- "ESC/POS Bytes (Bluetooth)" --> P2(("🖨️ Printer Thermal"))
     end
 ```
 
-### Alur Kerja:
-1. **Odoo POS** mengirim perintah cetak (JSON) ke HTTP Server aplikasi via `localhost:8080` (standalone) atau `192.168.x.x:8080` (client-server).
-2. **dPrinter Mart** menerima JSON, mengkonversi ke perintah ESC/POS, lalu mengirim ke **Printer Thermal** melalui Bluetooth.
-3. Hasil cetak (**Sukses / Error**) dikembalikan ke **Odoo POS** secara *realtime*.
+### Alur Kerja
+
+1. **Odoo POS** (via modul `sdr_print_direct_pos`) mengirim `POST /print` dengan payload JSON ke HTTP Server dPrinter Mart.
+2. **dPrinter Mart** mem-parsing JSON, mengkonversinya ke perintah **ESC/POS bytes**, dan mengirimnya ke **Printer Thermal** via Bluetooth.
+3. Status **sukses / error** dikembalikan ke Odoo POS secara *realtime* dalam format JSON.
 
 ---
 
 ## 📂 Struktur Proyek
 
 ```
-lib/
-├── main.dart                  # Entry point aplikasi
-├── models/                    # Model data
-├── screens/                   # Halaman/Layar aplikasi
-│   ├── home_screen.dart       # Layar utama (dashboard printer)
-│   ├── scan_screen.dart      # Scan & pairing perangkat Bluetooth
-│   ├── printer_settings_screen.dart  # Pengaturan printer
-│   ├── settings_screen.dart  # Pengaturan aplikasi
-│   ├── log_screen.dart       # Log aktivitas cetak
-│   ├── splash_screen.dart    # Layar pembuka
-│   ├── main_shell.dart       # Shell navigasi bawah
-│   ├── text_tab.dart         # Tab cetak teks bebas
-│   ├── image_tab.dart        # Tab cetak gambar
-│   └── pdf_tab.dart          # Tab cetak dokumen PDF
-└── services/
-    ├── bluetooth_service.dart   # Manajemen koneksi Bluetooth
-    └── print_server_service.dart  # HTTP Server (port 8080)
+sdr_printer_manager/
+├── pubspec.yaml
+├── lib/
+│   ├── main.dart                       # Entry point aplikasi
+│   ├── models/                         # Model data
+│   ├── screens/
+│   │   ├── splash_screen.dart          # Layar pembuka
+│   │   ├── main_shell.dart             # Shell navigasi + logic print job
+│   │   ├── home_screen.dart            # Dashboard utama (status, log, kontrol)
+│   │   ├── scan_screen.dart            # Scan & pairing Bluetooth printer
+│   │   ├── settings_screen.dart        # Pengaturan aplikasi (bahasa, port, dll)
+│   │   ├── printer_settings_screen.dart # Pengaturan printer (kertas, feed, cut)
+│   │   ├── log_screen.dart             # Riwayat log cetak
+│   │   ├── text_tab.dart               # Tab cetak teks bebas (preview realtime)
+│   │   ├── image_tab.dart              # Tab cetak gambar
+│   │   └── pdf_tab.dart                # Tab cetak dokumen PDF
+│   ├── services/
+│   │   ├── bluetooth_service.dart      # Manajemen koneksi & pengiriman Bluetooth
+│   │   └── print_server_service.dart   # HTTP Server (port 8080, shelf)
+│   └── utils/
+│       ├── escpos_helper.dart          # Builder ESC/POS: Full Receipt, Basic Receipt, Summary Report
+│       ├── test_print_template.dart    # Template test print (Short & Long)
+│       └── strings.dart               # Terjemahan multi-bahasa (id/en)
+└── android/
+    └── app/src/main/kotlin/
+        └── SdrPrintService.kt          # Android Print Service (system integration)
+```
+
+---
+
+## 🔗 Modul Odoo: `sdr_print_direct_pos`
+
+Modul Odoo yang bekerja bersama aplikasi ini, terpasang di instance **Odoo 18**.
+
+**Lokasi:** `odoo18-staging/sdr_print_direct_pos/`
+
+| File | Fungsi |
+|------|--------|
+| `static/src/js/sdr_print_service.js` | Service JS utama — normalisasi data order & pengiriman ke dPrinter Mart |
+| `static/src/js/pos_store_print_patch.js` | Patch Odoo POS Store untuk auto-print saat validasi |
+| `static/src/css/sdr_print.css` | Styling UI tambahan di layar POS |
+| `views/pos_config_views.xml` | Tambahan field konfigurasi di menu Settings POS |
+
+### Konfigurasi di Odoo POS
+
+Buka **Point of Sale > Configuration > Settings**, lalu:
+
+| Field | Nilai |
+|-------|-------|
+| **SDR Direct Print** | Aktifkan (centang) |
+| **Printer URL** | `http://127.0.0.1:8080` (Skema 1) atau `http://192.168.x.x:8080` (Skema 2) |
+| **Auto Print on Validate** | Opsional — cetak otomatis saat klik Validate |
+
+---
+
+## 📡 Endpoint HTTP Server
+
+Server berjalan di **port 8080** dan mendukung endpoint berikut:
+
+| Method | Endpoint | Deskripsi |
+|--------|----------|-----------|
+| `GET` | `/status` | Status server & koneksi Bluetooth printer |
+| `GET` | `/test-print?type=test_short` | Cetak struk test pendek |
+| `GET` | `/test-print?type=test_long` | Cetak struk test lengkap |
+| `POST` | `/print` | Cetak berdasarkan format payload |
+| `OPTIONS` | `/print`, `/status` | CORS preflight (untuk browser) |
+
+### Format Payload `POST /print`
+
+**1. Full Receipt (dari Odoo POS):**
+```json
+{
+  "format": "odoo_json",
+  "data": {
+    "name": "POS/2025/00123",
+    "date": "2025-05-15T11:00:00.000Z",
+    "cashier": "Kasir 1",
+    "receipt_type": "full",
+    "company": {
+      "name": "dRetail Mart",
+      "phone": "021-1234-5678",
+      "email": "info@dretail.id",
+      "logo": "<base64_string>",
+      "currency": { "symbol": "Rp", "decimal_places": 0, "position": "before" }
+    },
+    "orderlines": [
+      {
+        "product_name": "Indomie Goreng",
+        "qty": 2,
+        "price": 3500,
+        "price_with_tax": 7000,
+        "discount": 0,
+        "uom": "Pcs"
+      }
+    ],
+    "paymentlines": [{ "name": "Cash", "amount": 50000 }],
+    "total_with_tax": 7000,
+    "total_without_tax": 6307,
+    "total_tax": 693,
+    "total_paid": 50000,
+    "change": 43000
+  }
+}
+```
+
+**2. Basic Receipt (struk ringkas):**
+```json
+{
+  "format": "odoo_json",
+  "data": {
+    "receipt_type": "basic",
+    "...": "field lainnya sama seperti Full Receipt"
+  }
+}
+```
+
+**3. Session Summary Report:**
+```json
+{
+  "format": "session_summary",
+  "data": {
+    "session_name": "POS/2025/0012",
+    "pos_name": "Kasir Utama",
+    "cashier_name": "Kasir 1",
+    "start_at": "2025-05-15 08:00",
+    "stop_at": "2025-05-15 17:00",
+    "gross_sales": 1500000,
+    "total_discount": 50000,
+    "total_taxes": 132450,
+    "total_sales": 1650000,
+    "payments": [
+      { "method": "CASH", "amount": 1000000 },
+      { "method": "QRIS", "amount": 650000 }
+    ],
+    "starting_cash": 500000,
+    "expected_cash": 1500000
+  }
+}
+```
+
+**4. Teks Bebas:**
+```json
+{
+  "format": "text",
+  "data": "Baris 1\nBaris 2\nBaris 3"
+}
+```
+
+### Contoh Response
+
+```json
+{ "status": "ok", "message": "Print berhasil" }
+```
+```json
+{ "status": "error", "message": "Printer tidak terhubung" }
 ```
 
 ---
 
 ## ⚙️ Teknologi yang Digunakan
 
-| Teknologi | Fungsi |
-|-----------|--------|
-| **Flutter & Dart** | Framework & bahasa pemrograman |
-| **print_bluetooth_thermal** | Komunikasi Bluetooth & protokol ESC/POS |
-| **shelf & shelf_router** | HTTP Local Server (port 8080) |
-| **pdfx & image** | Render dokumen PDF & gambar untuk cetak thermal |
-| **permission_handler** | Manajemen izin Bluetooth & lokasi |
-| **network_info_plus** | Deteksi IP lokal untuk mode client-server |
-| **file_picker** | Pemilihan file PDF & gambar |
-| **shared_preferences** | Penyimpanan pengaturan |
-| **curved_navigation_bar** | Navigasi tab bawah |
+| Teknologi | Versi | Fungsi |
+|-----------|-------|--------|
+| **Flutter & Dart** | SDK ^3.5.0 | Framework & bahasa pemrograman |
+| **print_bluetooth_thermal** | Local | Komunikasi Bluetooth & protokol ESC/POS |
+| **shelf & shelf_router** | ^1.4.1 / ^1.1.4 | HTTP Local Server (port 8080) |
+| **pdfx** | ^2.6.0 | Render dokumen PDF untuk cetak thermal |
+| **image** | ^4.2.0 | Pemrosesan gambar & dithering untuk thermal |
+| **permission_handler** | ^11.3.1 | Manajemen izin Bluetooth & lokasi |
+| **network_info_plus** | ^6.0.1 | Deteksi IP lokal untuk mode client-server |
+| **file_picker** | ^8.0.0 | Pemilihan file PDF & gambar |
+| **shared_preferences** | ^2.3.2 | Penyimpanan pengaturan lokal |
+| **curved_navigation_bar** | ^1.0.6 | Navigasi tab bawah |
 
 ---
 
-## 📋 Izin yang Dibutuhkan
+## 📋 Izin Android yang Dibutuhkan
 
 | Izin | Alasan |
 |------|--------|
 | `BLUETOOTH` & `BLUETOOTH_ADMIN` | Scan & koneksi ke printer thermal |
 | `BLUETOOTH_CONNECT` & `BLUETOOTH_SCAN` | Akses Bluetooth pada Android 12+ |
 | `ACCESS_FINE_LOCATION` | Wajib untuk scanning Bluetooth di Android |
-| `INTERNET` & `ACCESS_NETWORK_STATE` | Komunikasi HTTP dengan Odoo POS |
+| `INTERNET` & `ACCESS_NETWORK_STATE` | HTTP Server & komunikasi dengan Odoo POS |
 | `ACCESS_WIFI_STATE` | Deteksi IP lokal perangkat |
 
 ---
@@ -107,233 +251,90 @@ lib/
 |-----------|-------|
 | **Nama Aplikasi** | dPrinter Mart |
 | **Package ID** | `id.dprinter.mart` |
-| **Versi** | 1.0.0.1 |
-| **Versi Code** | 12 |
-| **Min SDK** | Flutter default |
+| **Versi** | 1.0.0 |
+| **Version Code** | 12 |
+| **Min SDK** | Android 5.0+ (SDK 21) |
 | **Target SDK** | 36 |
 | **Orientasi** | Portrait Only |
+| **Port HTTP Server** | 8080 |
+| **Ukuran Kertas** | 58mm / 80mm / 100mm |
 
 ---
 
-## 🚀 Cara Instalasi
+## 🚀 Cara Build & Instalasi
 
-1. **Clone repository** (atau salin folder proyek ke lokal Anda).
-2. **Buka terminal** di folder proyek, lalu jalankan:
-   ```bash
-   flutter pub get
-   ```
-3. **Buka proyek** di Android Studio / VS Code, lalu:
-   - Hubungkan perangkat Android (USB Debugging aktif).
-   - Jalankan:
-     ```bash
-     flutter run
-     ```
-   - Atau untuk build APK Release:
-     ```bash
-     flutter build apk --release
-     ```
-4. **APK siap** di `build/app/outputs/flutter-apk/app-release.apk`.
+### Prasyarat
 
----
+- Flutter SDK `^3.5.0`
+- Android Studio / VS Code
+- Perangkat Android dengan USB Debugging aktif
 
-## 📡 Endpoint HTTP Server
+### Build
 
-| Method | Endpoint | Deskripsi |
-|--------|----------|-----------|
-| `POST` | `/print` | Mencetak JSON perintah ESC/POS |
-| `GET`  | `/status` | Status koneksi printer |
-| `GET`  | `/logs`   | Log aktivitas cetak |
+```bash
+# Install dependencies
+flutter pub get
 
----
+# Run di perangkat (mode debug)
+flutter run
 
-## 📖 Panduan Penggunaan
-
-### 1. Persiapan Awal
-
-Sebelum menggunakan aplikasi, pastikan:
-
-- **Bluetooth** dan **Lokasi** diaktifkan di perangkat Android.
-- **Printer Thermal** sudah menyala dan dalam mode pairing (LED indikator berkedip).
-- Untuk **Skema 2 (Client-Server)**, pastikan perangkat Android dan PC/Laptop terhubung ke **jaringan yang sama** (WiFi yang sama).
-
----
-
-### 2. Koneksi Printer Bluetooth
-
-Ikuti langkah berikut di aplikasi:
-
-1. Buka aplikasi **dPrinter Mart**.
-2. Di layar **Dashboard**, ketuk tombol **"Pilih"** pada kartu printer.
-3. Aplikasi akan membuka layar **Scan Bluetooth** dan mulai memindai perangkat terdekat.
-4. Pilih printer thermal yang ingin digunakan dari daftar.
-5. Tunggu hingga koneksi berhasil — indikator **"Terhubung via Bluetooth"** akan muncul.
-
-> **Tips:** Printer yang sudah pernah terhubung akan tersimpan otomatis dan dapat digunakan kembali tanpa scan ulang.
-
----
-
-### 3. Mengaktifkan Print Server
-
-Setelah printer terhubung:
-
-1. Di layar **Dashboard**, ketuk tombol **"Aktifkan Printer"**.
-2. Tunggu hingga proses koneksi Bluetooth dan start server selesai.
-3. Jika berhasil, layar akan menampilkan:
-   - Status: **"Printer Aktif"** (dengan indikator hijau berkedip)
-   - **URL Server**: `http://192.168.x.x:8080`
-4. Ketuk **"Salin URL"** untuk menyalin tautan server ke clipboard.
-
-> **Auto-Start:** Aktifkan toggle **"Aktifkan Otomatis"** agar printer langsung aktif setiap kali aplikasi dibuka (asalkan printer sudah terhubung sebelumnya).
-
----
-
-### 4. Mengubah Port Server (Opsional)
-
-Jika port 8080 bentrok dengan aplikasi lain:
-
-1. Ketuk kartu **"Port Server"** di layar Dashboard.
-2. Masukkan nomor port baru (1024–65535).
-3. Ketuk **"Simpan"**.
-4. Server akan restart secara otomatis pada port baru.
-
----
-
-### 5. Integrasi dengan Odoo POS
-
-#### Konfigurasi Odoo (Skema 1 - Standalone)
-
-Jika Odoo POS berjalan di **perangkat yang sama** dengan dPrinter Mart:
-
-```python
-# Di Odoo POS, set proxy_url ke localhost
-# Buka: Pengaturan POS > Hardware Proxy
-# Isikan: http://localhost:8080
+# Build APK release
+flutter build apk --release
 ```
 
-#### Konfigurasi Odoo (Skema 2 - Client-Server)
-
-Jika Odoo POS berjalan di **PC/Laptop terpisah**:
-
-1. Pastikan perangkat Android dan PC/Laptop terhubung ke **WiFi yang sama**.
-2. Di aplikasi dPrinter Mart, aktifkan printer dan catat **URL Server** (contoh: `http://192.168.1.100:8080`).
-3. Di Odoo POS (PC):
-   ```
-   # Set proxy_url ke IP perangkat Android
-   # Contoh: http://192.168.1.100:8080
-   ```
-
-#### Format Request ke `/print`
-
-Odoo POS secara otomatis mengirim perintah cetak dalam format JSON ke endpoint `POST /print`. Berikut contoh format yang didukung:
-
-**Format Odoo JSON:**
-```json
-{
-  "format": "odoo_json",
-  "receipt_type": "full",
-  "data": {
-    "order": {
-      "name": "00123",
-      "date": "2025-01-14 10:30:00",
-      "cashier": "Kasir 1",
-      "total": 150000,
-      "payment": "Tunai"
-    },
-    "lines": [
-      {"name": "Kopi Hitam", "qty": 2, "price": 15000},
-      {"name": "Roti Isi", "qty": 1, "price": 12000}
-    ]
-  }
-}
+APK hasil build ada di:
 ```
-
-**Format Session Summary:**
-```json
-{
-  "format": "session_summary",
-  "data": {
-    "session_name": "Shift Pagi",
-    "date": "2025-01-14",
-    "total_sales": 1500000,
-    "total_orders": 45,
-    "cash": 1000000,
-    "card": 500000
-  }
-}
-```
-
-**Format Text Biasa:**
-```json
-{
-  "format": "text",
-  "data": "Baris 1\nBaris 2\nBaris 3"
-}
+build/app/outputs/flutter-apk/app-release.apk
 ```
 
 ---
 
-### 6. Test Print
+## 📖 Panduan Penggunaan Singkat
 
-Untuk memastikan printer berfungsi:
+### 1. Koneksi Printer Bluetooth
 
-1. Buka browser di perangkat yang terhubung ke server.
-2. Kunjungi:
-   ```
-   http://192.168.1.100:8080/test-print
-   ```
-3. Printer akan mencetak struk test pendek.
-4. Untuk test panjang, kunjungi:
-   ```
-   http://192.168.1.100:8080/test-print?type=test_long
-   ```
+1. Buka **dPrinter Mart**, pastikan Bluetooth dan Lokasi aktif.
+2. Di **Dashboard**, ketuk **"Pilih"** pada kartu printer.
+3. Pilih printer thermal dari daftar hasil scan.
+4. Tunggu hingga status berubah menjadi **"Terhubung via Bluetooth"**.
 
----
+### 2. Aktifkan Print Server
 
-### 7. Cetak Manual (Tanpa Odoo POS)
+1. Ketuk tombol **"Aktifkan Printer"** di Dashboard.
+2. Jika berhasil, status berubah menjadi **"Printer Aktif"** (hijau).
+3. Catat **URL Server** yang ditampilkan (contoh: `http://192.168.1.100:8080`).
 
-Aplikasi mendukung cetak langsung tanpa Odoo POS melalui tab navigasi bawah:
+### 3. Konfigurasi Odoo POS
 
-#### 📝 Teks Bebas (Tab Teks)
-1. Pilih tab **"Teks"** di navigasi bawah.
-2. Ketik teks yang ingin dicetak.
-3. Ketuk tombol **"Cetak"**.
-4. Printer akan mencetak teks sesuai format ESC/POS.
+1. Buka **POS > Configuration > Settings**.
+2. Aktifkan **SDR Direct Print** dan masukkan URL server.
+3. Simpan dan buka sesi POS.
 
-#### 🖼️ Gambar (Tab Gambar)
-1. Pilih tab **"Gambar"** di navigasi bawah.
-2. Ketuk tombol **"Pilih Gambar"**.
-3. Pilih gambar dari galeri perangkat.
-4. Gambar akan di-*render* ke format printer thermal.
-5. Ketuk **"Cetak"**.
+### 4. Test Print
 
-#### 📑 Dokumen PDF (Tab PDF)
-1. Pilih tab **"PDF"** di navigasi bawah.
-2. Ketuk tombol **"Pilih File PDF"**.
-3. Pilih file PDF dari penyimpanan perangkat.
-4. PDF akan di-*render* per halaman.
-5. Ketuk **"Cetak"** untuk mencetak halaman yang dipilih.
+Dari browser di perangkat yang terhubung ke server:
 
----
+```
+GET http://192.168.1.100:8080/test-print?type=test_short
+GET http://192.168.1.100:8080/test-print?type=test_long
+```
 
-### 8. Memantau Aktivitas
-
-Layar **Dashboard** menampilkan log aktivitas *realtime*:
-
-- Request print dari Odoo POS
-- Status koneksi Bluetooth
-- Error atau kegagalan cetak
-- Counter struk yang berhasil dicetak
-
-Ketuk ikon **"Riwayat"** (⏱️) di sudut kanan atas untuk melihat log lengkap.
+Atau langsung dari aplikasi: **Pengaturan Printer > Cetak Percobaan (Pendek / Lengkap)**.
 
 ---
 
 ## 📝 Catatan Penting
 
-- Pastikan **Bluetooth** dan **Lokasi** diaktifkan di perangkat Android sebelum menggunakan aplikasi.
-- Port HTTP Server default: **8080**. Pastikan port tersebut tidak digunakan oleh aplikasi lain.
-- Aplikasi mendukung printer dengan lebar kertas **58mm**, **80mm**, dan **100mm** secara otomatis.
+- Port default adalah **8080**. Pastikan port ini tidak digunakan aplikasi lain.
+- Aplikasi mendukung printer **58mm**, **80mm**, dan **100mm** — sesuaikan di menu **Pengaturan Printer**.
+- Format tanggal pada struk: **DD/MM/YYYY HH:mm** (waktu lokal perangkat).
+- Data currency (simbol, desimal, posisi) diambil langsung dari konfigurasi Odoo, bukan hardcoded.
+- Log aktivitas realtime tersedia di Dashboard dan layar **Riwayat Log**.
 
 ---
 
 ## 📜 Lisensi
+
+Proyek ini dilisensikan di bawah **MIT License** — lihat file [LICENSE](LICENSE) untuk detailnya.
+
+&copy; 2025 Sarana Digital Retail — dRetail Mart
