@@ -17,7 +17,7 @@ class TestPrintTemplate {
       final Uint8List bytes = data.buffer.asUint8List();
       _cachedLogo = img.decodeImage(bytes);
     } catch (e) {
-      // Logo not found — skip silently
+      // LOGO NOT FOUND
     }
     _logoLoaded = true;
   }
@@ -46,6 +46,7 @@ class TestPrintTemplate {
     _addLogo(b, size);
     b.addAll(EscPosHelper.feed(1));
 
+    // STORE NAME
     b.addAll(EscPosHelper.align(1));
     b.addAll(EscPosHelper.bold(true));
     final halfW = EscPosHelper.charsPerLine(size) ~/ 2;
@@ -58,12 +59,14 @@ class TestPrintTemplate {
     }
     b.addAll(EscPosHelper.bold(false));
 
+    // CONTACT INFO
     b.addAll(EscPosHelper.txt('Jl. Sudirman No. 45, Jakarta'));
     b.addAll(EscPosHelper.txt('Telp: (021) 1234-5678'));
     b.addAll(EscPosHelper.txt('info@dretail.id'));
     b.addAll(EscPosHelper.align(0));
     b.addAll(EscPosHelper.divider(size, char: '='));
 
+    // ORDER INFO
     b.addAll(
         EscPosHelper.rowLR('Ref         :', 'TRX-${_genTrxId(now)}', size));
     b.addAll(EscPosHelper.rowLR('Tanggal     :', dateStr, size));
@@ -75,7 +78,7 @@ class TestPrintTemplate {
     b.addAll(EscPosHelper.sectionHeader('DETAIL ITEM', size));
     b.addAll(EscPosHelper.bold(false));
 
-    // Items — simulasi: 1 item normal, 1 item dengan diskon Rp, 1 item dengan diskon %
+    // ITEMS
     const shortItems = [
       _ItemWithDisc('Indomie Goreng', 2.0, 3500.0, 7000.0, 0.0, 0.0),
       _ItemWithDisc('Aqua 600ml', 3.0, 4000.0, 12000.0, 1000.0, 0.0),
@@ -103,7 +106,7 @@ class TestPrintTemplate {
 
     b.addAll(EscPosHelper.divider(size, char: '='));
 
-    // Financial summary dengan PPN 11%
+    // FINANCIAL SUMMARY
     const subtotal = 34000;
     const totalDiskonItem = 2500;
     const dpp = subtotal - totalDiskonItem;
@@ -131,12 +134,14 @@ class TestPrintTemplate {
     b.addAll(EscPosHelper.bold(false));
     b.addAll(EscPosHelper.doubleHeight(false));
 
+    // PAYMENT
     b.addAll(EscPosHelper.rowLR('Cash', 'Rp ${EscPosHelper.rp(bayar)}', size));
     b.addAll(EscPosHelper.bold(true));
     b.addAll(
         EscPosHelper.rowLR('CHANGE', 'Rp ${EscPosHelper.rp(kembali)}', size));
     b.addAll(EscPosHelper.bold(false));
 
+    // RECEIPT FOOTER
     b.addAll(EscPosHelper.divider(size, char: '='));
     b.addAll(EscPosHelper.align(1));
     b.addAll(EscPosHelper.bold(true));
@@ -146,6 +151,7 @@ class TestPrintTemplate {
     b.addAll(EscPosHelper.txt('tidak dapat dikembalikan'));
     b.addAll(EscPosHelper.align(0));
 
+    // POWERED BY
     b.addAll(EscPosHelper.feed(1));
     b.addAll(EscPosHelper.align(1));
     b.addAll(EscPosHelper.bold(true));
@@ -153,6 +159,7 @@ class TestPrintTemplate {
     b.addAll(EscPosHelper.bold(false));
     b.addAll(EscPosHelper.align(0));
 
+    // PRINTER SETTINGS INFO
     b.addAll(EscPosHelper.txt(''));
     b.addAll(EscPosHelper.divider(size, char: '='));
     b.addAll(EscPosHelper.align(1));
@@ -180,6 +187,7 @@ class TestPrintTemplate {
     _addLogo(b, size);
     b.addAll(EscPosHelper.feed(1));
 
+    // STORE NAME
     b.addAll(EscPosHelper.align(1));
     b.addAll(EscPosHelper.bold(true));
     final halfW = w ~/ 2;
@@ -192,12 +200,14 @@ class TestPrintTemplate {
     }
     b.addAll(EscPosHelper.bold(false));
 
+    // CONTACT INFO
     b.addAll(EscPosHelper.txt('Jl. Sudirman No. 45, Jakarta'));
     b.addAll(EscPosHelper.txt('Telp: (021) 1234-5678'));
     b.addAll(EscPosHelper.txt('info@dretail.id'));
     b.addAll(EscPosHelper.align(0));
     b.addAll(EscPosHelper.divider(size, char: '='));
 
+    // ORDER INFO
     b.addAll(
         EscPosHelper.rowLR('Ref         :', 'TRX-${_genTrxId(now)}', size));
     b.addAll(EscPosHelper.rowLR('Tanggal     :', dateStr, size));
@@ -209,7 +219,7 @@ class TestPrintTemplate {
     b.addAll(EscPosHelper.sectionHeader('DETAIL ITEM', size));
     b.addAll(EscPosHelper.bold(false));
 
-    // Items dengan kombinasi diskon berbeda
+    // ITEMS
     const longItems = [
       _ItemWithDisc('Indomie Goreng', 3.0, 3500.0, 10500.0, 0.0, 0.0),
       _ItemWithDisc('Aqua 600ml', 4.0, 4000.0, 16000.0, 0.0, 5.0),
@@ -244,7 +254,7 @@ class TestPrintTemplate {
       }
     }
 
-    // Global Discount Bill — diskon % diterapkan ke seluruh transaksi
+    // GLOBAL DISCOUNT
     const globalDiscPct = 10;
     const globalDiscAmt = 14310;
     b.addAll(EscPosHelper.bold(true));
@@ -255,7 +265,7 @@ class TestPrintTemplate {
 
     b.addAll(EscPosHelper.divider(size, char: '='));
 
-    // Financial summary — Total Diskon = Diskon Item + Diskon Nota
+    // FINANCIAL SUMMARY
     const subtotal = 143100;
     const totalDiskonItem = 3880;
     const totalDiskonNota = 0;
@@ -284,6 +294,7 @@ class TestPrintTemplate {
     b.addAll(EscPosHelper.bold(false));
     b.addAll(EscPosHelper.doubleHeight(false));
 
+    // PAYMENT
     if (bayarTunai > 0) {
       b.addAll(EscPosHelper.rowLR(
           'Cash', 'Rp ${EscPosHelper.rp(bayarTunai)}', size));
@@ -297,6 +308,7 @@ class TestPrintTemplate {
         EscPosHelper.rowLR('CHANGE', 'Rp ${EscPosHelper.rp(kembali)}', size));
     b.addAll(EscPosHelper.bold(false));
 
+    // RECEIPT FOOTER
     b.addAll(EscPosHelper.divider(size, char: '='));
     b.addAll(EscPosHelper.align(1));
     b.addAll(EscPosHelper.bold(true));
@@ -306,6 +318,7 @@ class TestPrintTemplate {
     b.addAll(EscPosHelper.txt('tidak dapat dikembalikan'));
     b.addAll(EscPosHelper.align(0));
 
+    // POWERED BY
     b.addAll(EscPosHelper.feed(1));
     b.addAll(EscPosHelper.align(1));
     b.addAll(EscPosHelper.bold(true));
@@ -313,6 +326,7 @@ class TestPrintTemplate {
     b.addAll(EscPosHelper.bold(false));
     b.addAll(EscPosHelper.align(0));
 
+    // PRINTER SETTINGS INFO
     b.addAll(EscPosHelper.txt(''));
     b.addAll(EscPosHelper.divider(size, char: '='));
     b.addAll(EscPosHelper.align(1));

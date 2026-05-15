@@ -31,13 +31,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _isConnectingBt = false;
   bool _btConnected = false;
 
-  // Animasi
+  // ANIMATION STATE
   late AnimationController _pulseController;
   late AnimationController _fadeController;
   late Animation<double> _pulseAnim;
   late Animation<double> _fadeAnim;
 
-  // Warna tema dRetail
+  // THEME COLORS
   static const Color _primary = Color(0xFF1346A0);
   static const Color _primaryLight = Color(0xFF1A5DC8);
   static const Color _accent = Color(0xFF00B4D8);
@@ -360,7 +360,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         children: [
           Row(
             children: [
-              // Indikator animasi
+              // ANIMATION INDICATOR
               AnimatedBuilder(
                 animation: _pulseAnim,
                 builder: (_, __) => Transform.scale(
@@ -454,7 +454,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
           const SizedBox(height: 20),
 
-          // Tombol utama
+          // PRIMARY BUTTON
           Row(
             children: [
               Expanded(

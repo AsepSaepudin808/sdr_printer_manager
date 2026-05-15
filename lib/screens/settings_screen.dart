@@ -106,7 +106,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // 1. Bahasa
+          // LANGUAGE
           _section(S.language,
               child: DropdownButton<String>(
                 value: _languageCode,
@@ -126,7 +126,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   if (mounted) setState(() {});
                 },
               )),
-          // 2. Printer
+          // PRINTER
           _section(S.printer,
               child: GestureDetector(
                 onTap: _pickPrinter,
@@ -140,7 +140,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       fontWeight: FontWeight.w600),
                 ),
               )),
-          // 3. Koneksi Printer
+          // PRINTER CONNECTION
           _section(S.printerConnection,
               child: SegmentedButton<String>(
                 segments: const [
@@ -166,21 +166,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       s.contains(WidgetState.selected) ? Colors.white : null),
                 ),
               )),
-          // 4. Ijin Notifikasi
+          // NOTIFICATION PERMISSION
           _section(S.notifPermission,
               child: _checkTile(
                 S.notifDesc,
                 _notifEnabled,
                 (v) => setState(() => _notifEnabled = v ?? false),
               )),
-          // 5. Langsung Cetak
+          // DIRECT PRINTING
           _section(S.directPrint,
               child: _checkTile(
                 S.directPrintDesc,
                 _directPrint,
                 (v) => setState(() => _directPrint = v ?? false),
               )),
-          // 6. Layanan Cetak Android
+          // ANDROID PRINT SERVICE
           _section(
               S.withLang(
                   id: 'Layanan Cetak Android',
@@ -205,7 +205,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   }
                 },
               )),
-          // 7. Versi
+          // APP VERSION
           _section(S.version,
               child: const Center(
                 child: Text('V1.0.0.1',

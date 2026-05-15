@@ -44,7 +44,7 @@ class _TextTabState extends State<TextTab> {
             ? PaperSize.mm100
             : PaperSize.mm80;
 
-    // Update EscPosHelper with latest settings.
+    // UPDATE CONFIGURATION
     EscPosHelper.setCustomCharsPerLine(p.getInt('chars_per_line') ?? 0);
     EscPosHelper.setExtraFeed(p.getInt('extra_feed') ?? 3);
     EscPosHelper.setAutoCut(p.getBool('auto_cut') ?? false);
@@ -388,7 +388,7 @@ class _TextTabState extends State<TextTab> {
       TextAlign textAlign, bool isLandscape) {
     return Stack(
       children: [
-        // Background
+        // BACKGROUND
         Positioned.fill(
           child: Container(
             decoration: BoxDecoration(
@@ -397,10 +397,10 @@ class _TextTabState extends State<TextTab> {
             ),
           ),
         ),
-        // Receipt paper
+        // RECEIPT PAPER
         Column(
           children: [
-            // Header strip
+            // HEADER STRIP
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 32),
               padding: const EdgeInsets.symmetric(vertical: 6),
@@ -428,7 +428,7 @@ class _TextTabState extends State<TextTab> {
               ),
             ),
             const SizedBox(height: 12),
-            // Scrollable text area
+            // SCROLLABLE TEXT AREA
             Expanded(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),

@@ -64,7 +64,7 @@ class _MainShellState extends State<MainShell> {
     _requestPerms();
     _setupListeners();
     _setupPrintJobChannel();
-    // Preload logo for test print templates
+    // PRELOAD LOGO
     TestPrintTemplate.preloadLogo();
   }
 
@@ -103,7 +103,7 @@ class _MainShellState extends State<MainShell> {
 
   img.Image _enhanceForThermal(img.Image source) {
     img.Image out = img.grayscale(source);
-    // Use strict luminance threshold for pure black and white without dither artifacts
+    // LUMINANCE THRESHOLD
     out = img.luminanceThreshold(out, threshold: 160 / 255.0);
     return out;
   }
@@ -121,7 +121,7 @@ class _MainShellState extends State<MainShell> {
     });
     _addLog('🖨️ Menerima Print Job: $name');
 
-    // Ensure connected
+    // ENSURE BT CONNECTION
     final connected = await _bt.checkConnection();
     if (!connected) {
       final a = _bt.lastAddress ?? _printer?.address;
@@ -196,7 +196,7 @@ class _MainShellState extends State<MainShell> {
       SharedPreferences.getInstance()
           .then((p) => p.setInt('print_count', _printCount));
 
-      // Clean up temp file
+      // CLEANUP TEMP FILE
       try {
         await file.delete();
       } catch (_) {}
@@ -393,7 +393,7 @@ class _MainShellState extends State<MainShell> {
     });
     _addLog('🖨️ Test print: $label (${data.length} bytes)');
 
-    // Pastikan koneksi BT aktif
+    // ENSURE BT CONNECTION
     final connected = await _bt.checkConnection();
     if (!connected) {
       final a = _bt.lastAddress;
@@ -444,7 +444,7 @@ class _MainShellState extends State<MainShell> {
       PaperSize.mm80 => '80mm',
       PaperSize.mm100 => '100mm'
     };
-    // Filter print logs
+    // FILTER LOGS
     final printLogs = _logs
         .where((l) =>
             l.contains('print') ||
@@ -482,7 +482,7 @@ class _MainShellState extends State<MainShell> {
                         color: _dark)),
               ]),
               const SizedBox(height: 16),
-              // Stats grid
+              // STATS GRID
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(

@@ -173,7 +173,7 @@ class _ImageTabState extends State<ImageTab> {
 
   @override
   Widget build(BuildContext context) {
-    // Responsive: handle safe area insets
+    // RESPONSIVE INSETS
     final viewPadding = MediaQuery.viewPaddingOf(context);
     final safeBottom = viewPadding.bottom;
     const bottomBarH = 65.0;

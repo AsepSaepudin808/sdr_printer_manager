@@ -133,7 +133,7 @@ class PrintServerService {
           final format = json['format'] as String? ?? 'escpos';
           final dataField = json['data'];
 
-          // Handle Session Summary format
+          // SESSION SUMMARY
           if (format == 'session_summary') {
             Map<String, dynamic> summaryData;
             if (dataField is Map<String, dynamic>) {

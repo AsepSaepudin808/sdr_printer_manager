@@ -75,13 +75,12 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
       return;
     }
 
-    // SIMPAN nilai original sebelum di-overwrite sementara
+    // SAVE ORIGINAL SETTINGS
     final originalChars = EscPosHelper.customCharsPerLineSetting;
     final originalFeed = EscPosHelper.extraFeedSetting;
     final originalCut = EscPosHelper.autoCutSetting;
 
-    // APLIKASIKAN nilai dari UI ke EscPosHelper agar fungsi pembungkus kata (word-wrap)
-    // dalam EscPosHelper.rowLR bisa dihitung sesuai pengaturan saat ini (meski belum di-save)
+    // APPLY TEMP SETTINGS
     final chars = int.tryParse(_charsCtrl.text.trim()) ??
         EscPosHelper.defaultCharsPerLine(_paperSize);
     final defaultChars = EscPosHelper.defaultCharsPerLine(_paperSize);
@@ -111,7 +110,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
         behavior: SnackBarBehavior.floating,
       ));
     } finally {
-      // KEMBALIKAN ke nilai semula agar tidak auto-save jika user menekan tombol "Batal"
+      // RESTORE ORIGINAL SETTINGS
       EscPosHelper.setCustomCharsPerLine(originalChars);
       EscPosHelper.setExtraFeed(originalFeed);
       EscPosHelper.setAutoCut(originalCut);
@@ -172,7 +171,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Ukuran Kertas
+          // PAPER SIZE
           _section(S.printerSize,
               child: SegmentedButton<PaperSize>(
                 segments: const [
@@ -195,7 +194,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                       s.contains(WidgetState.selected) ? Colors.white : null),
                 ),
               )),
-          // Karakter per Baris
+          // CHARS PER LINE
           _section(S.charsPerLine,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -228,7 +227,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                   ),
                 ],
               )),
-          // Auto Cut
+          // AUTO CUT
           _section(S.autoCut,
               child: Row(children: [
                 Expanded(
@@ -240,7 +239,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                   onChanged: (v) => setState(() => _autoCut = v),
                 ),
               ])),
-          // Extra Feed
+          // EXTRA FEED
           _section(S.extraFeed,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -270,7 +269,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                 ],
               )),
 
-          // SECTION TEST PRINT
+          // TEST PRINT SECTION
           _section(
               S.isEn
                   ? 'Test Print (Current Layout)'
@@ -311,7 +310,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
 
           const SizedBox(height: 24),
 
-          // Action Buttons
+          // ACTION BUTTONS
           Row(children: [
             Expanded(
                 child: OutlinedButton(

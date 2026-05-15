@@ -182,7 +182,7 @@ class EscPosHelper {
     return lines.isEmpty ? [''] : lines;
   }
 
-  // Baris "---- LABEL ----" rata tengah, lebar penuh kertas
+  // SECTION HEADER
   static List<int> sectionHeader(String label, PaperSize size) {
     final w = charsPerLine(size);
     final inner = ' $label ';
@@ -390,7 +390,7 @@ class EscPosHelper {
 
     b.addAll(feed(1));
 
-    // STORE NAME — doubleSize bold, truncated to fit
+    // STORE NAME
     b.addAll(align(1));
     b.addAll(bold(true));
     final w = charsPerLine(size);
@@ -410,7 +410,7 @@ class EscPosHelper {
       b.addAll(txt(storeEmail));
     }
 
-    // RECEIPT HEADER — custom message from Odoo
+    // RECEIPT HEADER
     if (receiptHeader.isNotEmpty) {
       b.addAll(align(1));
       b.addAll(txt(receiptHeader));
@@ -429,7 +429,6 @@ class EscPosHelper {
     b.addAll(rowLR('Kasir       :', cashier, size));
     b.addAll(divider(size, char: '='));
 
-    // Extract currency from company data (sent from Odoo)
     final currency = company['currency'] as Map<String, dynamic>? ?? {'symbol': 'Rp', 'decimal_places': 0};
     final symbol = currency['symbol'] as String? ?? 'Rp';
     final decimals = currency['decimal_places'] as int? ?? 0;
@@ -439,7 +438,7 @@ class EscPosHelper {
     b.addAll(sectionHeader('DETAIL ITEM', size));
     b.addAll(bold(false));
 
-    // ORDERLINES — nama produk bold, qty+price right-aligned (Full Receipt)
+    // ORDERLINES
     final lines = d['orderlines'] as List<dynamic>? ?? [];
     for (final line in lines) {
       final m = line as Map<String, dynamic>;
@@ -488,21 +487,21 @@ class EscPosHelper {
     final allDiscount = totalDiscount + globalDiscountAmt;
     final dppVal = subtotalVal - allDiscount;
 
-    // Total Belanja
+    // TOTAL BELANJA
     b.addAll(divider(size, char: '='));
     b.addAll(rowLR('Total Belanja', rp(subtotalVal.round(), symbol: symbol, decimals: decimals), size));
     if (allDiscount > 0) {
       b.addAll(rowLR('Total Diskon', rp(-allDiscount.round(), symbol: symbol, decimals: decimals), size));
     }
 
-    // DPP & PPN — hide jika tidak ada pajak
+    // DPP & PPN
     b.addAll(divider(size, char: '.'));
     if (taxVal > 0) {
       b.addAll(rowLR('DPP', rp(dppVal.round(), symbol: symbol, decimals: decimals), size));
       b.addAll(rowLR('PPN 11%', rp(taxVal.round(), symbol: symbol, decimals: decimals), size));
     }
 
-    // TOTAL — double-height, bold
+    // TOTAL BAYAR
     b.addAll(divider(size, char: '-'));
     b.addAll(doubleHeight(true));
     b.addAll(bold(true));
@@ -522,7 +521,7 @@ class EscPosHelper {
       b.addAll(rowLR('Cash', rp(paidVal.round(), symbol: symbol, decimals: decimals), size));
     }
 
-    // CHANGE — bold
+    // CHANGE
     b.addAll(bold(true));
     b.addAll(rowLR('CHANGE', rp(changeVal.round(), symbol: symbol, decimals: decimals), size));
     b.addAll(bold(false));
@@ -542,7 +541,7 @@ class EscPosHelper {
       b.addAll(align(0));
     }
 
-    // RECEIPT FOOTER — custom message from Odoo
+    // RECEIPT FOOTER
     b.addAll(divider(size, char: '='));
     if (receiptFooter.isNotEmpty) {
       b.addAll(align(1));
@@ -556,7 +555,7 @@ class EscPosHelper {
       b.addAll(align(0));
     }
 
-    // POWERED BY + PRINT DATETIME
+    // POWERED BY
     b.addAll(feed(1));
     b.addAll(align(1));
     b.addAll(bold(true));
@@ -601,7 +600,7 @@ class EscPosHelper {
       } catch (_) {}
     }
 
-    // STORE NAME — doubleSize bold, truncated to fit
+    // STORE NAME
     b.addAll(align(1));
     b.addAll(bold(true));
     final w = charsPerLine(size);
@@ -621,7 +620,7 @@ class EscPosHelper {
       b.addAll(txt(storeEmail));
     }
 
-    // RECEIPT HEADER — custom message from Odoo
+    // RECEIPT HEADER
     if (receiptHeader.isNotEmpty) {
       b.addAll(align(1));
       b.addAll(txt(receiptHeader));
@@ -645,7 +644,7 @@ class EscPosHelper {
     b.addAll(sectionHeader('DETAIL ITEM', size));
     b.addAll(bold(false));
 
-    // ORDERLINES — nama produk bold, qty right-aligned after name
+    // ORDERLINES
     final lines = d['orderlines'] as List<dynamic>? ?? [];
     final linesPerPage = charsPerLine(size);
     for (final line in lines) {
@@ -676,7 +675,7 @@ class EscPosHelper {
     }
     b.addAll(divider(size, char: '='));
 
-    // RECEIPT FOOTER — custom message from Odoo
+    // RECEIPT FOOTER
     if (receiptFooter.isNotEmpty) {
       b.addAll(align(1));
       b.addAll(bold(true));
@@ -689,7 +688,7 @@ class EscPosHelper {
       b.addAll(align(0));
     }
 
-    // POWERED BY + PRINT DATETIME
+    // POWERED BY
     b.addAll(align(1));
     b.addAll(bold(true));
     b.addAll(txt('Powered by dRetail'));
@@ -766,7 +765,6 @@ class EscPosHelper {
     b.addAll(init());
     _applyFontConfig(b);
 
-    // Extract currency from company data (sent from Odoo)
     final company = d['company'] as Map<String, dynamic>? ?? {};
     final currency = company['currency'] as Map<String, dynamic>? ?? {'symbol': 'Rp', 'decimal_places': 0};
     final symbol = currency['symbol'] as String? ?? 'Rp';
