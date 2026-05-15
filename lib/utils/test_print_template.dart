@@ -304,7 +304,6 @@ class TestPrintTemplate {
     b.addAll(EscPosHelper.bold(false));
     b.addAll(EscPosHelper.txt('Barang yang sudah dibeli'));
     b.addAll(EscPosHelper.txt('tidak dapat dikembalikan'));
-    b.addAll(EscPosHelper.txt('kecuali ada perjanjian khusus'));
     b.addAll(EscPosHelper.align(0));
 
     b.addAll(EscPosHelper.feed(1));
