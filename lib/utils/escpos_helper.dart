@@ -249,8 +249,40 @@ class EscPosHelper {
     return txt('$left$padding$right');
   }
 
-  static String rp(int amount) {
-    final s = amount.abs().toString();
+  static String rp(int amount, {String symbol = 'Rp', int decimals = 0, bool positionAfter = false}) {
+    String prefix = symbol;
+    String suffix = '';
+    int value = amount.abs();
+    if (decimals > 0) {
+      final divisor = _pow10(decimals);
+      final whole = (value ~/ divisor);
+      final frac = (value % divisor).toString().padLeft(decimals, '0');
+      final wholeStr = _formatWithDot(whole);
+      final result = '$wholeStr$frac';
+      if (positionAfter) {
+        suffix = ' $symbol';
+        return amount < 0 ? '-$result$suffix' : '$result$suffix';
+      }
+      return amount < 0 ? '-$prefix$result' : '$prefix$result';
+    }
+    final formatted = _formatWithDot(value);
+    if (positionAfter) {
+      suffix = ' $symbol';
+      return amount < 0 ? '-$formatted$suffix' : '$formatted$suffix';
+    }
+    return amount < 0 ? '-$prefix$formatted' : '$prefix$formatted';
+  }
+
+  static int _pow10(int exp) {
+    int result = 1;
+    for (int i = 0; i < exp; i++) {
+      result *= 10;
+    }
+    return result;
+  }
+
+  static String _formatWithDot(int value) {
+    final s = value.toString();
     final buf = StringBuffer();
     int count = 0;
     for (int i = s.length - 1; i >= 0; i--) {
@@ -260,8 +292,14 @@ class EscPosHelper {
       buf.write(s[i]);
       count++;
     }
-    final formatted = buf.toString().split('').reversed.join();
-    return amount < 0 ? '-$formatted' : formatted;
+    return buf.toString().split('').reversed.join();
+  }
+
+  static String currencyFmt(double amount, Map<String, dynamic> currency) {
+    final symbol = currency['symbol'] as String? ?? 'Rp';
+    final decimals = currency['decimal_places'] as int? ?? 0;
+    final positionAfter = (currency['position'] as String? ?? 'before') == 'after';
+    return rp(amount.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter);
   }
 
   static String fixLen(String s, int width) {
@@ -276,6 +314,12 @@ class EscPosHelper {
       return s.substring(0, width);
     }
     return s.padLeft(width);
+  }
+
+  static String storeNameDoubleSize(String name, int w) {
+    final maxChars = w ~/ 2;
+    final truncated = name.length > maxChars ? name.substring(0, maxChars) : name;
+    return '\x1D\x21\x11$truncated\x1D\x21\x00';
   }
 
   static List<int> logoHeader(PaperSize size) {
@@ -314,7 +358,6 @@ class EscPosHelper {
     return _buildFullReceipt(data, size);
   }
 
-  // FULL RECEIPT
   static Uint8List _buildFullReceipt(Map<String, dynamic> d, PaperSize size) {
     final List<int> b = [];
     b.addAll(init());
@@ -325,12 +368,11 @@ class EscPosHelper {
     final storeName = (company['name'] as String? ?? 'Toko').trim();
     final storePhone = company['phone'] as String? ?? '';
     final storeEmail = company['email'] as String? ?? '';
-    final storeStreet = company['street'] as String? ?? '';
     final orderName = d['name'] as String? ?? '-';
     final dateRaw = d['date'] as String? ?? '';
     final cashier = d['cashier'] as String? ?? '-';
-    final footer =
-        d['footer_messages'] as String? ?? 'Terima kasih!\nSampai jumpa lagi.';
+    final receiptHeader = (d['receipt_header'] as String? ?? '').trim();
+    final receiptFooter = (d['receipt_footer'] as String? ?? '').trim();
 
     // LOGO
     if (logoBase64.isNotEmpty) {
@@ -346,75 +388,58 @@ class EscPosHelper {
       } catch (_) {}
     }
 
-    // STORE NAME — doubleSize jika pendek, bold normal jika panjang (tetap 1 baris)
+    b.addAll(feed(1));
+
+    // STORE NAME — doubleSize bold, truncated to fit
     b.addAll(align(1));
     b.addAll(bold(true));
-    final halfW = charsPerLine(size) ~/ 2;
-    if (storeName.length <= halfW) {
-      b.addAll(doubleSize(true));
-      b.addAll(txt(storeName));
-      b.addAll(doubleSize(false));
-    } else {
-      b.addAll(txt(storeName));
-    }
+    final w = charsPerLine(size);
+    final maxChars = w ~/ 2;
+    final truncatedName = storeName.length > maxChars
+        ? storeName.substring(0, maxChars) : storeName;
+    b.addAll(doubleSize(true));
+    b.addAll(txt(truncatedName));
+    b.addAll(doubleSize(false));
     b.addAll(bold(false));
 
     // CONTACT INFO
     if (storePhone.isNotEmpty) {
-      b.addAll(txt('Tel: $storePhone'));
-    }
-    if (company['vat'] != null && (company['vat'] as String).isNotEmpty) {
-      b.addAll(txt('Tax ID: ${company['vat']}'));
+      b.addAll(txt('Telp : $storePhone'));
     }
     if (storeEmail.isNotEmpty) {
       b.addAll(txt(storeEmail));
     }
-    if (company['website'] != null &&
-        (company['website'] as String).isNotEmpty) {
-      b.addAll(txt(company['website'] as String));
-    }
-    if (storeStreet.isNotEmpty) {
-      for (final line in storeStreet.split('\n')) {
-        if (line.trim().isNotEmpty) {
-          b.addAll(txt(line.trim()));
-        }
-      }
-    }
-    b.addAll(align(0));
 
-    // CUSTOM HEADER — garis "-" hanya muncul jika ada isi
-    final customHeader = (d['receipt_header'] as String? ?? '').trim();
-    if (customHeader.isNotEmpty) {
-      b.addAll(divider(size, char: '-'));
+    // RECEIPT HEADER — custom message from Odoo
+    if (receiptHeader.isNotEmpty) {
       b.addAll(align(1));
-      b.addAll(txt(customHeader));
+      b.addAll(txt(receiptHeader));
       b.addAll(align(0));
     }
 
-    b.addAll(divider(size, char: '-'));
+    b.addAll(divider(size, char: '='));
 
+    // ORDER INFO
     final orderNumberClean = orderName
         .toString()
         .replaceFirst(RegExp(r'^Order\s*', caseSensitive: false), '');
-    final dateFormatted = dateRaw.isNotEmpty ? _formatDate(dateRaw) : '';
-
-    b.addAll(rowLR('Reff        :', orderNumberClean, size));
+    final dateFormatted = dateRaw.isNotEmpty ? _formatDateShort(dateRaw) : '';
+    b.addAll(rowLR('Ref         :', orderNumberClean, size));
     b.addAll(rowLR('Tanggal     :', dateFormatted, size));
     b.addAll(rowLR('Kasir       :', cashier, size));
-
     b.addAll(divider(size, char: '='));
 
-    // SECTION HEADER: ---- DETAIL ITEM ----
+    // Extract currency from company data (sent from Odoo)
+    final currency = company['currency'] as Map<String, dynamic>? ?? {'symbol': 'Rp', 'decimal_places': 0};
+    final symbol = currency['symbol'] as String? ?? 'Rp';
+    final decimals = currency['decimal_places'] as int? ?? 0;
+
+    // SECTION HEADER
     b.addAll(bold(true));
     b.addAll(sectionHeader('DETAIL ITEM', size));
     b.addAll(bold(false));
 
-    // ORDERLINES
-    // Layout:
-    //   Nama Produk Bold
-    //   3 Pcs x Rp3.500          Rp 10.500
-    //     Disc(5%)               Rp -500    (jika ada)
-    //     * catatan              (jika ada)
+    // ORDERLINES — nama produk bold, qty+price right-aligned (Full Receipt)
     final lines = d['orderlines'] as List<dynamic>? ?? [];
     for (final line in lines) {
       final m = line as Map<String, dynamic>;
@@ -435,17 +460,15 @@ class EscPosHelper {
       }
       b.addAll(bold(false));
 
-      // UoM dinamis dari Odoo — fallback ke 'Pcs' hanya jika kosong
       final uom = (m['uom'] as String? ?? '').trim();
       final uomLabel = uom.isNotEmpty ? uom : 'Pcs';
-      final qtyStr =
-          '${_formatQty(qty)} $uomLabel x Rp${rp(unitPrice.round())}';
-      final subtotalStr = 'Rp ${rp(subtotal.round())}';
-      b.addAll(rowLR(qtyStr, subtotalStr, size, boldRight: true));
+      final qtyStr = '${_formatQty(qty)} $uomLabel x ${rp(unitPrice.round(), symbol: symbol, decimals: decimals)}';
+      final totalStr = rp(subtotal.round(), symbol: symbol, decimals: decimals);
+      b.addAll(rowLR(qtyStr, totalStr, size, boldRight: true));
 
       if (discountPct > 0) {
         final discLabel = '  Disc(${_formatQty(discountPct)}%)';
-        final discStr = 'Rp -${rp(discountAmt.round())}';
+        final discStr = rp(-discountAmt.round(), symbol: symbol, decimals: decimals);
         b.addAll(rowLR(discLabel, discStr, size));
       }
 
@@ -454,52 +477,55 @@ class EscPosHelper {
       }
     }
 
-    b.addAll(divider(size, char: '-'));
-
-    // TAX BREAKDOWN
+    // FINANCIAL SUMMARY
     final subtotalVal = (d['total_without_tax'] ?? 0).toDouble();
     final taxVal = (d['total_tax'] ?? 0).toDouble();
     final totalVal = (d['total_with_tax'] ?? 0).toDouble();
     final paidVal = (d['total_paid'] ?? totalVal).toDouble();
     final changeVal = (d['change'] ?? (paidVal - totalVal)).toDouble();
     final totalDiscount = (d['total_discount'] ?? 0).toDouble();
+    final globalDiscountAmt = (d['global_discount_amount'] ?? 0).toDouble();
+    final allDiscount = totalDiscount + globalDiscountAmt;
+    final dppVal = subtotalVal - allDiscount;
 
-    if (subtotalVal > 0) {
-      b.addAll(rowLR('DPP', 'Rp ${rp(subtotalVal.round())}', size));
+    // Total Belanja
+    b.addAll(divider(size, char: '='));
+    b.addAll(rowLR('Total Belanja', rp(subtotalVal.round(), symbol: symbol, decimals: decimals), size));
+    if (allDiscount > 0) {
+      b.addAll(rowLR('Total Diskon', rp(-allDiscount.round(), symbol: symbol, decimals: decimals), size));
     }
+
+    // DPP & PPN — hide jika tidak ada pajak
+    b.addAll(divider(size, char: '.'));
     if (taxVal > 0) {
-      b.addAll(rowLR('PPN 11% on ${rp(subtotalVal.round())}',
-          'Rp ${rp(taxVal.round())}', size));
+      b.addAll(rowLR('DPP', rp(dppVal.round(), symbol: symbol, decimals: decimals), size));
+      b.addAll(rowLR('PPN 11%', rp(taxVal.round(), symbol: symbol, decimals: decimals), size));
     }
 
-    // TOTAL — double-height, tanpa garis berlebih di atas/bawah
+    // TOTAL — double-height, bold
     b.addAll(divider(size, char: '-'));
     b.addAll(doubleHeight(true));
     b.addAll(bold(true));
-    b.addAll(rowLR('TOTAL', 'Rp ${rp(totalVal.round())}', size));
+    b.addAll(rowLR('TOTAL BAYAR', rp(totalVal.round(), symbol: symbol, decimals: decimals), size));
     b.addAll(bold(false));
     b.addAll(doubleHeight(false));
 
-    // PAYMENT — langsung di bawah TOTAL
+    // PAYMENT
     final payments = d['paymentlines'] as List<dynamic>? ?? [];
     for (final pay in payments) {
       final p = pay as Map<String, dynamic>;
       final payName = p['name'] as String? ?? 'Cash';
       final payAmt = (p['amount'] ?? 0).toDouble();
-      b.addAll(rowLR(payName, 'Rp ${rp(payAmt.round())}', size));
+      b.addAll(rowLR(payName, rp(payAmt.round(), symbol: symbol, decimals: decimals), size));
     }
     if (payments.isEmpty && paidVal > 0) {
-      b.addAll(rowLR('Cash', 'Rp ${rp(paidVal.round())}', size));
+      b.addAll(rowLR('Cash', rp(paidVal.round(), symbol: symbol, decimals: decimals), size));
     }
 
-    // CHANGE — langsung mengikuti, dibedakan via bold
+    // CHANGE — bold
     b.addAll(bold(true));
-    b.addAll(rowLR('CHANGE', 'Rp ${rp(changeVal.round())}', size));
+    b.addAll(rowLR('CHANGE', rp(changeVal.round(), symbol: symbol, decimals: decimals), size));
     b.addAll(bold(false));
-
-    if (totalDiscount > 0) {
-      b.addAll(rowLR('Diskon Total', 'Rp ${rp(totalDiscount.round())}', size));
-    }
 
     // QR / PORTAL INFO
     if (d['unique_code'] != null || d['portal_url'] != null) {
@@ -516,39 +542,35 @@ class EscPosHelper {
       b.addAll(align(0));
     }
 
-    // FOOTER — hanya tampil jika ada isi, tidak ada baris kosong percuma
+    // RECEIPT FOOTER — custom message from Odoo
     b.addAll(divider(size, char: '='));
-    final footerLines =
-        footer.split('\n').where((l) => l.trim().isNotEmpty).toList();
-    if (footerLines.isNotEmpty) {
-      b.addAll(feed(1));
+    if (receiptFooter.isNotEmpty) {
       b.addAll(align(1));
-      for (final line in footerLines) {
-        b.addAll(txt(line.trim()));
+      b.addAll(bold(true));
+      for (final line in receiptFooter.split('\n')) {
+        if (line.trim().isNotEmpty) {
+          b.addAll(txt(line.trim()));
+        }
       }
+      b.addAll(bold(false));
       b.addAll(align(0));
     }
 
-    if (d['shipping_date'] != null &&
-        (d['shipping_date'] as String).isNotEmpty) {
-      b.addAll(align(1));
-      b.addAll(txt('Expected delivery: ${d['shipping_date']}'));
-      b.addAll(align(0));
-    }
-
-    // POWERED BY
+    // POWERED BY + PRINT DATETIME
     b.addAll(feed(1));
     b.addAll(align(1));
     b.addAll(bold(true));
     b.addAll(txt('Powered by dRetail'));
     b.addAll(bold(false));
+    final now = DateTime.now();
+    final printDt = '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year.toString().substring(2)} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    b.addAll(txt(printDt));
     b.addAll(align(0));
 
     b.addAll(finalize());
     return Uint8List.fromList(b);
   }
 
-  // BASIC RECEIPT
   static Uint8List _buildBasicReceipt(Map<String, dynamic> d, PaperSize size) {
     final List<int> b = [];
     b.addAll(init());
@@ -559,12 +581,11 @@ class EscPosHelper {
     final storeName = (company['name'] as String? ?? 'Toko').trim();
     final storePhone = company['phone'] as String? ?? '';
     final storeEmail = company['email'] as String? ?? '';
-    final storeStreet = company['street'] as String? ?? '';
     final orderName = d['name'] as String? ?? '-';
     final dateRaw = d['date'] as String? ?? '';
     final cashier = d['cashier'] as String? ?? '-';
-    final footer =
-        d['footer_messages'] as String? ?? 'Terima kasih!\nSampai jumpa lagi.';
+    final receiptHeader = (d['receipt_header'] as String? ?? '').trim();
+    final receiptFooter = (d['receipt_footer'] as String? ?? '').trim();
 
     // LOGO
     if (logoBase64.isNotEmpty) {
@@ -580,124 +601,102 @@ class EscPosHelper {
       } catch (_) {}
     }
 
-    // STORE NAME — doubleSize jika pendek, bold normal jika panjang
+    // STORE NAME — doubleSize bold, truncated to fit
     b.addAll(align(1));
     b.addAll(bold(true));
-    final halfW = charsPerLine(size) ~/ 2;
-    if (storeName.length <= halfW) {
-      b.addAll(doubleSize(true));
-      b.addAll(txt(storeName));
-      b.addAll(doubleSize(false));
-    } else {
-      b.addAll(txt(storeName));
-    }
+    final w = charsPerLine(size);
+    final maxChars = w ~/ 2;
+    final truncatedName = storeName.length > maxChars
+        ? storeName.substring(0, maxChars) : storeName;
+    b.addAll(doubleSize(true));
+    b.addAll(txt(truncatedName));
+    b.addAll(doubleSize(false));
     b.addAll(bold(false));
 
     // CONTACT INFO
     if (storePhone.isNotEmpty) {
-      b.addAll(txt('Tel: $storePhone'));
-    }
-    if (company['vat'] != null && (company['vat'] as String).isNotEmpty) {
-      b.addAll(txt('Tax ID: ${company['vat']}'));
+      b.addAll(txt('Telp : $storePhone'));
     }
     if (storeEmail.isNotEmpty) {
       b.addAll(txt(storeEmail));
     }
-    if (company['website'] != null &&
-        (company['website'] as String).isNotEmpty) {
-      b.addAll(txt(company['website'] as String));
-    }
-    if (storeStreet.isNotEmpty) {
-      for (final line in storeStreet.split('\n')) {
-        if (line.trim().isNotEmpty) {
-          b.addAll(txt(line.trim()));
-        }
-      }
-    }
-    b.addAll(align(0));
 
-    // CUSTOM HEADER — garis "-" hanya muncul jika ada isi
-    final customHeader = (d['receipt_header'] as String? ?? '').trim();
-    if (customHeader.isNotEmpty) {
-      b.addAll(divider(size, char: '-'));
+    // RECEIPT HEADER — custom message from Odoo
+    if (receiptHeader.isNotEmpty) {
       b.addAll(align(1));
-      b.addAll(txt(customHeader));
+      b.addAll(txt(receiptHeader));
       b.addAll(align(0));
     }
 
-    b.addAll(divider(size, char: '-'));
+    b.addAll(divider(size, char: '='));
 
+    // ORDER INFO
     final orderNumberClean = orderName
         .toString()
         .replaceFirst(RegExp(r'^Order\s*', caseSensitive: false), '');
-    final dateFormatted = dateRaw.isNotEmpty ? _formatDate(dateRaw) : '';
-
-    b.addAll(rowLR('Reff        :', orderNumberClean, size));
+    final dateFormatted = dateRaw.isNotEmpty ? _formatDateShort(dateRaw) : '';
+    b.addAll(rowLR('Ref         :', orderNumberClean, size));
     b.addAll(rowLR('Tanggal     :', dateFormatted, size));
     b.addAll(rowLR('Kasir       :', cashier, size));
-
     b.addAll(divider(size, char: '='));
 
-    // SECTION HEADER: ---- DETAIL ITEM ----
+    // SECTION HEADER
     b.addAll(bold(true));
     b.addAll(sectionHeader('DETAIL ITEM', size));
     b.addAll(bold(false));
 
-    // ORDERLINES — basic: nama + qty saja (tanpa harga)
+    // ORDERLINES — nama produk bold, qty right-aligned after name
     final lines = d['orderlines'] as List<dynamic>? ?? [];
-    if (lines.isNotEmpty) {
-      for (final line in lines) {
-        final m = line as Map<String, dynamic>;
-        final rawName = m['product_name'] as String? ?? '';
-        final name = rawName.replaceAll('\n', ' ').trim();
-        final qty = (m['qty'] ?? 1).toDouble();
-        final customerNote = m['customer_note'] as String? ?? '';
+    final linesPerPage = charsPerLine(size);
+    for (final line in lines) {
+      final m = line as Map<String, dynamic>;
+      final rawName = m['product_name'] as String? ?? '';
+      final name = rawName.replaceAll('\n', ' ').trim();
+      final qty = (m['qty'] ?? 1).toDouble();
+      final customerNote = m['customer_note'] as String? ?? '';
 
-        final w = charsPerLine(size);
-        final nameLines = _wordWrap(name, w);
-        b.addAll(bold(true));
-        for (final nl in nameLines) {
-          b.addAll(txt(nl));
-        }
-        b.addAll(bold(false));
+      final uom = (m['uom'] as String? ?? '').trim();
+      final uomLabel = uom.isNotEmpty ? uom : 'Pcs';
+      final qtyStr = '${_formatQty(qty)} $uomLabel';
 
-        final uom = (m['uom'] as String? ?? '').trim();
-        final uomLabel = uom.isNotEmpty ? uom : 'Pcs';
-        b.addAll(txt('  ${_formatQty(qty)} $uomLabel'));
-
-        if (customerNote.isNotEmpty) {
-          b.addAll(txt('  * $customerNote'));
+      b.addAll(bold(true));
+      final nameLines = _wordWrap(name, linesPerPage - qtyStr.length - 1);
+      for (int i = 0; i < nameLines.length; i++) {
+        if (i == 0) {
+          b.addAll(rowLR(nameLines[i], qtyStr, size));
+        } else {
+          b.addAll(txt(nameLines[i]));
         }
       }
-      b.addAll(divider(size, char: '-'));
-    }
+      b.addAll(bold(false));
 
-    // FOOTER — hanya tampil jika ada isi
+      if (customerNote.isNotEmpty) {
+        b.addAll(txt('  * $customerNote'));
+      }
+    }
     b.addAll(divider(size, char: '='));
-    final footerLines =
-        footer.split('\n').where((l) => l.trim().isNotEmpty).toList();
-    if (footerLines.isNotEmpty) {
-      b.addAll(feed(1));
+
+    // RECEIPT FOOTER — custom message from Odoo
+    if (receiptFooter.isNotEmpty) {
       b.addAll(align(1));
-      for (final line in footerLines) {
-        b.addAll(txt(line.trim()));
+      b.addAll(bold(true));
+      for (final line in receiptFooter.split('\n')) {
+        if (line.trim().isNotEmpty) {
+          b.addAll(txt(line.trim()));
+        }
       }
+      b.addAll(bold(false));
       b.addAll(align(0));
     }
 
-    if (d['shipping_date'] != null &&
-        (d['shipping_date'] as String).isNotEmpty) {
-      b.addAll(align(1));
-      b.addAll(txt('Expected delivery: ${d['shipping_date']}'));
-      b.addAll(align(0));
-    }
-
-    // POWERED BY
-    b.addAll(feed(1));
+    // POWERED BY + PRINT DATETIME
     b.addAll(align(1));
     b.addAll(bold(true));
     b.addAll(txt('Powered by dRetail'));
     b.addAll(bold(false));
+    final now = DateTime.now();
+    final printDt = '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year.toString().substring(2)} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    b.addAll(txt(printDt));
     b.addAll(align(0));
 
     b.addAll(finalize());
@@ -752,11 +751,27 @@ class EscPosHelper {
     return qty.toStringAsFixed(2);
   }
 
+  static String _formatDateShort(String raw) {
+    try {
+      final dt = DateTime.parse(raw).toLocal();
+      return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return raw;
+    }
+  }
+
   // SESSION SUMMARY
   static Uint8List buildSessionSummary(Map<String, dynamic> d, PaperSize size) {
     final List<int> b = [];
     b.addAll(init());
     _applyFontConfig(b);
+
+    // Extract currency from company data (sent from Odoo)
+    final company = d['company'] as Map<String, dynamic>? ?? {};
+    final currency = company['currency'] as Map<String, dynamic>? ?? {'symbol': 'Rp', 'decimal_places': 0};
+    final symbol = currency['symbol'] as String? ?? 'Rp';
+    final decimals = currency['decimal_places'] as int? ?? 0;
+    final positionAfter = (currency['position'] as String? ?? 'before') == 'after';
 
     b.addAll(align(1));
     b.addAll(bold(true));
@@ -793,16 +808,15 @@ class EscPosHelper {
     final totalTaxes = (d['total_taxes'] ?? 0).toDouble();
     final totalSales = (d['total_sales'] ?? 0).toDouble();
 
-    b.addAll(rowLR('Gross Sales', 'Rp ${rp(grossSales.round())}', size));
-    b.addAll(rowLR('Discounts', '-Rp ${rp(totalDiscount.round())}', size));
-    b.addAll(
-        rowLR('Returns/Refunds', '-Rp ${rp(refundUntaxed.round())}', size));
+    b.addAll(rowLR('Gross Sales', rp(grossSales.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
+    b.addAll(rowLR('Discounts', rp(-totalDiscount.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
+    b.addAll(rowLR('Returns/Refunds', rp(-refundUntaxed.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
     b.addAll(divider(size, char: '.'));
-    b.addAll(rowLR('Net Sales', 'Rp ${rp(netSalesBeforeTax.round())}', size));
-    b.addAll(rowLR('Taxes', 'Rp ${rp(totalTaxes.round())}', size));
+    b.addAll(rowLR('Net Sales', rp(netSalesBeforeTax.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
+    b.addAll(rowLR('Taxes', rp(totalTaxes.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
     b.addAll(divider(size, char: '.'));
     b.addAll(bold(true));
-    b.addAll(rowLR('Total Sales', 'Rp ${rp(totalSales.round())}', size));
+    b.addAll(rowLR('Total Sales', rp(totalSales.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
     b.addAll(bold(false));
 
     final refundAmount = (d['refund_amount'] ?? 0).toDouble();
@@ -813,8 +827,7 @@ class EscPosHelper {
       b.addAll(txt('----- RETURNS/REFUNDS -----'));
       b.addAll(bold(false));
       b.addAll(align(0));
-      b.addAll(
-          rowLR('Total Refund Amount', 'Rp ${rp(refundAmount.round())}', size));
+      b.addAll(rowLR('Total Refund Amount', rp(refundAmount.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
     }
 
     b.addAll(divider(size, char: '-'));
@@ -829,12 +842,12 @@ class EscPosHelper {
       final p = pay as Map<String, dynamic>;
       final payName = (p['method'] as String? ?? 'Payment').toUpperCase();
       final payAmt = (p['amount'] ?? 0).toDouble();
-      b.addAll(rowLR(payName, 'Rp ${rp(payAmt.round())}', size));
+      b.addAll(rowLR(payName, rp(payAmt.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
     }
     final totalPayment = (d['total_payment_amount'] ?? 0).toDouble();
     b.addAll(divider(size, char: '.'));
     b.addAll(bold(true));
-    b.addAll(rowLR('Total Payments', 'Rp ${rp(totalPayment.round())}', size));
+    b.addAll(rowLR('Total Payments', rp(totalPayment.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
     b.addAll(bold(false));
 
     final startingCash = (d['starting_cash'] ?? 0).toDouble();
@@ -850,17 +863,17 @@ class EscPosHelper {
     b.addAll(bold(false));
     b.addAll(align(0));
 
-    b.addAll(rowLR('Opening Cash', 'Rp ${rp(startingCash.round())}', size));
-    b.addAll(rowLR('(+) Cash Sales', 'Rp ${rp(cashSales.round())}', size));
+    b.addAll(rowLR('Opening Cash', rp(startingCash.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
+    b.addAll(rowLR('(+) Cash Sales', rp(cashSales.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
     if (cashIn > 0) {
-      b.addAll(rowLR('(+) Cash In', 'Rp ${rp(cashIn.round())}', size));
+      b.addAll(rowLR('(+) Cash In', rp(cashIn.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
     }
     if (cashOut > 0) {
-      b.addAll(rowLR('(-) Cash Out', 'Rp ${rp(cashOut.round())}', size));
+      b.addAll(rowLR('(-) Cash Out', rp(-cashOut.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
     }
     b.addAll(divider(size, char: '.'));
     b.addAll(bold(true));
-    b.addAll(rowLR('Total', 'Rp ${rp(expectedCash.round())}', size));
+    b.addAll(rowLR('Total', rp(expectedCash.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
     b.addAll(bold(false));
 
     final totalTransactions = d['total_transactions'] ?? 0;
@@ -886,14 +899,11 @@ class EscPosHelper {
 
     b.addAll(divider(size, char: '='));
     b.addAll(bold(true));
-    b.addAll(
-        rowLR('Expected Balance:', 'Rp ${rp(expectedCash.round())}', size));
-    b.addAll(rowLR('Closing Balance:', 'Rp ${rp(countedCash.round())}', size));
+    b.addAll(rowLR('Expected Balance:', rp(expectedCash.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
+    b.addAll(rowLR('Closing Balance:', rp(countedCash.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
     b.addAll(bold(false));
 
-    final diffStr = differenceCash >= 0
-        ? 'Rp ${rp(differenceCash.round())}'
-        : '-Rp ${rp(differenceCash.abs().round())}';
+    final diffStr = rp(differenceCash.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter);
     if (differenceCash != 0) {
       b.addAll(bold(true));
       b.addAll(rowLR('Difference:', diffStr, size));
@@ -902,8 +912,7 @@ class EscPosHelper {
 
     if (totalCreditAmount > 0) {
       b.addAll(divider(size, char: '.'));
-      b.addAll(rowLR(
-          '* Credit(piutang):', 'Rp ${rp(totalCreditAmount.round())}', size));
+      b.addAll(rowLR('* Credit(piutang):', rp(totalCreditAmount.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter), size));
     }
 
     b.addAll(divider(size, char: '='));
