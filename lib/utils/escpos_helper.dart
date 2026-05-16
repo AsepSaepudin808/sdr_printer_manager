@@ -449,15 +449,29 @@ class EscPosHelper {
 
     // ORDERLINES
     final lines = d['orderlines'] as List<dynamic>? ?? [];
+    double globalDiscountLineAmt = 0;
+
     for (final line in lines) {
       final m = line as Map<String, dynamic>;
+      final isGlobalDiscount = m['is_global_discount'] == true;
+
+      // Kumpulkan global discount lines untuk ditampilkan di paling bawah
+      if (isGlobalDiscount) {
+        globalDiscountLineAmt +=
+            (m['discount_amount'] ?? (m['price_with_tax'] ?? m['price'] ?? 0))
+                .toDouble()
+                .abs();
+        continue;
+      }
+
       final rawName = m['product_name'] as String? ?? '';
       final name = rawName.replaceAll('\n', ' ').trim();
       final qty = (m['qty'] ?? 1).toDouble();
       final unitPrice = (m['price'] ?? 0).toDouble();
       final subtotal = (m['price_with_tax'] ?? unitPrice * qty).toDouble();
       final discountPct = (m['discount'] ?? 0).toDouble();
-      final discountAmt = unitPrice * qty - subtotal;
+      final discountAmt = (m['discount_amount'] ?? 0).toDouble();
+      final discountType = m['discount_type'] as String? ?? '%';
       final customerNote = m['customer_note'] as String? ?? '';
 
       final w = charsPerLine(size);
@@ -475,8 +489,13 @@ class EscPosHelper {
       final totalStr = rp(subtotal.round(), symbol: symbol, decimals: decimals);
       b.addAll(rowLR(qtyStr, totalStr, size, boldRight: true));
 
-      if (discountPct > 0) {
+      if (discountType == '%' && discountPct > 0 && discountAmt > 0) {
         final discLabel = '  Disc(${_formatQty(discountPct)}%)';
+        final discStr =
+            rp(-discountAmt.round(), symbol: symbol, decimals: decimals);
+        b.addAll(rowLR(discLabel, discStr, size));
+      } else if (discountType == 'Rp' && discountAmt > 0) {
+        const discLabel = '  Disc(Rp)';
         final discStr =
             rp(-discountAmt.round(), symbol: symbol, decimals: decimals);
         b.addAll(rowLR(discLabel, discStr, size));
@@ -487,15 +506,23 @@ class EscPosHelper {
       }
     }
 
+    // Global discount ditampilkan di paling bawah daftar item, tanpa qty/UoM
+    if (globalDiscountLineAmt > 0) {
+      final globalDiscStr = rp(-globalDiscountLineAmt.round(),
+          symbol: symbol, decimals: decimals);
+      b.addAll(bold(true));
+      b.addAll(rowLR('Discount', globalDiscStr, size, boldRight: true));
+      b.addAll(bold(false));
+    }
+
     // FINANCIAL SUMMARY
     final subtotalVal = (d['total_without_tax'] ?? 0).toDouble();
     final taxVal = (d['total_tax'] ?? 0).toDouble();
     final totalVal = (d['total_with_tax'] ?? 0).toDouble();
     final paidVal = (d['total_paid'] ?? totalVal).toDouble();
     final changeVal = (d['change'] ?? (paidVal - totalVal)).toDouble();
-    final totalDiscount = (d['total_discount'] ?? 0).toDouble();
-    final globalDiscountAmt = (d['global_discount_amount'] ?? 0).toDouble();
-    final allDiscount = totalDiscount + globalDiscountAmt;
+    // total_discount sudah mencakup semua diskon (item Rp/%, global Rp/%)
+    final allDiscount = (d['total_discount'] ?? 0).toDouble();
     final dppVal = subtotalVal - allDiscount;
 
     // TOTAL BELANJA
