@@ -197,6 +197,21 @@ class EscPosHelper {
     return txt(line);
   }
 
+  // Full-width section header line (fill full width, centered label)
+  static String sectionHeaderLine(String label, PaperSize size, String char) {
+    final w = charsPerLine(size);
+    final inner = label;
+    final dashCount = ((w - inner.length) / 2).floor();
+    final dashes = char * (dashCount > 0 ? dashCount : 1);
+    String line = '$dashes$inner$dashes';
+    if (line.length < w) {
+      line = line + char * (w - line.length);
+    } else if (line.length > w) {
+      line = line.substring(0, w);
+    }
+    return line;
+  }
+
   static List<int> txt(String s) {
     final bytes = <int>[];
     for (int i = 0; i < s.length; i++) {
@@ -455,7 +470,6 @@ class EscPosHelper {
       final m = line as Map<String, dynamic>;
       final isGlobalDiscount = m['is_global_discount'] == true;
 
-      // Kumpulkan global discount lines untuk ditampilkan di paling bawah
       if (isGlobalDiscount) {
         globalDiscountLineAmt +=
             (m['discount_amount'] ?? (m['price_with_tax'] ?? m['price'] ?? 0))
@@ -782,19 +796,6 @@ class EscPosHelper {
   }
 
   // INTERNAL HELPERS
-  static String _formatDate(String raw) {
-    try {
-      final dt = DateTime.parse(raw).toLocal();
-      return '${dt.day.toString().padLeft(2, '0')}/'
-          '${dt.month.toString().padLeft(2, '0')}/'
-          '${dt.year} '
-          '${dt.hour.toString().padLeft(2, '0')}:'
-          '${dt.minute.toString().padLeft(2, '0')}';
-    } catch (_) {
-      return raw.length > 16 ? raw.substring(0, 16) : raw;
-    }
-  }
-
   static String _formatQty(double qty) {
     if (qty == qty.roundToDouble()) {
       return qty.round().toString();
@@ -818,6 +819,7 @@ class EscPosHelper {
     final List<int> b = [];
     b.addAll(init());
     _applyFontConfig(b);
+    final now = DateTime.now();
 
     final company = d['company'] as Map<String, dynamic>? ?? {};
     final currency = company['currency'] as Map<String, dynamic>? ??
@@ -826,14 +828,15 @@ class EscPosHelper {
     final decimals = currency['decimal_places'] as int? ?? 0;
     final positionAfter =
         (currency['position'] as String? ?? 'before') == 'after';
+    final w = charsPerLine(size);
 
+    // Header: SESSION SUMMARY REPORT with solid + dashed line
     b.addAll(align(1));
     b.addAll(bold(true));
-    b.addAll(setFontB(false));
     b.addAll(txt('SESSION SUMMARY REPORT'));
     b.addAll(bold(false));
-    b.addAll(divider(size, char: '='));
-    b.addAll(divider(size, char: '-'));
+    b.addAll(txt('=' * w));
+    b.addAll(txt('-' * w));
 
     final posName = d['pos_name'] as String? ?? '-';
     final sessionName = d['session_name'] as String? ?? '-';
@@ -841,17 +844,20 @@ class EscPosHelper {
     final startAt = d['start_at'] as String? ?? '-';
     final stopAt = d['stop_at'] as String? ?? '-';
 
+    // Header fields - all values right-aligned with :
     b.addAll(align(0));
-    b.addAll(rowLR('PoS Name', posName, size));
-    b.addAll(rowLR('Session ID', sessionName, size));
-    b.addAll(rowLR('Cashier', cashierName, size));
-    b.addAll(rowLR('Opening Date', startAt, size));
-    b.addAll(rowLR('Closing Date', stopAt, size));
+    b.addAll(rowLR('PoS Name :', posName, size));
+    b.addAll(rowLR('Session ID :', sessionName, size));
+    b.addAll(rowLR('Cashier :', cashierName, size));
+    b.addAll(rowLR('Opening :', startAt, size));
+    b.addAll(rowLR('Closing :', stopAt, size));
 
-    b.addAll(divider(size, char: '-'));
+    // SALES SUMMARY section
     b.addAll(align(1));
     b.addAll(bold(true));
-    b.addAll(txt('------ SALES SUMMARY ------'));
+    b.addAll(txt(sectionHeaderLine('', size, '-')));
+    b.addAll(txt(sectionHeaderLine('SALES SUMMARY', size, '-')));
+    b.addAll(txt(sectionHeaderLine('', size, '-')));
     b.addAll(bold(false));
     b.addAll(align(0));
 
@@ -864,58 +870,54 @@ class EscPosHelper {
 
     b.addAll(rowLR(
         'Gross Sales',
-        rp(grossSales.round(),
-            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        rp(grossSales.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
     b.addAll(rowLR(
         'Discounts',
-        rp(-totalDiscount.round(),
-            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        rp(-totalDiscount.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
     b.addAll(rowLR(
         'Returns/Refunds',
-        rp(-refundUntaxed.round(),
-            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        rp(-refundUntaxed.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
-    b.addAll(divider(size, char: '.'));
+    b.addAll(txt('.' * w));
     b.addAll(rowLR(
         'Net Sales',
-        rp(netSalesBeforeTax.round(),
-            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        rp(netSalesBeforeTax.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
     b.addAll(rowLR(
-        'Taxes',
-        rp(totalTaxes.round(),
-            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        'Tax',
+        rp(totalTaxes.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
-    b.addAll(divider(size, char: '.'));
+    b.addAll(txt('.' * w));
     b.addAll(bold(true));
     b.addAll(rowLR(
         'Total Sales',
-        rp(totalSales.round(),
-            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        rp(totalSales.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
     b.addAll(bold(false));
 
-    final refundAmount = (d['refund_amount'] ?? 0).toDouble();
-    if (refundAmount > 0) {
-      b.addAll(divider(size, char: '-'));
-      b.addAll(align(1));
-      b.addAll(bold(true));
-      b.addAll(txt('----- RETURNS/REFUNDS -----'));
-      b.addAll(bold(false));
-      b.addAll(align(0));
-      b.addAll(rowLR(
-          'Total Refund Amount',
-          rp(refundAmount.round(),
-              symbol: symbol, decimals: decimals, positionAfter: positionAfter),
-          size));
-    }
-
-    b.addAll(divider(size, char: '-'));
+    // RETURNS/REFUNDS section - ALWAYS SHOW
     b.addAll(align(1));
     b.addAll(bold(true));
-    b.addAll(txt('------ PAYMENT METHOD -----'));
+    b.addAll(txt(sectionHeaderLine('', size, '-')));
+    b.addAll(txt(sectionHeaderLine('RETURNS/REFUNDS', size, '-')));
+    b.addAll(txt(sectionHeaderLine('', size, '-')));
+    b.addAll(bold(false));
+    b.addAll(align(0));
+
+    final refundAmount = (d['refund_amount'] ?? 0).toDouble();
+    b.addAll(rowLR(
+        'Total Refund Amount',
+        rp(refundAmount.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        size));
+
+    // PAYMENT METHOD section
+    b.addAll(align(1));
+    b.addAll(bold(true));
+    b.addAll(txt(sectionHeaderLine('', size, '-')));
+    b.addAll(txt(sectionHeaderLine('PAYMENT METHOD', size, '-')));
+    b.addAll(txt(sectionHeaderLine('', size, '-')));
     b.addAll(bold(false));
     b.addAll(align(0));
 
@@ -926,19 +928,26 @@ class EscPosHelper {
       final payAmt = (p['amount'] ?? 0).toDouble();
       b.addAll(rowLR(
           payName,
-          rp(payAmt.round(),
-              symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+          rp(payAmt.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
           size));
     }
     final totalPayment = (d['total_payment_amount'] ?? 0).toDouble();
-    b.addAll(divider(size, char: '.'));
+    b.addAll(txt('.' * w));
     b.addAll(bold(true));
     b.addAll(rowLR(
-        'Total Payments',
-        rp(totalPayment.round(),
-            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        'Total Payment',
+        rp(totalPayment.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
     b.addAll(bold(false));
+
+    // CASH DRAWER SUMMARY section
+    b.addAll(align(1));
+    b.addAll(bold(true));
+    b.addAll(txt(sectionHeaderLine('', size, '-')));
+    b.addAll(txt(sectionHeaderLine('CASH DRAWER SUMMARY', size, '-')));
+    b.addAll(txt(sectionHeaderLine('', size, '-')));
+    b.addAll(bold(false));
+    b.addAll(align(0));
 
     final startingCash = (d['starting_cash'] ?? 0).toDouble();
     final cashSales = (d['cash_sales'] ?? 0).toDouble();
@@ -946,104 +955,90 @@ class EscPosHelper {
     final cashOut = (d['cash_out'] ?? 0).toDouble();
     final expectedCash = (d['expected_cash'] ?? 0).toDouble();
 
-    b.addAll(divider(size, char: '-'));
-    b.addAll(align(1));
-    b.addAll(bold(true));
-    b.addAll(txt('--- CASH DRAWER SUMMARY ---'));
-    b.addAll(bold(false));
-    b.addAll(align(0));
-
     b.addAll(rowLR(
         'Opening Cash',
-        rp(startingCash.round(),
-            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        rp(startingCash.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
     b.addAll(rowLR(
         '(+) Cash Sales',
-        rp(cashSales.round(),
-            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        rp(cashSales.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
     if (cashIn > 0) {
       b.addAll(rowLR(
           '(+) Cash In',
-          rp(cashIn.round(),
-              symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+          rp(cashIn.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
           size));
     }
     if (cashOut > 0) {
       b.addAll(rowLR(
           '(-) Cash Out',
-          rp(-cashOut.round(),
-              symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+          rp(-cashOut.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
           size));
     }
-    b.addAll(divider(size, char: '.'));
+    b.addAll(txt('.' * w));
     b.addAll(bold(true));
     b.addAll(rowLR(
         'Total',
-        rp(expectedCash.round(),
-            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        rp(expectedCash.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
     b.addAll(bold(false));
+
+    // SESSION TRANSACTIONS section
+    b.addAll(align(1));
+    b.addAll(bold(true));
+    b.addAll(txt(sectionHeaderLine('', size, '-')));
+    b.addAll(txt(sectionHeaderLine('SESSION TRANSACTIONS', size, '-')));
+    b.addAll(txt(sectionHeaderLine('', size, '-')));
+    b.addAll(bold(false));
+    b.addAll(align(0));
 
     final totalTransactions = d['total_transactions'] ?? 0;
     final salesTransactions = d['sales_transactions'] ?? 0;
     final refundTransactions = d['refund_transactions'] ?? 0;
     final totalQtySold = d['total_qty_sold'] ?? 0;
 
-    b.addAll(divider(size, char: '-'));
-    b.addAll(align(1));
-    b.addAll(bold(true));
-    b.addAll(txt('-- SESSION TRANSACTIONS --'));
-    b.addAll(bold(false));
-    b.addAll(align(0));
-
-    b.addAll(rowLR('Total Transactions', totalTransactions.toString(), size));
-    b.addAll(rowLR('Sales Transactions', salesTransactions.toString(), size));
-    b.addAll(rowLR('Returns/Refunds', refundTransactions.toString(), size));
-    b.addAll(rowLR('Items Sold', totalQtySold.toString(), size));
+    b.addAll(rowLR('Total Transactions', '$totalTransactions', size));
+    b.addAll(rowLR('Sales Transactions', '$salesTransactions', size));
+    b.addAll(rowLR('Returns/Refunds', '$refundTransactions', size));
+    b.addAll(rowLR('Items Sold', '$totalQtySold', size));
 
     final countedCash = (d['counted_cash'] ?? 0).toDouble();
     final differenceCash = (d['difference_cash'] ?? 0).toDouble();
     final totalCreditAmount = (d['total_credit_amount'] ?? 0).toDouble();
 
-    b.addAll(divider(size, char: '='));
+    b.addAll(txt('=' * w));
     b.addAll(bold(true));
     b.addAll(rowLR(
-        'Expected Balance:',
-        rp(expectedCash.round(),
-            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        'Expected Balance :',
+        rp(expectedCash.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
     b.addAll(rowLR(
-        'Closing Balance:',
-        rp(countedCash.round(),
-            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        'Closing Balance :',
+        rp(countedCash.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        size));
+    b.addAll(rowLR(
+        'Difference :',
+        rp(differenceCash.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
     b.addAll(bold(false));
 
-    final diffStr = rp(differenceCash.round(),
-        symbol: symbol, decimals: decimals, positionAfter: positionAfter);
-    if (differenceCash != 0) {
-      b.addAll(bold(true));
-      b.addAll(rowLR('Difference:', diffStr, size));
-      b.addAll(bold(false));
-    }
-
     if (totalCreditAmount > 0) {
-      b.addAll(divider(size, char: '.'));
+      b.addAll(txt('.' * w));
       b.addAll(rowLR(
-          '* Credit(piutang):',
-          rp(totalCreditAmount.round(),
-              symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+          '* Credit(piutang) :',
+          rp(totalCreditAmount.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
           size));
     }
 
-    b.addAll(divider(size, char: '='));
+    b.addAll(txt('=' * w));
+    b.addAll(feed(1));
     b.addAll(align(1));
-    final printDate = d['print_date'] as String? ??
-        _formatDate(DateTime.now().toIso8601String());
-    b.addAll(txt('Printed at: $printDate'));
+    b.addAll(bold(true));
     b.addAll(txt('Powered by dRetail'));
+    b.addAll(bold(false));
+    final printDt = d['print_date'] as String? ??
+        '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year.toString().substring(2)} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    b.addAll(txt(printDt));
     b.addAll(align(0));
 
     b.addAll(finalize());
