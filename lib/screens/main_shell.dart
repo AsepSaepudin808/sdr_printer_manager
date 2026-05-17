@@ -780,6 +780,27 @@ class _MainShellState extends State<MainShell> {
                 ],
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: RichText(
+                textAlign: TextAlign.center,
+                text: const TextSpan(
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w400),
+                  children: [
+                    TextSpan(text: 'Powered by '),
+                    TextSpan(
+                        text: 'd',
+                        style: TextStyle(
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w700)),
+                    TextSpan(text: 'Retail'),
+                  ],
+                ),
+              ),
+            ),
             _drawerItem(
                 Icons.logout_rounded, S.exit, () => SystemNavigator.pop()),
             const SizedBox(height: 12),
