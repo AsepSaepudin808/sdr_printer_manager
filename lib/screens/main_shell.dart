@@ -614,58 +614,58 @@ class _MainShellState extends State<MainShell> {
       systemNavigationBarColor: Colors.white,
       systemNavigationBarDividerColor: Colors.transparent,
       systemNavigationBarIconBrightness: Brightness.dark,
+      statusBarColor: _primary,
+      statusBarIconBrightness: Brightness.light,
+      statusBarBrightness: Brightness.dark,
     ));
 
-    return SafeArea(
-      bottom: false,
-      child: Scaffold(
-        key: _scaffoldKey,
-        backgroundColor: _bg,
-        extendBody: true,
-        resizeToAvoidBottomInset: true,
-        drawerEnableOpenDragGesture: false,
-        appBar: AppBar(
-          backgroundColor: _primary,
-          foregroundColor: Colors.white,
-          title: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            child: Text(
-              titles[_tab],
-              key: ValueKey(titles[_tab]),
-              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
-            ),
+    return Scaffold(
+      key: _scaffoldKey,
+      backgroundColor: _bg,
+      extendBody: true,
+      resizeToAvoidBottomInset: true,
+      drawerEnableOpenDragGesture: false,
+      appBar: AppBar(
+        backgroundColor: _primary,
+        foregroundColor: Colors.white,
+        title: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          child: Text(
+            titles[_tab],
+            key: ValueKey(titles[_tab]),
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
           ),
-          elevation: 0,
-          automaticallyImplyLeading: false,
-          leadingWidth: 56,
-          leading: GestureDetector(
-            onTap: () => _scaffoldKey.currentState?.openDrawer(),
-            behavior: HitTestBehavior.opaque,
-            child: const SizedBox(
-              width: 56,
-              height: 56,
-              child: Icon(Icons.menu_rounded, color: Colors.white, size: 26),
-            ),
+        ),
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        leadingWidth: 56,
+        leading: GestureDetector(
+          onTap: () => _scaffoldKey.currentState?.openDrawer(),
+          behavior: HitTestBehavior.opaque,
+          child: const SizedBox(
+            width: 56,
+            height: 56,
+            child: Icon(Icons.menu_rounded, color: Colors.white, size: 26),
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 24),
-              onPressed: () {
-                _toast('Refreshed');
-              },
-            ),
-          ],
         ),
-        drawer: _buildDrawer(),
-        body: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
-          transitionBuilder: (child, animation) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-          child: _buildBody(),
-        ),
-        bottomNavigationBar: isKeyboardVisible ? null : _buildBottomBar(),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 24),
+            onPressed: () {
+              _toast('Refreshed');
+            },
+          ),
+        ],
       ),
+      drawer: _buildDrawer(),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        transitionBuilder: (child, animation) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+        child: _buildBody(isKeyboardVisible),
+      ),
+      bottomNavigationBar: isKeyboardVisible ? null : _buildBottomBar(),
     );
   }
 
@@ -823,12 +823,16 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(bool isKeyboardVisible) {
     switch (_tab) {
       case 0:
         return _buildHomeTab();
       case 1:
-        return TextTab(btService: _bt, paperSize: _paperSize);
+        return TextTab(
+          btService: _bt,
+          paperSize: _paperSize,
+          isKeyboardVisible: isKeyboardVisible,
+        );
       case 2:
         return _buildStatsTab();
       case 3:

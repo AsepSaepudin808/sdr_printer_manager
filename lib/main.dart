@@ -11,8 +11,9 @@ void main() async {
     systemNavigationBarColor: Colors.white,
     systemNavigationBarDividerColor: Colors.transparent,
     systemNavigationBarIconBrightness: Brightness.dark,
-    statusBarColor: Colors.transparent,
+    statusBarColor: Color(0xFF2BBCC4),
     statusBarIconBrightness: Brightness.light,
+    statusBarBrightness: Brightness.dark,
   ));
 
   await SharedPreferences.getInstance();
