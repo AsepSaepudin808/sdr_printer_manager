@@ -18,6 +18,8 @@ class PrintServerService {
   Function(String)? onLog;
   Function()? onPrintSuccess;
   Function(bool)? onStatusChange;
+  /// Rich callback: (type, label, success, dataSize)
+  Function(String type, String label, bool success, int dataSize)? onPrintJob;
 
   PaperSize _paperSize = PaperSize.mm80;
 
@@ -79,6 +81,7 @@ class PrintServerService {
       if (ok) {
         onLog?.call('Test print berhasil');
         onPrintSuccess?.call();
+        onPrintJob?.call('test', 'Test Print ($action)', true, testData.length);
         return Response.ok(
             jsonEncode({'status': 'ok', 'message': 'Test print berhasil'}),
             headers: const {
@@ -87,6 +90,7 @@ class PrintServerService {
             });
       } else {
         onLog?.call('❌ Test print GAGAL — printer tidak terhubung');
+        onPrintJob?.call('test', 'Test Print ($action)', false, testData.length);
         return Response.internalServerError(
             body: jsonEncode(
                 {'status': 'error', 'message': 'Printer tidak terhubung'}),
@@ -124,6 +128,8 @@ class PrintServerService {
       try {
         final contentType = req.headers['content-type'] ?? '';
         Uint8List printData;
+        String jobType = 'escpos';
+        String jobLabel = 'Print Job';
 
         if (contentType.contains('application/json')) {
           final bodyStr = await req.readAsString();
@@ -144,6 +150,8 @@ class PrintServerService {
               summaryData = {};
             }
             printData = EscPosHelper.buildSessionSummary(summaryData, _paperSize);
+            jobType = 'session_summary';
+            jobLabel = 'Session Summary Report';
             onLog?.call('🖨️ Terima job Session Summary Report (${printData.length}B)');
           } else if (format == 'odoo_json') {
             Map<String, dynamic> orderData;
@@ -156,15 +164,20 @@ class PrintServerService {
             }
 
             final receiptType = orderData['receipt_type'] as String? ?? 'full';
+            final orderName = orderData['name'] as String? ?? '';
 
             if (receiptType == 'basic') {
               printData = EscPosHelper.buildFromOdooData(orderData, _paperSize,
                   basic: true);
+              jobType = 'receipt_basic';
+              jobLabel = orderName.isNotEmpty ? 'Struk Pendek $orderName' : 'Struk Pendek';
               onLog?.call(
                   '🖨️ Terima job Basic Receipt (odoo_json, ${printData.length}B)');
             } else {
               printData = EscPosHelper.buildFromOdooData(orderData, _paperSize,
                   basic: false);
+              jobType = 'receipt_full';
+              jobLabel = orderName.isNotEmpty ? 'Struk Lengkap $orderName' : 'Struk Lengkap';
               onLog?.call(
                   '🖨️ Terima job Full Receipt (odoo_json, ${printData.length}B)');
             }
@@ -172,6 +185,8 @@ class PrintServerService {
             final textContent =
                 dataField is String ? dataField : dataField.toString();
             printData = EscPosHelper.textToEscPos(textContent, _paperSize);
+            jobType = 'text';
+            jobLabel = 'Cetak Teks';
             onLog?.call('Terima job (TEXT, ${printData.length}B)');
           } else {
             final b64 = dataField is String ? dataField : '';
@@ -187,15 +202,21 @@ class PrintServerService {
               );
             }
             printData = base64Decode(b64);
+            jobType = 'escpos';
+            jobLabel = 'ESC/POS Data';
             onLog?.call('Terima job (ESC/POS base64, ${printData.length}B)');
           }
         } else if (contentType.contains('text/plain')) {
           final body = await req.readAsString();
           printData = EscPosHelper.textToEscPos(body, _paperSize);
+          jobType = 'text';
+          jobLabel = 'Cetak Teks';
           onLog?.call('Terima job (TEXT, ${printData.length}B)');
         } else {
           final bytes = await req.read().expand((x) => x).toList();
           printData = Uint8List.fromList(bytes);
+          jobType = 'escpos';
+          jobLabel = 'Binary Data';
           onLog?.call('Terima job (BINARY, ${printData.length}B)');
         }
 
@@ -203,6 +224,7 @@ class PrintServerService {
         if (ok) {
           onLog?.call('✅ Print berhasil (${printData.length}B dikirim)');
           onPrintSuccess?.call();
+          onPrintJob?.call(jobType, jobLabel, true, printData.length);
           return Response.ok(
             jsonEncode({'status': 'ok', 'message': 'Print berhasil'}),
             headers: const {
@@ -212,6 +234,7 @@ class PrintServerService {
           );
         } else {
           onLog?.call('❌ Gagal kirim ke printer — cek koneksi Bluetooth');
+          onPrintJob?.call(jobType, jobLabel, false, printData.length);
           return Response.internalServerError(
             body: jsonEncode(
                 {'status': 'error', 'message': 'Gagal kirim ke printer'}),

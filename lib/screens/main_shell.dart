@@ -9,7 +9,9 @@ import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 
 import '../services/print_server_service.dart';
 import '../services/bluetooth_service.dart';
+import '../services/print_history_service.dart';
 import '../models/printer_device.dart';
+import '../models/print_history.dart';
 import '../utils/escpos_helper.dart';
 import '../utils/test_print_template.dart';
 import '../utils/strings.dart';
@@ -33,12 +35,12 @@ class _MainShellState extends State<MainShell> {
 
   final PrintServerService _server = PrintServerService();
   final SdrBluetoothService _bt = SdrBluetoothService();
+  final PrintHistoryService _historyService = PrintHistoryService();
   final GlobalKey<ScaffoldState> _scaffoldKey =
       GlobalKey<ScaffoldState>();
 
   int _tab = 0;
   bool _serverRunning = false;
-  String _localIp = '';
   int _serverPort = 8080;
   PrinterDevice? _printer;
   final List<String> _logs = [];
@@ -64,6 +66,7 @@ class _MainShellState extends State<MainShell> {
     _requestPerms();
     _setupListeners();
     _setupPrintJobChannel();
+    _historyService.load().then((_) { if (mounted) setState(() {}); });
     // PRELOAD LOGO
     TestPrintTemplate.preloadLogo();
   }
@@ -195,6 +198,7 @@ class _MainShellState extends State<MainShell> {
       });
       SharedPreferences.getInstance()
           .then((p) => p.setInt('print_count', _printCount));
+      _recordHistory('pdf', name, true, 0);
 
       // CLEANUP TEMP FILE
       try {
@@ -258,6 +262,9 @@ class _MainShellState extends State<MainShell> {
       SharedPreferences.getInstance()
           .then((p) => p.setInt('print_count', _printCount));
     };
+    _server.onPrintJob = (type, label, success, dataSize) {
+      _recordHistory(type, label, success, dataSize);
+    };
     _server.onStatusChange = (r) => setState(() => _serverRunning = r);
   }
 
@@ -301,8 +308,6 @@ class _MainShellState extends State<MainShell> {
     }
     setState(() => _btConnected = true);
     _addLog(S.printerConnected);
-    final ip = await _server.getLocalIp();
-    setState(() => _localIp = ip);
     try {
       await _server.start(
           port: _serverPort, bluetoothService: _bt, paperSize: _paperSize);
@@ -321,7 +326,6 @@ class _MainShellState extends State<MainShell> {
     setState(() {
       _serverRunning = false;
       _btConnected = false;
-      _localIp = '';
     });
     _addLog(S.printerStopped);
   }
@@ -363,6 +367,16 @@ class _MainShellState extends State<MainShell> {
             : PaperSize.mm80;
     setState(() => _paperSize = newSize);
     _server.setPaperSize(newSize);
+    // Reload history (may have been reset)
+    await _historyService.load();
+    final newCount = p.getInt('print_count') ?? 0;
+    setState(() {
+      _printCount = newCount;
+      // If data was reset, clear in-memory logs too
+      if (newCount == 0 && _historyService.items.isEmpty) {
+        _logs.clear();
+      }
+    });
   }
 
   Future<void> _goPrinterSettings() async {
@@ -428,13 +442,31 @@ class _MainShellState extends State<MainShell> {
         _isPrinting = false;
         _printStatus = S.printSuccess(label);
       });
+      _recordHistory('test', label, true, data.length);
     } else {
       _addLog(S.printFail);
       setState(() {
         _isPrinting = false;
         _printStatus = S.printFail;
       });
+      _recordHistory('test', label, false, data.length);
     }
+  }
+
+  /// Record a print job to persistent history
+  void _recordHistory(String type, String label, bool success, int dataSize) {
+    final entry = PrintHistory(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      type: type,
+      label: label,
+      timestamp: DateTime.now(),
+      success: success,
+      dataSize: dataSize,
+      source: 'pos',
+    );
+    _historyService.add(entry).then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   void _showPrintHistory() {
@@ -588,14 +620,20 @@ class _MainShellState extends State<MainShell> {
       child: Scaffold(
         key: _scaffoldKey,
         backgroundColor: _bg,
-        extendBody: false,
+        extendBody: true,
         resizeToAvoidBottomInset: true,
         drawerEnableOpenDragGesture: false,
         appBar: AppBar(
           backgroundColor: _primary,
           foregroundColor: Colors.white,
-          title: Text(titles[_tab],
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+          title: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child: Text(
+              titles[_tab],
+              key: ValueKey(titles[_tab]),
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+            ),
+          ),
           elevation: 0,
           automaticallyImplyLeading: false,
           leadingWidth: 56,
@@ -605,12 +643,26 @@ class _MainShellState extends State<MainShell> {
             child: const SizedBox(
               width: 56,
               height: 56,
-              child: Icon(Icons.menu_rounded, color: Colors.white),
+              child: Icon(Icons.menu_rounded, color: Colors.white, size: 26),
             ),
           ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 24),
+              onPressed: () {
+                _toast('Refreshed');
+              },
+            ),
+          ],
         ),
         drawer: _buildDrawer(),
-        body: _buildBody(),
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          transitionBuilder: (child, animation) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+          child: _buildBody(),
+        ),
         bottomNavigationBar: isKeyboardVisible ? null : _buildBottomBar(),
       ),
     );
@@ -618,72 +670,156 @@ class _MainShellState extends State<MainShell> {
 
   Widget _buildDrawer() {
     return Drawer(
-      child: SafeArea(
-        child: Column(children: [
-          DrawerHeader(
-            decoration: const BoxDecoration(color: _primary),
-            child: Row(children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.print_rounded,
-                    color: Colors.white, size: 28),
-              ),
-              const SizedBox(width: 12),
-              const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('dPrinter Mart',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800)),
-                    Text('Print Bridge for PoS',
-                        style: TextStyle(color: Colors.white60, fontSize: 12)),
-                  ]),
-            ]),
+      elevation: 16,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topRight: Radius.circular(20),
+          bottomRight: Radius.circular(20),
+        ),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              _primary,
+              _primary.withValues(alpha: 0.95),
+            ],
           ),
-          Expanded(child: SingleChildScrollView(
-            child: Column(children: [
-              _drawerItem(Icons.home_rounded, S.home, () {
-                Navigator.pop(context);
-                setState(() => _tab = 0);
-              }),
-              _drawerItem(Icons.history_rounded, S.activityHistory, () {
-                Navigator.pop(context);
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => LogScreen(logs: _logs)));
-              }),
-              const Divider(),
-              _drawerItem(Icons.settings_rounded, S.settings, () async {
-                Navigator.pop(context);
-                await _goSettings();
-              }),
-              _drawerItem(Icons.print_outlined, S.printerSize, () async {
-                Navigator.pop(context);
-                await _goPrinterSettings();
-              }),
-              _drawerItem(Icons.info_outline_rounded, S.aboutApp, () {
-                Navigator.pop(context);
-                _showCustomAboutDialog(context);
-              }),
-            ]),
-          )),
-          const Divider(),
-          _drawerItem(
-              Icons.exit_to_app_rounded, S.exit, () => SystemNavigator.pop()),
-          const SizedBox(height: 16),
-        ]),
+        ),
+        child: SafeArea(
+          child: Column(children: [
+            DrawerHeader(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              child: Row(children: [
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.print_rounded,
+                      color: Colors.white, size: 32),
+                ),
+                const SizedBox(width: 16),
+                const Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('dPrinter Mart',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5)),
+                        SizedBox(height: 4),
+                        Text('Print Bridge for PoS',
+                            style: TextStyle(color: Colors.white70, fontSize: 13)),
+                      ]),
+                ),
+              ]),
+            ),
+            Expanded(child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(children: [
+                const SizedBox(height: 8),
+                _drawerItem(Icons.home_rounded, S.home, () {
+                  Navigator.pop(context);
+                  setState(() => _tab = 0);
+                }, isSelected: _tab == 0),
+                _drawerItem(Icons.history_rounded, S.activityHistory, () {
+                  Navigator.pop(context);
+                  Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => LogScreen(logs: _logs)));
+                }),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  child: Divider(color: Colors.white24, thickness: 1),
+                ),
+                _drawerItem(Icons.settings_rounded, S.settings, () async {
+                  Navigator.pop(context);
+                  await _goSettings();
+                }),
+                _drawerItem(Icons.print_outlined, S.printerSize, () async {
+                  Navigator.pop(context);
+                  await _goPrinterSettings();
+                }),
+                _drawerItem(Icons.info_outline_rounded, S.aboutApp, () {
+                  Navigator.pop(context);
+                  _showCustomAboutDialog(context);
+                }),
+              ]),
+            )),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.bluetooth_rounded, color: Colors.white70, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    _printer?.name ?? 'No Printer',
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            _drawerItem(
+                Icons.logout_rounded, S.exit, () => SystemNavigator.pop()),
+            const SizedBox(height: 12),
+          ]),
+        ),
       ),
     );
   }
 
-  Widget _drawerItem(IconData icon, String label, VoidCallback onTap) {
-    return ListTile(
-        leading: Icon(icon, color: _dark), title: Text(label), onTap: onTap);
+  Widget _drawerItem(IconData icon, String label, VoidCallback onTap, {bool isSelected = false, bool isDanger = false}) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: isSelected ? Colors.white.withValues(alpha: 0.15) : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListTile(
+        leading: Icon(icon, color: isDanger ? Colors.red.shade300 : Colors.white, size: 22),
+        title: Text(
+          label,
+          style: TextStyle(
+            color: isDanger ? Colors.red.shade300 : Colors.white,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            fontSize: 14,
+          ),
+        ),
+        trailing: isSelected
+            ? Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+              )
+            : null,
+        onTap: onTap,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      ),
+    );
   }
 
   Widget _buildBody() {
@@ -708,36 +844,16 @@ class _MainShellState extends State<MainShell> {
       backgroundColor: _bg,
       color: Colors.white,
       buttonBackgroundColor: _primary,
-      height: 65,
-      animationDuration: const Duration(milliseconds: 300),
+      height: 75,
+      animationDuration: const Duration(milliseconds: 350),
       animationCurve: Curves.easeOutCubic,
       index: _tab,
       items: [
-        Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Icon(Icons.home_rounded,
-                size: 26,
-                color: _tab == 0 ? Colors.white : Colors.grey.shade500)),
-        Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Icon(Icons.description_rounded,
-                size: 26,
-                color: _tab == 1 ? Colors.white : Colors.grey.shade500)),
-        Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Icon(Icons.insights_rounded,
-                size: 26,
-                color: _tab == 2 ? Colors.white : Colors.grey.shade500)),
-        Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Icon(Icons.image_rounded,
-                size: 26,
-                color: _tab == 3 ? Colors.white : Colors.grey.shade500)),
-        Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Icon(Icons.picture_as_pdf_rounded,
-                size: 26,
-                color: _tab == 4 ? Colors.white : Colors.grey.shade500)),
+        _buildNavItem(Icons.home_rounded, _tab == 0, 'Home'),
+        _buildNavItem(Icons.description_rounded, _tab == 1, 'Text'),
+        _buildNavItem(Icons.insights_rounded, _tab == 2, 'Stats'),
+        _buildNavItem(Icons.image_rounded, _tab == 3, 'Image'),
+        _buildNavItem(Icons.picture_as_pdf_rounded, _tab == 4, 'PDF'),
       ],
       onTap: (index) {
         setState(() => _tab = index);
@@ -745,104 +861,413 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  Widget _buildStatsTab() {
-    final w = EscPosHelper.charsPerLine(_paperSize);
-    final paperLabel = switch (_paperSize) {
-      PaperSize.mm58 => '58mm',
-      PaperSize.mm80 => '80mm',
-      PaperSize.mm100 => '100mm'
-    };
-    final printLogs = _logs
-        .where((l) =>
-            l.contains('print') ||
-            l.contains('Print') ||
-            l.contains('cetak') ||
-            l.contains('dicetak'))
-        .toList();
+  Widget _buildNavItem(IconData icon, bool isSelected, String label) {
+    if (isSelected) {
+      return Icon(icon, size: 28, color: Colors.white);
+    }
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 24, color: Colors.grey.shade400),
+        const SizedBox(height: 3),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey.shade400,
+          ),
+        ),
+      ],
+    );
+  }
 
-    const double bottomPad = 16.0;
+  Widget _buildStatsTab() {
+    final items = _historyService.items;
+    final totalSuccess = _historyService.successCount;
+    final totalFail = _historyService.failCount;
+    final todayCount = _historyService.todayCount;
+    final totalBytes = _historyService.totalBytes;
+    final byType = _historyService.countByType;
+    final byDate = _historyService.countByDate;
+    final rate = (totalSuccess + totalFail) > 0
+        ? (totalSuccess / (totalSuccess + totalFail) * 100).toStringAsFixed(0)
+        : '—';
+
+    String formatBytes(int bytes) {
+      if (bytes < 1024) return '${bytes}B';
+      if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)}KB';
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)}MB';
+    }
+
+    // Type label & color map
+    final typeInfo = <String, (String, Color, IconData)>{
+      'receipt_full': (S.receiptFull, const Color(0xFF2BBCC4), Icons.receipt_long_rounded),
+      'receipt_basic': (S.receiptBasic, const Color(0xFF7B2FBE), Icons.receipt_rounded),
+      'session_summary': (S.sessionSummary, const Color(0xFFF59E0B), Icons.summarize_rounded),
+      'text': (S.textPrint, const Color(0xFF06C270), Icons.text_fields_rounded),
+      'image': (S.imagePrint, const Color(0xFFEC4899), Icons.image_rounded),
+      'pdf': (S.pdfPrint, const Color(0xFFEF4444), Icons.picture_as_pdf_rounded),
+      'test': (S.testPrintLabel, Colors.grey, Icons.bug_report_rounded),
+      'escpos': ('ESC/POS', const Color(0xFF6366F1), Icons.code_rounded),
+    };
+
+    // Max for chart
+    int maxDay = 1;
+    for (final v in byDate.values) {
+      if (v > maxDay) maxDay = v;
+    }
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, bottomPad),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // HEADER
           Row(children: [
-            const Icon(Icons.analytics_rounded, color: _primary, size: 22),
-            const SizedBox(width: 8),
-            Text(S.isEn ? 'Print Statistics' : 'Statistik Cetak',
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: _primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.insights_rounded, color: _primary, size: 22),
+            ),
+            const SizedBox(width: 10),
+            Text(S.statsTitle,
                 style: const TextStyle(
                     fontSize: 18, fontWeight: FontWeight.w800, color: _dark)),
           ]),
           const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3))
-                ]),
-            child: Row(children: [
-              Expanded(
-                  child: _statItem(S.isEn ? 'Total Printed' : 'Total Dicetak',
-                      '$_printCount', Icons.receipt_long_rounded)),
-              Container(width: 1, height: 40, color: Colors.grey.shade200),
-              Expanded(
-                  child: _statItem(S.isEn ? 'Paper' : 'Kertas', paperLabel,
-                      Icons.description_rounded)),
-              Container(width: 1, height: 40, color: Colors.grey.shade200),
-              Expanded(
-                  child: _statItem(S.isEn ? 'Chars' : 'Karakter', '${w}kar',
-                      Icons.text_fields_rounded)),
+
+          // OVERVIEW CARDS (2x2 Grid)
+          Row(children: [
+            Expanded(child: _overviewCard(
+              S.totalPrinted,
+              '$totalSuccess',
+              Icons.print_rounded,
+              _primary,
+            )),
+            const SizedBox(width: 10),
+            Expanded(child: _overviewCard(
+              S.todayPrinted,
+              '$todayCount',
+              Icons.today_rounded,
+              const Color(0xFF7B2FBE),
+            )),
+          ]),
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(child: _overviewCard(
+              S.successRate,
+              '$rate%',
+              Icons.check_circle_outline_rounded,
+              _success,
+            )),
+            const SizedBox(width: 10),
+            Expanded(child: _overviewCard(
+              S.dataSent,
+              formatBytes(totalBytes),
+              Icons.data_usage_rounded,
+              const Color(0xFFF59E0B),
+            )),
+          ]),
+          const SizedBox(height: 20),
+
+          // 7 DAY CHART
+          _card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Icon(Icons.bar_chart_rounded, color: _primary, size: 18),
+              const SizedBox(width: 8),
+              Text(S.last7Days,
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w700, color: _dark)),
             ]),
-          ),
-          const SizedBox(height: 24),
-          Text(S.isEn ? 'Recent Print Activity' : 'Aktivitas Cetak Terbaru',
-              style: const TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.w700, color: _dark)),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 100,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: byDate.entries.map((e) {
+                  final fraction = maxDay > 0 ? e.value / maxDay : 0.0;
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Text('${e.value}',
+                              style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: e.value > 0 ? _primary : Colors.grey.shade400)),
+                          const SizedBox(height: 4),
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 500),
+                            curve: Curves.easeOutCubic,
+                            height: (fraction * 60).clamp(4.0, 60.0),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                                colors: e.value > 0
+                                    ? [_primary, _primary.withValues(alpha: 0.6)]
+                                    : [Colors.grey.shade200, Colors.grey.shade200],
+                              ),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(e.key,
+                              style: TextStyle(
+                                  fontSize: 9, color: Colors.grey.shade500)),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ])),
+          const SizedBox(height: 16),
+
+          // BY TYPE
+          if (byType.isNotEmpty) ...[
+            _card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                const Icon(Icons.category_rounded, color: _primary, size: 18),
+                const SizedBox(width: 8),
+                Text(S.printByType,
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w700, color: _dark)),
+              ]),
+              const SizedBox(height: 14),
+              ...byType.entries.map((e) {
+                final info = typeInfo[e.key];
+                final label = info?.$1 ?? e.key;
+                final color = info?.$2 ?? Colors.grey;
+                final icon = info?.$3 ?? Icons.print_rounded;
+                final fraction = totalSuccess > 0 ? e.value / totalSuccess : 0.0;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(icon, size: 16, color: color),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(children: [
+                            Text(label,
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: _dark)),
+                            const Spacer(),
+                            Text('${e.value}',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: color)),
+                          ]),
+                          const SizedBox(height: 4),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: fraction,
+                              backgroundColor: Colors.grey.shade100,
+                              valueColor: AlwaysStoppedAnimation(color),
+                              minHeight: 5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ]),
+                );
+              }),
+            ])),
+            const SizedBox(height: 16),
+          ],
+
+          // PRINT HISTORY
+          Row(children: [
+            const Icon(Icons.history_rounded, color: _primary, size: 18),
+            const SizedBox(width: 8),
+            Text(S.printHistory,
+                style: const TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w700, color: _dark)),
+            const Spacer(),
+            if (items.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text('${items.length}',
+                    style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: _primary)),
+              ),
+          ]),
           const SizedBox(height: 12),
-          if (printLogs.isEmpty)
-            Center(
-                child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Text(S.noActivity,
-                  style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
+          if (items.isEmpty)
+            _card(Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.receipt_long_rounded,
+                      size: 48, color: Colors.grey.shade300),
+                  const SizedBox(height: 12),
+                  Text(S.noHistoryYet,
+                      style: TextStyle(
+                          color: Colors.grey.shade400, fontSize: 13)),
+                ]),
+              ),
             ))
           else
-            ...printLogs.take(10).map((log) => Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
+            ...items.take(50).map((h) {
+              final info = typeInfo[h.type];
+              final color = info?.$2 ?? Colors.grey;
+              final icon = info?.$3 ?? Icons.print_rounded;
+              final time =
+                  '${h.timestamp.day}/${h.timestamp.month}/${h.timestamp.year} '
+                  '${h.timestamp.hour.toString().padLeft(2, '0')}:'
+                  '${h.timestamp.minute.toString().padLeft(2, '0')}';
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: (h.success ? color : _danger).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      h.success ? icon : Icons.error_outline_rounded,
+                      size: 18,
+                      color: h.success ? color : _danger,
+                    ),
                   ),
-                  child: Row(
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(
-                            log.contains('✅')
-                                ? Icons.check_circle_rounded
-                                : log.contains('❌')
-                                    ? Icons.error_rounded
-                                    : Icons.print_rounded,
-                            size: 16,
-                            color: log.contains('✅')
-                                ? _success
-                                : log.contains('❌')
-                                    ? _danger
-                                    : Colors.grey),
-                        const SizedBox(width: 12),
-                        Expanded(
-                            child: Text(log,
-                                style: const TextStyle(
-                                    fontSize: 12, fontFamily: 'monospace'))),
-                      ]),
-                )),
+                        Text(h.label,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: _dark),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 2),
+                        Row(children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(h.typeLabel,
+                                style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w600,
+                                    color: color)),
+                          ),
+                          const SizedBox(width: 6),
+                          if (h.dataSize > 0)
+                            Text(formatBytes(h.dataSize),
+                                style: TextStyle(
+                                    fontSize: 9, color: Colors.grey.shade500)),
+                        ]),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Icon(
+                        h.success
+                            ? Icons.check_circle_rounded
+                            : Icons.cancel_rounded,
+                        size: 16,
+                        color: h.success ? _success : _danger,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(time,
+                          style: TextStyle(
+                              fontSize: 9, color: Colors.grey.shade400)),
+                    ],
+                  ),
+                ]),
+              );
+            }),
+          const SizedBox(height: 16),
         ],
       ),
+    );
+  }
+
+  Widget _overviewCard(String label, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 18, color: color),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(value,
+                  style: TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.w800, color: color)),
+              Text(label,
+                  style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
+            ],
+          ),
+        ),
+      ]),
     );
   }
 
@@ -900,65 +1325,124 @@ class _MainShellState extends State<MainShell> {
         gradient: LinearGradient(
             colors: _serverRunning
                 ? [const Color(0xFF034B2F), const Color(0xFF06874F)]
-                : [const Color(0xFF1A8A91), _primary]),
-        borderRadius: BorderRadius.circular(20),
+                : [_primary, _primary.withValues(alpha: 0.85)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
               color:
-                  (_serverRunning ? _success : _primary).withValues(alpha: 0.3),
-              blurRadius: 16,
-              offset: const Offset(0, 6))
+                  (_serverRunning ? _success : _primary).withValues(alpha: 0.35),
+              blurRadius: 20,
+              offset: const Offset(0, 8))
         ],
       ),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(22),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                  color: _serverRunning ? _success : Colors.grey,
-                  shape: BoxShape.circle)),
-          const SizedBox(width: 8),
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.8, end: 1.0),
+            duration: const Duration(milliseconds: 1200),
+            curve: Curves.easeInOut,
+            builder: (context, value, child) {
+              return Transform.scale(
+                scale: value,
+                child: Container(
+                  width: 14,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: _serverRunning ? _success : Colors.grey.shade400,
+                    shape: BoxShape.circle,
+                    boxShadow: _serverRunning
+                        ? [
+                            BoxShadow(
+                              color: _success.withValues(alpha: 0.6),
+                              blurRadius: 8,
+                              spreadRadius: 2,
+                            )
+                          ]
+                        : null,
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 10),
           Text(_serverRunning ? S.printerActive : S.printerInactive,
               style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700)),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800)),
           const Spacer(),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.15),
+                color: Colors.white.withValues(alpha: 0.18),
                 borderRadius: BorderRadius.circular(20)),
-            child: Text('📄 $paperLabel',
-                style: const TextStyle(color: Colors.white70, fontSize: 11)),
+            child: Row(children: [
+              const Icon(Icons.description_rounded, color: Colors.white70, size: 14),
+              const SizedBox(width: 4),
+              Text(paperLabel,
+                  style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
+            ]),
           ),
         ]),
-        const SizedBox(height: 8),
+        const SizedBox(height: 16),
         if (_serverRunning) ...[
           GestureDetector(
             onTap: () {
               Clipboard.setData(
-                  ClipboardData(text: 'http://$_localIp:$_serverPort'));
+                  ClipboardData(text: 'http://127.0.0.1:$_serverPort'));
               _toast(S.urlCopied);
             },
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(children: [
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('http://127.0.0.1:$_serverPort',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'monospace',
+                            letterSpacing: 0.5)),
+                    const SizedBox(height: 2),
+                    Text(S.tapToCopy,
+                        style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                  ]),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.copy_rounded, color: Colors.white, size: 18),
+                ),
+              ]),
+            ),
+          ),
+        ] else
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Row(children: [
-              Text('http://$_localIp:$_serverPort',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'monospace')),
-              const SizedBox(width: 6),
-              const Icon(Icons.copy_rounded, color: Colors.white38, size: 14),
+              const Icon(Icons.wifi_rounded, color: Colors.white54, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(S.pressToActivate,
+                    style: const TextStyle(color: Colors.white54, fontSize: 12)),
+              ),
             ]),
           ),
-          Text(S.tapToCopy,
-              style: const TextStyle(color: Colors.white38, fontSize: 10)),
-        ] else
-          Text(S.pressToActivate,
-              style: const TextStyle(color: Colors.white54, fontSize: 12)),
       ]),
     );
   }
@@ -967,80 +1451,152 @@ class _MainShellState extends State<MainShell> {
     final has = _printer != null;
     return _card(Row(children: [
       Container(
-        width: 48,
-        height: 48,
+        width: 54,
+        height: 54,
         decoration: BoxDecoration(
-            color: (has ? _primary : Colors.grey).withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12)),
+            gradient: LinearGradient(
+              colors: has
+                  ? [_primary.withValues(alpha: 0.15), _primary.withValues(alpha: 0.05)]
+                  : [Colors.grey.shade200, Colors.grey.shade100],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(14),
+        ),
         child: Icon(Icons.print_rounded,
-            color: has ? _primary : Colors.grey, size: 24),
+            color: has ? _primary : Colors.grey, size: 26),
       ),
-      const SizedBox(width: 12),
+      const SizedBox(width: 14),
       Expanded(
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(has ? _printer!.name : S.noPrinter,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-                color: has ? _dark : Colors.grey)),
+        Row(children: [
+          Expanded(
+            child: Text(has ? _printer!.name : S.noPrinter,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    color: has ? _dark : Colors.grey)),
+          ),
+          if (_btConnected)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: _success.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: _success,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: _success.withValues(alpha: 0.5),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(S.connected,
+                    style: const TextStyle(fontSize: 10, color: _success, fontWeight: FontWeight.w600)),
+              ]),
+            ),
+        ]),
         if (has) ...[
-          const SizedBox(height: 2),
+          const SizedBox(height: 4),
           GestureDetector(
             onTap: () {
               showModalBottomSheet(
                 context: context,
                 backgroundColor: Colors.white,
                 shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                 ),
                 builder: (_) => SafeArea(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Center(
+                          child: Container(
+                            width: 50,
+                            height: 5,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade300,
+                              borderRadius: BorderRadius.circular(99),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: _primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.print_rounded, color: _primary, size: 22),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text(_printer!.name,
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                              const SizedBox(height: 4),
+                              Text('ID Printer',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                            ]),
+                          ),
+                        ]),
+                        const SizedBox(height: 16),
                         Container(
-                          width: 40,
-                          height: 4,
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade300,
-                            borderRadius: BorderRadius.circular(99),
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(10),
                           ),
+                          child: Row(children: [
+                            Icon(Icons.fingerprint_rounded, color: Colors.grey.shade500, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: SelectableText(_printer!.address,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.black87,
+                                    fontFamily: 'monospace',
+                                    letterSpacing: 1,
+                                  )),
+                            ),
+                          ]),
                         ),
-                        const SizedBox(height: 12),
-                        Text(
-                          S.isEn ? 'Printer ID' : 'ID Printer',
-                          style: const TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.w800),
-                        ),
-                        const SizedBox(height: 8),
-                        SelectableText(
-                          _printer!.address,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Colors.black87,
-                            fontFamily: 'monospace',
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton.icon(
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
                             onPressed: () async {
-                              await Clipboard.setData(
-                                  ClipboardData(text: _printer!.address));
+                              await Clipboard.setData(ClipboardData(text: _printer!.address));
                               if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text(S.urlCopied)),
-                                );
+                                Navigator.pop(context);
+                                _toast(S.urlCopied);
                               }
                             },
                             icon: const Icon(Icons.copy_rounded, size: 18),
                             label: Text(S.isEn ? 'Copy ID' : 'Salin ID'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
                           ),
                         ),
                       ],
@@ -1049,146 +1605,117 @@ class _MainShellState extends State<MainShell> {
                 ),
               );
             },
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text('ID: ${_printer!.address}',
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('ID: ${_printer!.address}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                          fontSize: 10.5,
-                          color: Colors.grey.shade500,
+                          fontSize: 10,
+                          color: Colors.grey.shade600,
                           fontFamily: 'monospace')),
+                  const SizedBox(width: 4),
+                  Icon(Icons.content_copy_rounded,
+                      size: 12, color: Colors.grey.shade500),
+                ],
+              ),
+            ),
+          ),
+        ] else ...[
+          const SizedBox(height: 4),
+          Text(
+            S.selectPrinterFirst,
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+          ),
+        ],
+      ])),
+      const SizedBox(width: 12),
+      Column(children: [
+        GestureDetector(
+          onTap: _serverRunning ? null : _goScan,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: (_serverRunning ? Colors.grey : _primary).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: (_serverRunning ? Colors.grey : _primary).withValues(alpha: 0.3),
+              ),
+            ),
+            child: Text(has ? S.change : S.select,
+                style: TextStyle(
+                    color: _serverRunning ? Colors.grey : _primary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12)),
+          ),
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: _connecting
+              ? null
+              : (_serverRunning ? _stopServer : _startServer),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+            decoration: BoxDecoration(
+              color: _connecting
+                  ? Colors.grey.shade400
+                  : _serverRunning
+                      ? _danger
+                      : _success,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: (_connecting
+                          ? Colors.grey
+                          : _serverRunning
+                              ? _danger
+                              : _success)
+                      .withValues(alpha: 0.35),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
-                const SizedBox(width: 4),
-                Icon(Icons.content_copy_rounded,
-                    size: 12, color: Colors.grey.shade500),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _connecting
+                      ? Icons.hourglass_top_rounded
+                      : _serverRunning
+                          ? Icons.power_settings_new_rounded
+                          : Icons.play_arrow_rounded,
+                  size: 16,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  _connecting
+                      ? '...'
+                      : _serverRunning
+                          ? 'OFF'
+                          : 'ON',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                    letterSpacing: 0.3,
+                  ),
+                ),
               ],
             ),
           ),
-        ],
-        const SizedBox(height: 3),
-        Row(children: [
-          Container(
-              width: 7,
-              height: 7,
-              decoration: BoxDecoration(
-                  color: _btConnected ? _success : Colors.grey,
-                  shape: BoxShape.circle)),
-          const SizedBox(width: 5),
-          Expanded(
-            child: Text(
-                _btConnected
-                    ? S.connected
-                    : has
-                        ? S.notConnected
-                        : S.selectPrinterFirst,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    fontSize: 11,
-                    color: _btConnected ? _success : Colors.grey)),
-          ),
-        ]),
-      ])),
-      LayoutBuilder(builder: (context, constraints) {
-        final compact = constraints.maxWidth < 120;
-        final changeFont = compact ? 11.0 : 12.0;
-        final powerFont = compact ? 10.0 : 11.5;
-        final powerHPad = compact ? 10.0 : 16.0;
-        final powerVPad = compact ? 8.0 : 10.0;
-        final iconSize = compact ? 12.0 : 14.0;
-        final gap = compact ? 4.0 : 6.0;
-
-        return Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          alignment: WrapAlignment.end,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            GestureDetector(
-              onTap: _serverRunning ? null : _goScan,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                decoration: BoxDecoration(
-                    color: (_serverRunning ? Colors.grey : _primary)
-                        .withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8)),
-                child: Text(has ? S.change : S.select,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        color: _serverRunning ? Colors.grey : _primary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: changeFont)),
-              ),
-            ),
-            GestureDetector(
-              onTap: _connecting
-                  ? null
-                  : (_serverRunning ? _stopServer : _startServer),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                padding: EdgeInsets.symmetric(
-                    horizontal: powerHPad, vertical: powerVPad),
-                constraints: BoxConstraints(minWidth: compact ? 66 : 78),
-                decoration: BoxDecoration(
-                  color: _connecting
-                      ? Colors.grey.shade400
-                      : _serverRunning
-                          ? _danger
-                          : _success,
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: [
-                    BoxShadow(
-                      color: (_connecting
-                              ? Colors.grey
-                              : _serverRunning
-                                  ? _danger
-                                  : _success)
-                          .withValues(alpha: 0.28),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      _connecting
-                          ? Icons.hourglass_top_rounded
-                          : _serverRunning
-                              ? Icons.power_settings_new_rounded
-                              : Icons.play_arrow_rounded,
-                      size: iconSize,
-                      color: Colors.white,
-                    ),
-                    SizedBox(width: gap),
-                    Text(
-                      _connecting
-                          ? (S.isEn ? 'WAIT' : 'TUNGGU')
-                          : _serverRunning
-                              ? (S.isEn ? 'STOP' : 'MATIKAN')
-                              : (S.isEn ? 'ON' : 'NYALAKAN'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: powerFont,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        );
-      }),
+        ),
+      ]),
     ]));
   }
 
@@ -1201,16 +1728,31 @@ class _MainShellState extends State<MainShell> {
         child: _card(
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            const Icon(Icons.receipt_long_rounded, color: _primary, size: 18),
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: _primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.receipt_long_rounded, color: _primary, size: 16),
+            ),
             const Spacer(),
-            Icon(Icons.info_outline_rounded, size: 12, color: Colors.grey[400]),
+            Icon(Icons.chevron_right_rounded, size: 18, color: Colors.grey[400]),
           ]),
-          const SizedBox(height: 8),
-          Text('$_printCount',
-              style: const TextStyle(
-                  fontSize: 20, fontWeight: FontWeight.w800, color: _primary)),
+          const SizedBox(height: 10),
+          TweenAnimationBuilder<int>(
+            tween: IntTween(begin: 0, end: _printCount),
+            duration: const Duration(milliseconds: 800),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, child) {
+              return Text('$value',
+                  style: const TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.w900, color: _primary));
+            },
+          ),
+          const SizedBox(height: 2),
           Text(S.receiptsPrinted,
-              style: const TextStyle(fontSize: 10, color: Colors.grey)),
+              style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
         ])),
       )),
       const SizedBox(width: 12),
@@ -1220,19 +1762,25 @@ class _MainShellState extends State<MainShell> {
         child: _card(
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            const Icon(Icons.tune_rounded, color: Color(0xFF7B2FBE), size: 18),
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF7B2FBE).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.tune_rounded, color: Color(0xFF7B2FBE), size: 16),
+            ),
             const Spacer(),
-            Icon(Icons.chevron_right_rounded,
-                size: 16, color: Colors.grey[400]),
+            Icon(Icons.chevron_right_rounded, size: 18, color: Colors.grey[400]),
           ]),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text('$paperLabel · ${w}kar',
               style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
                   color: Color(0xFF7B2FBE))),
           Text(S.isEn ? 'Printer Settings' : 'Pengaturan Printer',
-              style: const TextStyle(fontSize: 10, color: Colors.grey)),
+              style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
         ])),
       )),
     ]);
@@ -1242,13 +1790,20 @@ class _MainShellState extends State<MainShell> {
     return _card(
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
-        const Icon(Icons.settings_ethernet_rounded,
-            color: Colors.orange, size: 16),
-        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.orange.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(Icons.settings_ethernet_rounded,
+              color: Colors.orange.shade700, size: 18),
+        ),
+        const SizedBox(width: 10),
         Text(S.portHttpServer,
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
       ]),
-      const SizedBox(height: 10),
+      const SizedBox(height: 12),
       Row(children: [
         Expanded(
             child: TextField(
@@ -1256,24 +1811,37 @@ class _MainShellState extends State<MainShell> {
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
               labelText: 'Port',
+              labelStyle: TextStyle(color: Colors.grey.shade600, fontSize: 13),
               border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               isDense: true,
               contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
-          style: const TextStyle(fontSize: 13),
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: _primary, width: 2),
+              )),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         )),
-        const SizedBox(width: 8),
+        const SizedBox(width: 10),
         ElevatedButton(
             onPressed: _savePort,
             style: ElevatedButton.styleFrom(
                 backgroundColor: _primary,
                 foregroundColor: Colors.white,
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8))),
-            child: Text(S.save, style: const TextStyle(fontSize: 12))),
+                    borderRadius: BorderRadius.circular(12)),
+                elevation: 0),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.save_rounded, size: 18, color: Colors.white),
+                const SizedBox(width: 6),
+                Text(S.save, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
+              ],
+            )),
       ]),
     ]));
   }
@@ -1282,40 +1850,66 @@ class _MainShellState extends State<MainShell> {
     return _card(
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
-        const Icon(Icons.print_rounded, color: _success, size: 16),
-        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: _success.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: const Icon(Icons.print_rounded, color: _success, size: 18),
+        ),
+        const SizedBox(width: 10),
         Text(S.testPrint,
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
       ]),
-      const SizedBox(height: 10),
-      _tpBtn(
-          S.shortReceipt,
-          Icons.receipt_rounded,
-          _primary,
-          _isPrinting
-              ? null
-              : () => _doTestPrint(TestPrintTemplate.buildTestShort(_paperSize),
-                  'Struk pendek')),
-      const SizedBox(height: 8),
-      _tpBtn(
-          S.fullReceipt,
-          Icons.receipt_long_rounded,
-          const Color(0xFF7B2FBE),
-          _isPrinting
-              ? null
-              : () => _doTestPrint(TestPrintTemplate.buildTestLong(_paperSize),
-                  'Struk lengkap')),
+      const SizedBox(height: 12),
+      Row(children: [
+        Expanded(
+          child: _tpBtn(
+              S.shortReceipt,
+              Icons.receipt_rounded,
+              _primary,
+              _isPrinting
+                  ? null
+                  : () => _doTestPrint(TestPrintTemplate.buildTestShort(_paperSize),
+                      'Struk pendek')),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _tpBtn(
+              S.fullReceipt,
+              Icons.receipt_long_rounded,
+              const Color(0xFF7B2FBE),
+              _isPrinting
+                  ? null
+                  : () => _doTestPrint(TestPrintTemplate.buildTestLong(_paperSize),
+                      'Struk lengkap')),
+        ),
+      ]),
       if (_isPrinting) ...[
-        const SizedBox(height: 10),
-        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          const SizedBox(
-              width: 14,
-              height: 14,
-              child: CircularProgressIndicator(strokeWidth: 2)),
-          const SizedBox(width: 8),
-          Text(S.sending,
-              style: const TextStyle(color: Colors.grey, fontSize: 12)),
-        ]),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: _primary.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: _primary,
+                  )),
+              const SizedBox(width: 10),
+              Text(S.sending,
+                  style: const TextStyle(color: _primary, fontSize: 12, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
       ],
     ]));
   }
@@ -1388,23 +1982,50 @@ class _MainShellState extends State<MainShell> {
       ]),
       const SizedBox(height: 10),
       Container(
-        height: 100,
+        height: 110,
         decoration: BoxDecoration(
             color: const Color(0xFF0D1117),
-            borderRadius: BorderRadius.circular(10)),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: Colors.grey.shade800.withValues(alpha: 0.5),
+              width: 1,
+            )),
         child: _logs.isEmpty
             ? Center(
-                child: Text(S.noActivity,
-                    style:
-                        const TextStyle(color: Colors.white38, fontSize: 11)))
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.terminal_rounded, color: Colors.white24, size: 28),
+                  const SizedBox(height: 8),
+                  Text(S.noActivity,
+                      style:
+                          const TextStyle(color: Colors.white38, fontSize: 11)),
+                ]),
+              )
             : ListView.builder(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(10),
                 itemCount: _logs.length > 8 ? 8 : _logs.length,
-                itemBuilder: (_, i) => Text(_logs[i],
-                    style: const TextStyle(
-                        color: Color(0xFF7EE787),
-                        fontSize: 10,
-                        fontFamily: 'monospace')),
+                itemBuilder: (_, i) => Row(children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    margin: const EdgeInsets.only(right: 8, top: 4),
+                    decoration: BoxDecoration(
+                      color: _logs[i].contains('✅')
+                          ? _success
+                          : _logs[i].contains('❌')
+                              ? _danger
+                              : Colors.amber.shade600,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(_logs[i],
+                        style: const TextStyle(
+                            color: Color(0xFF7EE787),
+                            fontSize: 10,
+                            fontFamily: 'monospace',
+                            height: 1.4)),
+                  ),
+                ]),
               ),
       ),
     ]));

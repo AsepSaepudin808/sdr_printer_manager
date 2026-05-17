@@ -536,4 +536,143 @@ class S {
         en: '❌ Failed to read image',
         ms: '❌ Gagal membaca imej',
       );
+
+  // Statistics
+  static String get statsTitle => withLang(
+        id: 'Statistik Cetak',
+        en: 'Print Statistics',
+        ms: 'Statistik Cetak',
+      );
+  static String get totalPrinted => withLang(
+        id: 'Total Dicetak',
+        en: 'Total Printed',
+        ms: 'Jumlah Dicetak',
+      );
+  static String get todayPrinted => withLang(
+        id: 'Hari Ini',
+        en: 'Today',
+        ms: 'Hari Ini',
+      );
+  static String get successRate => withLang(
+        id: 'Tingkat Sukses',
+        en: 'Success Rate',
+        ms: 'Kadar Kejayaan',
+      );
+  static String get dataSent => withLang(
+        id: 'Data Terkirim',
+        en: 'Data Sent',
+        ms: 'Data Dihantar',
+      );
+  static String get printByType => withLang(
+        id: 'Berdasarkan Jenis',
+        en: 'By Type',
+        ms: 'Mengikut Jenis',
+      );
+  static String get last7Days => withLang(
+        id: '7 Hari Terakhir',
+        en: 'Last 7 Days',
+        ms: '7 Hari Lepas',
+      );
+  static String get printHistory => withLang(
+        id: 'Riwayat Cetak',
+        en: 'Print History',
+        ms: 'Sejarah Cetak',
+      );
+  static String get allHistory => withLang(
+        id: 'Semua Riwayat',
+        en: 'All History',
+        ms: 'Semua Sejarah',
+      );
+  static String get noHistoryYet => withLang(
+        id: 'Belum ada riwayat cetak',
+        en: 'No print history yet',
+        ms: 'Belum ada sejarah cetak',
+      );
+  static String get successLabel => withLang(
+        id: 'Berhasil',
+        en: 'Success',
+        ms: 'Berjaya',
+      );
+  static String get failedLabel => withLang(
+        id: 'Gagal',
+        en: 'Failed',
+        ms: 'Gagal',
+      );
+  static String get receiptFull => withLang(
+        id: 'Struk Lengkap',
+        en: 'Full Receipt',
+        ms: 'Resit Penuh',
+      );
+  static String get receiptBasic => withLang(
+        id: 'Struk Pendek',
+        en: 'Short Receipt',
+        ms: 'Resit Pendek',
+      );
+  static String get sessionSummary => withLang(
+        id: 'Laporan Sesi',
+        en: 'Session Summary',
+        ms: 'Laporan Sesi',
+      );
+  static String get textPrint => withLang(
+        id: 'Cetak Teks',
+        en: 'Text Print',
+        ms: 'Cetak Teks',
+      );
+  static String get imagePrint => withLang(
+        id: 'Cetak Gambar',
+        en: 'Image Print',
+        ms: 'Cetak Imej',
+      );
+  static String get pdfPrint => withLang(
+        id: 'Cetak PDF',
+        en: 'PDF Print',
+        ms: 'Cetak PDF',
+      );
+  static String get testPrintLabel => withLang(
+        id: 'Test Print',
+        en: 'Test Print',
+        ms: 'Ujian Cetak',
+      );
+
+  // Settings - Reset Data
+  static String get resetData => withLang(
+        id: 'Reset Data',
+        en: 'Reset Data',
+        ms: 'Set Semula Data',
+      );
+  static String get resetDataDesc => withLang(
+        id: 'Hapus semua riwayat cetak dan pengaturan untuk mengosongkan memori',
+        en: 'Clear all print history and settings to free memory',
+        ms: 'Padam semua sejarah cetak dan tetapan untuk mengosongkan memori',
+      );
+  static String get resetConfirmTitle => withLang(
+        id: 'Reset Semua Data?',
+        en: 'Reset All Data?',
+        ms: 'Set Semula Semua Data?',
+      );
+  static String get resetConfirmMsg => withLang(
+        id: 'Semua riwayat cetak, log aktivitas, dan pengaturan akan dihapus. Tindakan ini tidak bisa dibatalkan.',
+        en: 'All print history, activity logs, and settings will be deleted. This action cannot be undone.',
+        ms: 'Semua sejarah cetak, log aktiviti, dan tetapan akan dipadam. Tindakan ini tidak boleh dibatalkan.',
+      );
+  static String get resetButton => withLang(
+        id: 'Hapus Semua',
+        en: 'Delete All',
+        ms: 'Padam Semua',
+      );
+  static String get resetSuccess => withLang(
+        id: '✅ Semua data berhasil dihapus',
+        en: '✅ All data cleared successfully',
+        ms: '✅ Semua data berjaya dipadam',
+      );
+  static String get source => withLang(
+        id: 'Sumber',
+        en: 'Source',
+        ms: 'Sumber',
+      );
+  static String get overview => withLang(
+        id: 'Ringkasan',
+        en: 'Overview',
+        ms: 'Ringkasan',
+      );
 }

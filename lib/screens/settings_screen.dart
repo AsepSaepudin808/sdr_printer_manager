@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/strings.dart';
 import '../models/printer_device.dart';
+import '../services/print_history_service.dart';
 import 'scan_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -12,12 +13,10 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  static const Color _primary = Color(0xFF2BBCC4);
-  static const _channel =
-      MethodChannel('id.dretail.sdr_printer_manager/settings');
+  static const _primary = Color(0xFF2BBCC4);
+  static const _channel = MethodChannel('id.dretail.sdr_printer_manager/settings');
 
   late String _languageCode;
-  late bool _notifEnabled;
   late bool _directPrint;
   late bool _androidPrintService;
   late String _connectionType;
@@ -34,8 +33,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final p = await SharedPreferences.getInstance();
     setState(() {
       _languageCode = p.getString('language_code') ?? 'id';
-      _notifEnabled = false;
-      _directPrint = p.getBool('direct_print') ?? false;
+      _directPrint = p.getBool('direct_print_on') ?? true;
       _androidPrintService = p.getBool('android_print_service') ?? false;
       _connectionType = 'bluetooth';
       final addr = p.getString('printer_address');
@@ -63,14 +61,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _save() async {
     final p = await SharedPreferences.getInstance();
     await S.setLang(_languageCode);
-    await p.setBool('direct_print', _directPrint);
+    await p.setBool('direct_print_on', _directPrint);
     await p.setBool('android_print_service', _androidPrintService);
     if (mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(S.settingsSaved),
+        content: Row(children: [
+          const Icon(Icons.check_circle_rounded, color: Colors.white),
+          const SizedBox(width: 10),
+          Text(S.settingsSaved),
+        ]),
         backgroundColor: const Color(0xFF06C270),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
       ));
       Navigator.pop(context);
     }
@@ -82,193 +86,464 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Gagal membuka pengaturan cetak Android')),
+          SnackBar(
+            content: const Text('Gagal membuka pengaturan cetak Android'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
+          ),
         );
       }
     }
   }
 
+  Future<void> _resetData() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(children: [
+          const Icon(Icons.warning_amber_rounded, color: Color(0xFFFF3B30), size: 24),
+          const SizedBox(width: 10),
+          Expanded(child: Text(S.resetConfirmTitle,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800))),
+        ]),
+        content: Text(S.resetConfirmMsg,
+            style: const TextStyle(fontSize: 13, height: 1.5)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(S.cancel, style: TextStyle(color: Colors.grey.shade600)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF3B30),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 0,
+            ),
+            child: Text(S.resetButton,
+                style: const TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Measure data size before clearing
+    final p = await SharedPreferences.getInstance();
+    final historyRaw = p.getString('print_history_v1') ?? '';
+    int freedBytes = historyRaw.length; // approximate size of history JSON
+
+    // Clear print history
+    final historyService = PrintHistoryService();
+    await historyService.load();
+    await historyService.clear();
+
+    // Clear all counters and stats
+    await p.setInt('print_count', 0);
+    await p.remove('print_history_v1');
+
+    // Format freed size
+    String freedLabel;
+    if (freedBytes < 1024) {
+      freedLabel = '${freedBytes}B';
+    } else if (freedBytes < 1024 * 1024) {
+      freedLabel = '${(freedBytes / 1024).toStringAsFixed(1)}KB';
+    } else {
+      freedLabel = '${(freedBytes / (1024 * 1024)).toStringAsFixed(1)}MB';
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Row(children: [
+          const Icon(Icons.check_circle_rounded, color: Colors.white),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(S.resetSuccess,
+                    style: const TextStyle(fontWeight: FontWeight.w700)),
+                Text('${S.isEn ? 'Freed' : 'Memori dibebaskan'}: $freedLabel',
+                    style: const TextStyle(fontSize: 12)),
+              ],
+            ),
+          ),
+        ]),
+        backgroundColor: const Color(0xFF06C270),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: EdgeInsets.only(
+          bottom: MediaQuery.of(context).size.height - 150,
+          left: 16,
+          right: 16,
+        ),
+        duration: const Duration(seconds: 3),
+      ));
+    }
+  }
+
+  Widget _buildSection(String label, {required Widget child, IconData? icon, Color? iconColor}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            if (icon != null) ...[
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: (iconColor ?? _primary).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, size: 18, color: iconColor ?? _primary),
+              ),
+              const SizedBox(width: 10),
+            ],
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF2C3E50),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_loaded) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
     }
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FC),
       appBar: AppBar(
         backgroundColor: _primary,
         foregroundColor: Colors.white,
-        title: Text(S.settings,
-            style: const TextStyle(fontWeight: FontWeight.w700)),
+        title: Text(
+          S.settings,
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+        ),
         elevation: 0,
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // LANGUAGE
-          _section(S.language,
-              child: DropdownButton<String>(
-                value: _languageCode,
-                isExpanded: true,
-                underline: const SizedBox(),
-                items: S.languages
-                    .map((e) => DropdownMenuItem(
-                          value: e.code,
-                          child:
-                              Text('${e.nativeName} (${e.code.toUpperCase()})'),
-                        ))
-                    .toList(),
-                onChanged: (v) async {
-                  if (v == null) return;
-                  setState(() => _languageCode = v);
-                  await S.setLang(v);
-                  if (mounted) setState(() {});
-                },
-              )),
-          // PRINTER
-          _section(S.printer,
-              child: GestureDetector(
-                onTap: _pickPrinter,
-                child: Text(
-                  _printer != null
-                      ? '${_printer!.name} (${_printer!.address})'
-                      : S.selectPrinter,
-                  style: TextStyle(
-                      fontSize: 14,
+          _buildSection(
+            S.language,
+            icon: Icons.language_rounded,
+            iconColor: const Color(0xFF7B2FBE),
+            child: DropdownButton<String>(
+              value: _languageCode,
+              isExpanded: true,
+              underline: const SizedBox(),
+              items: S.languages
+                  .map((e) => DropdownMenuItem(
+                        value: e.code,
+                        child: Text('${e.nativeName} (${e.code.toUpperCase()})'),
+                      ))
+                  .toList(),
+              onChanged: (v) async {
+                if (v == null) return;
+                setState(() => _languageCode = v);
+                await S.setLang(v);
+                if (mounted) setState(() {});
+              },
+            ),
+          ),
+
+          _buildSection(
+            S.printer,
+            icon: Icons.print_rounded,
+            iconColor: _primary,
+            child: GestureDetector(
+              onTap: _pickPrinter,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: _printer != null ? _primary.withValues(alpha: 0.06) : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _printer != null ? _primary.withValues(alpha: 0.3) : Colors.grey.shade200,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _printer != null ? Icons.print_rounded : Icons.add_rounded,
                       color: _printer != null ? _primary : Colors.grey,
-                      fontWeight: FontWeight.w600),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _printer != null
+                            ? _printer!.name
+                            : S.selectPrinter,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: _printer != null ? _primary : Colors.grey,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    if (_printer != null)
+                      const Icon(Icons.chevron_right_rounded, color: _primary, size: 20)
+                    else
+                      const Icon(Icons.add_rounded, color: Colors.grey, size: 20),
+                  ],
                 ),
-              )),
-          // PRINTER CONNECTION
-          _section(S.printerConnection,
-              child: SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(
-                      value: 'bluetooth',
-                      label: Text('Bluetooth', style: TextStyle(fontSize: 12))),
-                  ButtonSegment(
-                      value: 'wifi',
-                      label: Text('Wifi', style: TextStyle(fontSize: 12)),
-                      enabled: false),
-                  ButtonSegment(
-                      value: 'usb',
-                      label: Text('USB', style: TextStyle(fontSize: 12)),
-                      enabled: false),
-                ],
-                selected: {_connectionType},
-                onSelectionChanged: (v) =>
-                    setState(() => _connectionType = v.first),
-                style: ButtonStyle(
-                  backgroundColor: WidgetStateProperty.resolveWith((s) =>
-                      s.contains(WidgetState.selected) ? _primary : null),
-                  foregroundColor: WidgetStateProperty.resolveWith((s) =>
-                      s.contains(WidgetState.selected) ? Colors.white : null),
+              ),
+            ),
+          ),
+
+          _buildSection(
+            S.printerConnection,
+            icon: Icons.bluetooth_rounded,
+            iconColor: const Color(0xFF2BBCC4),
+            child: SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(
+                  value: 'bluetooth',
+                  label: Text('Bluetooth', style: TextStyle(fontSize: 12)),
+                  icon: Icon(Icons.bluetooth_rounded, size: 16),
                 ),
-              )),
-          // NOTIFICATION PERMISSION
-          _section(S.notifPermission,
-              child: _checkTile(
-                S.notifDesc,
-                _notifEnabled,
-                (v) => setState(() => _notifEnabled = v ?? false),
-              )),
-          // DIRECT PRINTING
-          _section(S.directPrint,
-              child: _checkTile(
-                S.directPrintDesc,
-                _directPrint,
-                (v) => setState(() => _directPrint = v ?? false),
-              )),
-          // ANDROID PRINT SERVICE
-          _section(
-              S.withLang(
-                  id: 'Layanan Cetak Android',
-                  en: 'Android Print Service',
-                  ms: 'Perkhidmatan Cetak Android',
-                  th: 'บริการพิมพ์ Android',
-                  zh: 'Android 打印服务',
-                  ar: 'خدمة طباعة أندرويد'),
-              child: _checkTile(
-                S.withLang(
+                ButtonSegment(
+                  value: 'wifi',
+                  label: Text('Wifi', style: TextStyle(fontSize: 12)),
+                  icon: Icon(Icons.wifi_rounded, size: 16),
+                  enabled: false,
+                ),
+                ButtonSegment(
+                  value: 'usb',
+                  label: Text('USB', style: TextStyle(fontSize: 12)),
+                  icon: Icon(Icons.usb_rounded, size: 16),
+                  enabled: false,
+                ),
+              ],
+              selected: {_connectionType},
+              onSelectionChanged: (v) => setState(() => _connectionType = v.first),
+              style: ButtonStyle(
+                backgroundColor: WidgetStateProperty.resolveWith((s) =>
+                    s.contains(WidgetState.selected) ? _primary : null),
+                foregroundColor: WidgetStateProperty.resolveWith((s) =>
+                    s.contains(WidgetState.selected) ? Colors.white : null),
+              ),
+            ),
+          ),
+
+          _buildSection(
+            S.directPrint,
+            icon: Icons.flash_on_rounded,
+            iconColor: Colors.amber.shade700,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    S.directPrintDesc,
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+                Switch.adaptive(
+                  value: _directPrint,
+                  activeTrackColor: _primary,
+                  onChanged: (v) => setState(() => _directPrint = v),
+                ),
+              ],
+            ),
+          ),
+
+          _buildSection(
+            S.withLang(
+              id: 'Layanan Cetak Android',
+              en: 'Android Print Service',
+              ms: 'Perkhidmatan Cetak Android',
+              th: 'บริการพิมพ์ Android',
+              zh: 'Android 打印服务',
+              ar: 'خدمة طباعة أندرويد',
+            ),
+            icon: Icons.android_rounded,
+            iconColor: Colors.green.shade700,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  S.withLang(
                     id: 'Aktifkan agar muncul sebagai pilihan printer di dialog cetak Android',
                     en: 'Enable to appear as a printer option in Android print dialog',
                     ms: 'Aktifkan agar muncul sebagai pilihan pencetak di dialog cetak Android',
                     th: 'เปิดใช้งานเพื่อให้แสดงเป็นตัวเลือกเครื่องพิมพ์ในกล่องพิมพ์ Android',
                     zh: '启用后会在 Android 打印对话框中显示为打印机选项',
-                    ar: 'فعّل هذا الخيار ليظهر كخيار طابعة في نافذة طباعة أندرويد'),
-                _androidPrintService,
-                (v) async {
-                  setState(() => _androidPrintService = v ?? false);
-                  if (v == true) {
-                    await _openPrintSettings();
-                  }
-                },
-              )),
-          // APP VERSION
-          _section(S.version,
-              child: const Center(
-                child: Text('V1.0.0.1',
-                    style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: _primary)),
-              )),
-          const SizedBox(height: 24),
+                    ar: 'فعّل هذا الخيار ليظهر كخيار طابعة في نافذة طباعة أندرويد',
+                  ),
+                  style: const TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Switch.adaptive(
+                      value: _androidPrintService,
+                      activeTrackColor: _primary,
+                      onChanged: (v) async {
+                        setState(() => _androidPrintService = v);
+                        if (v) await _openPrintSettings();
+                      },
+                    ),
+                    if (_androidPrintService)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.check_circle_rounded, size: 14, color: Colors.green.shade600),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Aktif',
+                              style: TextStyle(fontSize: 11, color: Colors.green.shade600, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          _buildSection(
+            S.resetData,
+            icon: Icons.delete_forever_rounded,
+            iconColor: const Color(0xFFFF3B30),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  S.resetDataDesc,
+                  style: const TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _resetData,
+                    icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                    label: Text(S.resetButton,
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFFF3B30),
+                      side: const BorderSide(color: Color(0xFFFF3B30)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          _buildSection(
+            S.version,
+            icon: Icons.info_outline_rounded,
+            iconColor: Colors.grey.shade600,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  'V1.0.0.1',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: _primary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
           Row(children: [
             Expanded(
-                child: OutlinedButton(
-              onPressed: () => Navigator.pop(context),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.grey[600],
-                side: BorderSide(color: Colors.grey.shade400),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(context),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.grey.shade600,
+                  side: BorderSide(color: Colors.grey.shade400),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: Text(
+                  S.cancel,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
               ),
-              child: Text(S.cancel,
-                  style: const TextStyle(fontWeight: FontWeight.w700)),
-            )),
+            ),
             const SizedBox(width: 12),
             Expanded(
-                child: ElevatedButton(
-              onPressed: _save,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+              child: ElevatedButton(
+                onPressed: _save,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  elevation: 0,
+                ),
+                child: Text(
+                  S.save,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
               ),
-              child: Text(S.save,
-                  style: const TextStyle(fontWeight: FontWeight.w700)),
-            )),
+            ),
           ]),
+
           const SizedBox(height: 32),
         ],
       ),
     );
-  }
-
-  Widget _section(String label, {required Widget child}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          contentPadding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
-        ),
-        child: child,
-      ),
-    );
-  }
-
-  Widget _checkTile(String desc, bool value, ValueChanged<bool?> onChanged) {
-    return Row(children: [
-      Expanded(child: Text(desc, style: const TextStyle(fontSize: 13))),
-      Checkbox(value: value, onChanged: onChanged, activeColor: _primary),
-    ]);
   }
 }

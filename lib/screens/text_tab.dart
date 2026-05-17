@@ -20,19 +20,31 @@ class TextTab extends StatefulWidget {
   State<TextTab> createState() => _TextTabState();
 }
 
-class _TextTabState extends State<TextTab> {
+class _TextTabState extends State<TextTab> with SingleTickerProviderStateMixin {
+  static const _primary = Color(0xFF2BBCC4);
   PaperSize? _localPaperSize;
   final TextEditingController _textCtrl = TextEditingController();
 
   bool _isPrinting = false;
   int _alignMode = 0;
   bool _isBold = false;
+  bool _isItalic = false;
+
+  late AnimationController _animController;
+  late Animation<double> _scaleAnimation;
 
   @override
   void initState() {
     super.initState();
     _localPaperSize = widget.paperSize;
     _loadLocalSettings();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.03).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
+    );
   }
 
   Future<void> _loadLocalSettings() async {
@@ -44,7 +56,6 @@ class _TextTabState extends State<TextTab> {
             ? PaperSize.mm100
             : PaperSize.mm80;
 
-    // UPDATE CONFIGURATION
     EscPosHelper.setCustomCharsPerLine(p.getInt('chars_per_line') ?? 0);
     EscPosHelper.setExtraFeed(p.getInt('extra_feed') ?? 3);
     EscPosHelper.setAutoCut(p.getBool('auto_cut') ?? false);
@@ -58,11 +69,15 @@ class _TextTabState extends State<TextTab> {
   @override
   void dispose() {
     _textCtrl.dispose();
+    _animController.dispose();
     super.dispose();
   }
 
   Future<void> _print() async {
-    if (_textCtrl.text.isEmpty) return;
+    if (_textCtrl.text.isEmpty) {
+      _showSnackBar('Ketik teks terlebih dahulu', isError: true);
+      return;
+    }
 
     setState(() => _isPrinting = true);
 
@@ -82,10 +97,33 @@ class _TextTabState extends State<TextTab> {
       alignMode: printAlignMode,
     );
 
-    await widget.btService.sendRaw(data);
+    final success = await widget.btService.sendRaw(data);
 
     if (!mounted) return;
     setState(() => _isPrinting = false);
+    _showSnackBar(
+      success ? S.printSuccess('Text') : S.printFail,
+      isError: !success,
+    );
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Row(children: [
+        Icon(
+          isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
+          color: Colors.white,
+          size: 20,
+        ),
+        const SizedBox(width: 10),
+        Expanded(child: Text(message)),
+      ]),
+      backgroundColor: isError ? const Color(0xFFFF3B30) : const Color(0xFF06C270),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.all(16),
+    ));
   }
 
   String _wrapText(String text, int width, {bool justify = false}) {
@@ -121,8 +159,7 @@ class _TextTabState extends State<TextTab> {
   }
 
   String _justifyLine(String line, int width) {
-    final words =
-        line.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    final words = line.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
 
     if (words.length <= 1) return line.padRight(width);
 
@@ -145,13 +182,16 @@ class _TextTabState extends State<TextTab> {
   }
 
   void _insertTestPattern() {
-    const pattern = "TEST PRINT PATTERN\n"
+    const pattern = "================================\n"
+        "         dPrinter Mart\n"
+        "           TEST PRINT\n"
         "================================\n"
-        "ABCDEFG HIJKLMNOP QRSTUV WXYZ\n"
-        "abcdefg hijklmnop qrstuv wxyz\n"
-        "0123456789 !@#\$%^&*()_+-=\n"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ\n"
+        "abcdefghijklmnopqrstuvwxyz\n"
+        "0123456789 !@#\$%^&*()\n"
         "--------------------------------\n"
-        "dPrinter Mart - OK\n";
+        "Receipt OK - All features work!\n"
+        "================================\n";
 
     _textCtrl.text = pattern;
     setState(() {});
@@ -186,116 +226,57 @@ class _TextTabState extends State<TextTab> {
                 ? TextAlign.right
                 : TextAlign.justify;
 
-    final orientation = MediaQuery.orientationOf(context);
-    final isLandscape = orientation == Orientation.landscape;
-
     final viewPadding = MediaQuery.viewPaddingOf(context);
     final safeTop = viewPadding.top;
     final safeBottom = viewPadding.bottom;
     final safeLeft = viewPadding.left;
 
-    const bottomBarH = 65.0;
+    const bottomBarH = 75.0;
     final totalBottomPad = bottomBarH + safeBottom;
 
-    final horPad = isLandscape ? (safeLeft + 24) : (20 + safeLeft);
-
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            const Color(0xFFF8FAFB),
-            Colors.white.withValues(alpha: 0.8),
+            Color(0xFFF8FAFB),
+            Color(0xFFF0F2F5),
           ],
         ),
       ),
       child: Padding(
         padding: EdgeInsets.only(
-          left: horPad,
-          right: horPad,
+          left: 20 + safeLeft,
+          right: 20,
           top: 16 + safeTop,
           bottom: totalBottomPad,
         ),
         child: Column(
           children: [
-            _buildToolbar(isLandscape),
-
-            const SizedBox(height: 16),
-
+            _buildToolbar(),
+            const SizedBox(height: 14),
             Expanded(
               child: _buildReceiptPreview(
                 charsPerLine,
                 paperContentWidth,
                 textAlign,
-                isLandscape,
               ),
             ),
-
-            const SizedBox(height: 12),
-
-            GestureDetector(
-              onTap: _isPrinting ? null : _print,
-              behavior: HitTestBehavior.opaque,
-              child: Container(
-                width: double.infinity,
-                height: 56,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF2BBCC4), Color(0xFF24AAB1)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF2BBCC4).withValues(alpha: 0.35),
-                      blurRadius: 15,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: _isPrinting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.print_rounded, size: 22),
-                          const SizedBox(width: 8),
-                          Text(
-                            S.printText.toUpperCase(),
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
-            ),
+            const SizedBox(height: 14),
+            _buildPrintButton(),
           ],
         ),
       ),
     );
   }
 
-  // TOOLBAR
-  Widget _buildToolbar(bool isLandscape) {
+  Widget _buildToolbar() {
     const themeColor = Color(0xFF2BBCC4);
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -304,63 +285,97 @@ class _TextTabState extends State<TextTab> {
             offset: const Offset(0, 4),
           ),
         ],
-        border: Border.all(color: Colors.white, width: 1.5),
+        border: Border.all(color: Colors.grey.shade200, width: 1),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              child: Row(
-                children: [
-                  _formatBtn(Icons.format_align_left_rounded, _alignMode == 0,
-                      () => setState(() => _alignMode = 0), 'Rata Kiri', themeColor),
-                  _formatBtn(Icons.format_align_center_rounded, _alignMode == 1,
-                      () => setState(() => _alignMode = 1), 'Rata Tengah', themeColor),
-                  _formatBtn(Icons.format_align_right_rounded, _alignMode == 2,
-                      () => setState(() => _alignMode = 2), 'Rata Kanan', themeColor),
-                  _formatBtn(Icons.format_align_justify_rounded, _alignMode == 3,
-                      () => setState(() => _alignMode = 3), 'Rata Kiri Kanan', themeColor),
-                  const SizedBox(width: 4),
-                  Container(width: 1.5, height: 20, color: Colors.grey.shade200),
-                  const SizedBox(width: 4),
-                  _formatBtn(Icons.format_bold_rounded, _isBold,
-                      () => setState(() => _isBold = !_isBold), 'Tebal', themeColor),
-                  _formatBtn(Icons.text_fields_rounded, false,
-                      _insertTestPattern, 'Teks Tes', const Color(0xFF6C757D)),
-                ],
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      child: Column(children: [
+        Row(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  children: [
+                    _formatBtn(Icons.format_align_left_rounded, _alignMode == 0,
+                        () => setState(() => _alignMode = 0), 'Rata Kiri', themeColor),
+                    _formatBtn(Icons.format_align_center_rounded, _alignMode == 1,
+                        () => setState(() => _alignMode = 1), 'Rata Tengah', themeColor),
+                    _formatBtn(Icons.format_align_right_rounded, _alignMode == 2,
+                        () => setState(() => _alignMode = 2), 'Rata Kanan', themeColor),
+                    _formatBtn(Icons.format_align_justify_rounded, _alignMode == 3,
+                        () => setState(() => _alignMode = 3), 'Rata Kiri Kanan', themeColor),
+                    const SizedBox(width: 6),
+                    Container(width: 1.5, height: 22, color: Colors.grey.shade200),
+                    const SizedBox(width: 6),
+                    _formatBtn(Icons.format_bold_rounded, _isBold,
+                        () => setState(() => _isBold = !_isBold), 'Tebal', themeColor),
+                    _formatBtn(Icons.format_italic_rounded, _isItalic,
+                        () => setState(() => _isItalic = !_isItalic), 'Miring', themeColor),
+                  ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 6),
-          Container(width: 1.5, height: 24, color: Colors.grey.shade200),
-          const SizedBox(width: 6),
-          GestureDetector(
-            onTap: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const PrinterSettingsScreen()),
-              );
-              await _loadLocalSettings();
-            },
-            behavior: HitTestBehavior.opaque,
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: themeColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+            const SizedBox(width: 6),
+            Container(width: 1.5, height: 24, color: Colors.grey.shade200),
+            const SizedBox(width: 6),
+            GestureDetector(
+              onTap: _insertTestPattern,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF7B2FBE).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.auto_awesome_rounded,
+                    size: 20, color: Color(0xFF7B2FBE)),
               ),
-              child: const Icon(Icons.settings_suggest_rounded, size: 20, color: themeColor),
             ),
+            GestureDetector(
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PrinterSettingsScreen()),
+                );
+                await _loadLocalSettings();
+              },
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                margin: const EdgeInsets.only(left: 6),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: themeColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.settings_suggest_rounded, size: 20, color: themeColor),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: themeColor.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(8),
           ),
-        ],
-      ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.description_rounded, size: 14, color: _primary),
+              const SizedBox(width: 6),
+              Text(
+                '${_paperSize.name.replaceAll('mm', '')}mm • ${EscPosHelper.charsPerLine(_paperSize)} chars',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+      ]),
     );
   }
 
-  // FORMAT BUTTON
   Widget _formatBtn(IconData icon, bool isActive, VoidCallback onTap,
       String tooltip, Color themeColor) {
     return Tooltip(
@@ -368,7 +383,8 @@ class _TextTabState extends State<TextTab> {
       child: GestureDetector(
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: isActive ? themeColor.withValues(alpha: 0.15) : Colors.transparent,
@@ -377,18 +393,20 @@ class _TextTabState extends State<TextTab> {
               color: isActive ? themeColor.withValues(alpha: 0.3) : Colors.transparent,
             ),
           ),
-          child: Icon(icon, size: 20, color: isActive ? themeColor : Colors.grey.shade500),
+          child: Icon(
+            icon,
+            size: 20,
+            color: isActive ? themeColor : Colors.grey.shade400,
+          ),
         ),
       ),
     );
   }
 
-  // RECEIPT PREVIEW
   Widget _buildReceiptPreview(int charsPerLine, double paperContentWidth,
-      TextAlign textAlign, bool isLandscape) {
+      TextAlign textAlign) {
     return Stack(
       children: [
-        // BACKGROUND
         Positioned.fill(
           child: Container(
             decoration: BoxDecoration(
@@ -397,38 +415,37 @@ class _TextTabState extends State<TextTab> {
             ),
           ),
         ),
-        // RECEIPT PAPER
         Column(
           children: [
-            // HEADER STRIP
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 32),
-              padding: const EdgeInsets.symmetric(vertical: 6),
+              padding: const EdgeInsets.symmetric(vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFF2BBCC4),
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(10)),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF2BBCC4), Color(0xFF24AAB1)],
+                ),
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF2BBCC4).withValues(alpha: 0.25),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
+                    color: const Color(0xFF2BBCC4).withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   )
                 ],
               ),
               child: Center(
                 child: Text(
-                  '${_paperSize.name.replaceAll('mm', '')}mm • $charsPerLine CHARS',
+                  '${_paperSize.name.replaceAll('mm', '')}mm THERMAL RECEIPT',
                   style: const TextStyle(
-                    fontSize: 9,
+                    fontSize: 10,
                     color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.2,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.5,
                   ),
                 ),
               ),
             ),
             const SizedBox(height: 12),
-            // SCROLLABLE TEXT AREA
             Expanded(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
@@ -439,42 +456,86 @@ class _TextTabState extends State<TextTab> {
                     constraints: const BoxConstraints(minHeight: 200),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(6),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.10),
-                          blurRadius: 16,
-                          offset: const Offset(0, 6),
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
                         ),
                       ],
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
-                      child: TextField(
-                        controller: _textCtrl,
-                        maxLines: null,
-                        textAlign: textAlign,
-                        onChanged: (_) => setState(() {}),
-                        style: TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 13,
-                          fontWeight: _isBold ? FontWeight.w700 : FontWeight.w400,
-                          color: const Color(0xFF1A1A1A),
-                          height: 1.2,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Ketik struk Anda di sini...',
-                          hintStyle: TextStyle(
-                            color: Colors.grey.shade300,
-                            fontFamily: 'sans-serif',
-                            fontSize: 12,
-                            fontStyle: FontStyle.italic,
+                    child: Stack(
+                      children: [
+                        // Perforated edge effect
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0F2F5),
+                              borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(6)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                )
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: List.generate(
+                                30,
+                                (_) => Container(
+                                  width: 4,
+                                  height: 4,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF0F2F5),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.grey.shade300,
+                                      width: 0.5,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
                         ),
-                      ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(10, 20, 10, 16),
+                          child: TextField(
+                            controller: _textCtrl,
+                            maxLines: null,
+                            textAlign: textAlign,
+                            onChanged: (_) => setState(() {}),
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 13,
+                              fontWeight: _isBold ? FontWeight.w700 : FontWeight.w400,
+                              fontStyle: _isItalic ? FontStyle.italic : FontStyle.normal,
+                              color: const Color(0xFF1A1A1A),
+                              height: 1.3,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Ketik struk Anda di sini...',
+                              hintStyle: TextStyle(
+                                color: Colors.grey.shade300,
+                                fontFamily: 'sans-serif',
+                                fontSize: 12,
+                                fontStyle: FontStyle.italic,
+                              ),
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -483,6 +544,86 @@ class _TextTabState extends State<TextTab> {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildPrintButton() {
+    return GestureDetector(
+      onTap: _isPrinting ? null : _print,
+      child: AnimatedBuilder(
+        animation: _scaleAnimation,
+        builder: (context, child) {
+          return Transform.scale(
+            scale: _isPrinting ? 1.0 : _scaleAnimation.value,
+            child: child,
+          );
+        },
+        child: Container(
+          width: double.infinity,
+          height: 56,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              colors: _isPrinting
+                  ? [Colors.grey.shade400, Colors.grey.shade500]
+                  : [const Color(0xFF2BBCC4), const Color(0xFF24AAB1)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: (_isPrinting
+                        ? Colors.grey
+                        : const Color(0xFF2BBCC4))
+                    .withValues(alpha: 0.4),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: _isPrinting
+              ? Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white.withValues(alpha: 0.9),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      S.sending.toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.print_rounded, size: 24, color: Colors.white),
+                    const SizedBox(width: 10),
+                    Text(
+                      S.printText.toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.2,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+      ),
     );
   }
 }

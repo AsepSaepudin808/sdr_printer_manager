@@ -16,11 +16,27 @@ class ImageTab extends StatefulWidget {
   State<ImageTab> createState() => _ImageTabState();
 }
 
-class _ImageTabState extends State<ImageTab> {
+class _ImageTabState extends State<ImageTab> with SingleTickerProviderStateMixin {
   static const _primary = Color(0xFF2BBCC4);
   File? _imageFile;
   bool _isPrinting = false;
   String _status = '';
+  late AnimationController _pulseController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickImage() async {
     final result = await FilePicker.platform.pickFiles(type: FileType.image);
@@ -109,7 +125,7 @@ class _ImageTabState extends State<ImageTab> {
     return Uint8List.fromList(buf);
   }
 
-  Widget _imgBtn({
+  Widget _buildImageButton({
     IconData? icon,
     required String label,
     required Color color,
@@ -120,22 +136,23 @@ class _ImageTabState extends State<ImageTab> {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
         decoration: BoxDecoration(
           color: outlined
               ? Colors.white
               : (onTap == null ? color.withValues(alpha: 0.4) : color),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           border: outlined
-              ? Border.all(color: onTap == null ? Colors.grey.shade300 : color)
+              ? Border.all(color: onTap == null ? Colors.grey.shade300 : color, width: 2)
               : null,
           boxShadow: !outlined && onTap != null
               ? [
                   BoxShadow(
-                    color: color.withValues(alpha: 0.25),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
+                    color: color.withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   )
                 ]
               : null,
@@ -144,22 +161,22 @@ class _ImageTabState extends State<ImageTab> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (loading)
-              const SizedBox(
-                width: 16,
-                height: 16,
+              SizedBox(
+                width: 18,
+                height: 18,
                 child: CircularProgressIndicator(
-                    strokeWidth: 2, color: Colors.white),
+                    strokeWidth: 2.5, color: outlined ? color : Colors.white),
               )
             else if (icon != null)
               Icon(icon,
-                  size: 18,
+                  size: 20,
                   color:
                       outlined ? (onTap == null ? Colors.grey : color) : Colors.white),
             if (icon != null || loading) const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 14,
                 fontWeight: FontWeight.w700,
                 color:
                     outlined ? (onTap == null ? Colors.grey : color) : Colors.white,
@@ -173,82 +190,159 @@ class _ImageTabState extends State<ImageTab> {
 
   @override
   Widget build(BuildContext context) {
-    // RESPONSIVE INSETS
     final viewPadding = MediaQuery.viewPaddingOf(context);
     final safeBottom = viewPadding.bottom;
-    const bottomBarH = 65.0;
+    const bottomBarH = 75.0;
     final totalBottomPad = bottomBarH + safeBottom;
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        16 + viewPadding.left,
-        16 + viewPadding.top,
-        16 + viewPadding.right,
-        16 + totalBottomPad,
-      ),
-      child: Column(children: [
-        Expanded(
-          child: GestureDetector(
-            onTap: _pickImage,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: _imageFile != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.file(_imageFile!, fit: BoxFit.contain),
-                    )
-                  : Center(
-                      child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        Icon(Icons.add_photo_alternate_rounded,
-                            size: 48, color: Colors.grey.shade300),
-                        const SizedBox(height: 12),
-                        Text(S.tapToSelectImage,
-                            style: TextStyle(
-                                color: Colors.grey.shade400, fontSize: 14)),
-                      ]),
-                    ),
-            ),
-          ),
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFF8FAFB), Color(0xFFF0F2F5)],
         ),
-        const SizedBox(height: 12),
-        Row(children: [
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          16 + viewPadding.left,
+          16 + viewPadding.top,
+          16,
+          16 + totalBottomPad,
+        ),
+        child: Column(children: [
           Expanded(
-            child: _imgBtn(
-              icon: Icons.folder_open_rounded,
-              label: S.selectImage,
-              color: _primary,
-              outlined: true,
+            child: GestureDetector(
               onTap: _pickImage,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: _imageFile != null ? _primary.withValues(alpha: 0.3) : Colors.grey.shade200,
+                    width: 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (_imageFile != null ? _primary : Colors.grey)
+                          .withValues(alpha: 0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: _imageFile != null
+                      ? Stack(
+                          children: [
+                            Positioned.fill(
+                              child: Image.file(_imageFile!, fit: BoxFit.contain),
+                            ),
+                            Positioned(
+                              top: 12,
+                              right: 12,
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.5),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.image_rounded,
+                                    color: Colors.white, size: 20),
+                              ),
+                            ),
+                          ],
+                        )
+                      : Center(
+                          child: Column(mainAxisSize: MainAxisSize.min, children: [
+                            AnimatedBuilder(
+                              animation: _pulseController,
+                              builder: (context, child) {
+                                return Transform.scale(
+                                  scale: 1.0 + (_pulseController.value * 0.1),
+                                  child: Opacity(
+                                    opacity: 0.5 + (_pulseController.value * 0.5),
+                                    child: child,
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: _primary.withValues(alpha: 0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.add_photo_alternate_rounded,
+                                    size: 48, color: _primary),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              S.tapToSelectImage,
+                              style: TextStyle(
+                                  color: Colors.grey.shade500,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'PNG, JPG, JPEG',
+                              style: TextStyle(
+                                  color: Colors.grey.shade400, fontSize: 12),
+                            ),
+                          ]),
+                        ),
+                ),
+              ),
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _imgBtn(
-              icon: _isPrinting ? null : Icons.print_rounded,
-              label: _isPrinting ? S.printing : S.print_,
-              color: _primary,
-              outlined: false,
-              loading: _isPrinting,
-              onTap: (_isPrinting || _imageFile == null) ? null : _printImage,
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(
+              child: _buildImageButton(
+                icon: Icons.folder_open_rounded,
+                label: S.selectImage,
+                color: _primary,
+                outlined: true,
+                onTap: _pickImage,
+              ),
             ),
-          ),
-        ]),
-        if (_status.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text(_status,
-              style: TextStyle(
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildImageButton(
+                icon: _isPrinting ? null : Icons.print_rounded,
+                label: _isPrinting ? S.printing : S.print_,
+                color: _primary,
+                outlined: false,
+                loading: _isPrinting,
+                onTap: (_isPrinting || _imageFile == null) ? null : _printImage,
+              ),
+            ),
+          ]),
+          if (_status.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
                 color: _status.startsWith('✅')
-                    ? const Color(0xFF06C270)
-                    : const Color(0xFFFF3B30),
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              )),
-        ],
-      ]),
+                    ? const Color(0xFF06C270).withValues(alpha: 0.1)
+                    : const Color(0xFFFF3B30).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(_status,
+                  style: TextStyle(
+                    color: _status.startsWith('✅')
+                        ? const Color(0xFF06C270)
+                        : const Color(0xFFFF3B30),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  )),
+            ),
+          ],
+        ]),
+      ),
     );
   }
 }
