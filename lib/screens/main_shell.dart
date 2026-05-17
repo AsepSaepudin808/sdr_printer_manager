@@ -52,6 +52,7 @@ class _MainShellState extends State<MainShell> {
   bool _isPrinting = false;
   String _printStatus = '';
   final TextEditingController _portCtrl = TextEditingController();
+  DateTimeRange? _historyDateRange;
 
   static const _primary = Color(0xFF2BBCC4);
   static const _dark = Color(0xFF2C3E50);
@@ -918,6 +919,15 @@ class _MainShellState extends State<MainShell> {
       if (v > maxDay) maxDay = v;
     }
 
+    // DATE FILTER
+    final filteredItems = _historyDateRange != null
+        ? items.where((h) {
+            final d = h.timestamp;
+            return !d.isBefore(_historyDateRange!.start) &&
+                d.isBefore(_historyDateRange!.end.add(const Duration(days: 1)));
+          }).toList()
+        : items;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       child: Column(
@@ -1098,6 +1108,7 @@ class _MainShellState extends State<MainShell> {
           ],
 
           // PRINT HISTORY
+
           Row(children: [
             const Icon(Icons.history_rounded, color: _primary, size: 18),
             const SizedBox(width: 8),
@@ -1105,22 +1116,102 @@ class _MainShellState extends State<MainShell> {
                 style: const TextStyle(
                     fontSize: 14, fontWeight: FontWeight.w700, color: _dark)),
             const Spacer(),
-            if (items.isNotEmpty)
+            if (filteredItems.isNotEmpty)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: _primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Text('${items.length}',
+                child: Text('${filteredItems.length}',
                     style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                         color: _primary)),
               ),
           ]),
+          const SizedBox(height: 8),
+
+          // DATE RANGE FILTER
+          Row(children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () async {
+                  final now = DateTime.now();
+                  final picked = await showDateRangePicker(
+                    context: context,
+                    firstDate: DateTime(2024),
+                    lastDate: now,
+                    initialDateRange: _historyDateRange ??
+                        DateTimeRange(
+                          start: now.subtract(const Duration(days: 7)),
+                          end: now,
+                        ),
+                    builder: (ctx, child) => Theme(
+                      data: Theme.of(ctx).copyWith(
+                        colorScheme: const ColorScheme.light(
+                          primary: _primary,
+                          onPrimary: Colors.white,
+                          surface: Colors.white,
+                        ),
+                      ),
+                      child: child!,
+                    ),
+                  );
+                  if (picked != null) {
+                    setState(() => _historyDateRange = picked);
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: _historyDateRange != null
+                          ? _primary
+                          : Colors.grey.shade300,
+                    ),
+                  ),
+                  child: Row(children: [
+                    Icon(Icons.date_range_rounded,
+                        size: 16,
+                        color: _historyDateRange != null
+                            ? _primary
+                            : Colors.grey.shade400),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _historyDateRange != null
+                            ? '${_historyDateRange!.start.day}/${_historyDateRange!.start.month}/${_historyDateRange!.start.year}'
+                              ' — ${_historyDateRange!.end.day}/${_historyDateRange!.end.month}/${_historyDateRange!.end.year}'
+                            : S.isEn ? 'Filter by date' : 'Filter tanggal',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: _historyDateRange != null
+                              ? _dark
+                              : Colors.grey.shade400,
+                          fontWeight: _historyDateRange != null
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                    if (_historyDateRange != null)
+                      GestureDetector(
+                        onTap: () =>
+                            setState(() => _historyDateRange = null),
+                        child: Icon(Icons.close_rounded,
+                            size: 16, color: Colors.grey.shade400),
+                      ),
+                  ]),
+                ),
+              ),
+            ),
+          ]),
           const SizedBox(height: 12),
-          if (items.isEmpty)
+
+          if (filteredItems.isEmpty)
             _card(Center(
               child: Padding(
                 padding: const EdgeInsets.all(32),
@@ -1135,7 +1226,7 @@ class _MainShellState extends State<MainShell> {
               ),
             ))
           else
-            ...items.take(50).map((h) {
+            ...filteredItems.take(50).map((h) {
               final info = typeInfo[h.type];
               final color = info?.$2 ?? Colors.grey;
               final icon = info?.$3 ?? Icons.print_rounded;
@@ -1179,9 +1270,7 @@ class _MainShellState extends State<MainShell> {
                             style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
-                                color: _dark),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis),
+                                color: _dark)),
                         const SizedBox(height: 2),
                         Row(children: [
                           Container(

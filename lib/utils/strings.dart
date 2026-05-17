@@ -601,39 +601,39 @@ class S {
         ms: 'Gagal',
       );
   static String get receiptFull => withLang(
-        id: 'Struk Lengkap',
+        id: 'Full Receipt',
         en: 'Full Receipt',
-        ms: 'Resit Penuh',
+        ms: 'Full Receipt',
       );
   static String get receiptBasic => withLang(
-        id: 'Struk Pendek',
-        en: 'Short Receipt',
-        ms: 'Resit Pendek',
+        id: 'Basic Receipt',
+        en: 'Basic Receipt',
+        ms: 'Basic Receipt',
       );
   static String get sessionSummary => withLang(
-        id: 'Laporan Sesi',
+        id: 'Session Summary',
         en: 'Session Summary',
-        ms: 'Laporan Sesi',
+        ms: 'Session Summary',
       );
   static String get textPrint => withLang(
-        id: 'Cetak Teks',
+        id: 'Text Print',
         en: 'Text Print',
-        ms: 'Cetak Teks',
+        ms: 'Text Print',
       );
   static String get imagePrint => withLang(
-        id: 'Cetak Gambar',
+        id: 'Image Print',
         en: 'Image Print',
-        ms: 'Cetak Imej',
+        ms: 'Image Print',
       );
   static String get pdfPrint => withLang(
-        id: 'Cetak PDF',
+        id: 'PDF Print',
         en: 'PDF Print',
-        ms: 'Cetak PDF',
+        ms: 'PDF Print',
       );
   static String get testPrintLabel => withLang(
         id: 'Test Print',
         en: 'Test Print',
-        ms: 'Ujian Cetak',
+        ms: 'Test Print',
       );
 
   // Settings - Reset Data

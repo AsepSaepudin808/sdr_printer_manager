@@ -151,7 +151,13 @@ class PrintServerService {
             }
             printData = EscPosHelper.buildSessionSummary(summaryData, _paperSize);
             jobType = 'session_summary';
-            jobLabel = 'Session Summary Report';
+            final sessionName = summaryData['session_name'] as String?
+                ?? summaryData['name'] as String?
+                ?? summaryData['session_id']?.toString()
+                ?? '';
+            jobLabel = sessionName.isNotEmpty
+                ? 'Session Summary $sessionName'
+                : 'Session Summary Report';
             onLog?.call('🖨️ Terima job Session Summary Report (${printData.length}B)');
           } else if (format == 'odoo_json') {
             Map<String, dynamic> orderData;
@@ -164,20 +170,26 @@ class PrintServerService {
             }
 
             final receiptType = orderData['receipt_type'] as String? ?? 'full';
-            final orderName = orderData['name'] as String? ?? '';
+            final orderName = (orderData['name'] as String?)?.isNotEmpty == true
+                ? orderData['name'] as String
+                : (orderData['order_ref'] as String?)?.isNotEmpty == true
+                    ? orderData['order_ref'] as String
+                    : (orderData['pos_reference'] as String?)?.isNotEmpty == true
+                        ? orderData['pos_reference'] as String
+                        : '';
 
             if (receiptType == 'basic') {
               printData = EscPosHelper.buildFromOdooData(orderData, _paperSize,
                   basic: true);
               jobType = 'receipt_basic';
-              jobLabel = orderName.isNotEmpty ? 'Struk Pendek $orderName' : 'Struk Pendek';
+              jobLabel = orderName.isNotEmpty ? 'Basic Receipt\n$orderName' : 'Basic Receipt';
               onLog?.call(
                   '🖨️ Terima job Basic Receipt (odoo_json, ${printData.length}B)');
             } else {
               printData = EscPosHelper.buildFromOdooData(orderData, _paperSize,
                   basic: false);
               jobType = 'receipt_full';
-              jobLabel = orderName.isNotEmpty ? 'Struk Lengkap $orderName' : 'Struk Lengkap';
+              jobLabel = orderName.isNotEmpty ? 'Full Receipt\n$orderName' : 'Full Receipt';
               onLog?.call(
                   '🖨️ Terima job Full Receipt (odoo_json, ${printData.length}B)');
             }

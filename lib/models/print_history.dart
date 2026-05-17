@@ -56,15 +56,15 @@ class PrintHistory {
   String get typeLabel {
     switch (type) {
       case 'receipt_full':
-        return 'Struk Lengkap';
+        return 'Full Receipt';
       case 'receipt_basic':
-        return 'Struk Pendek';
+        return 'Basic Receipt';
       case 'session_summary':
-        return 'Laporan Sesi';
+        return 'Session Summary';
       case 'text':
-        return 'Teks';
+        return 'Text Print';
       case 'image':
-        return 'Gambar';
+        return 'Image Print';
       case 'pdf':
         return 'PDF';
       case 'test':
