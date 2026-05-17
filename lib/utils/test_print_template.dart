@@ -176,9 +176,7 @@ class TestPrintTemplate {
     return Uint8List.fromList(b);
   }
 
-  // ===========================================================================
-  // ========================== PRINT LONG RECEIPT =============================
-  // ===========================================================================
+  // PRINT LONG RECEIPT
   static Uint8List buildTestLong(PaperSize size) {
     final List<int> b = [];
     final w = EscPosHelper.charsPerLine(size);

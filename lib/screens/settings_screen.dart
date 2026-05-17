@@ -135,21 +135,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (confirmed != true) return;
 
-    // Measure data size before clearing
+    // MEASURE DATA SIZE
     final p = await SharedPreferences.getInstance();
     final historyRaw = p.getString('print_history_v1') ?? '';
-    int freedBytes = historyRaw.length; // approximate size of history JSON
+    int freedBytes = historyRaw.length;
 
-    // Clear print history
+    // CLEAR PRINT HISTORY
     final historyService = PrintHistoryService();
     await historyService.load();
     await historyService.clear();
 
-    // Clear all counters and stats
+    // CLEAR COUNTERS
     await p.setInt('print_count', 0);
     await p.remove('print_history_v1');
 
-    // Format freed size
+    // FORMAT FREED SIZE
     String freedLabel;
     if (freedBytes < 1024) {
       freedLabel = '${freedBytes}B';

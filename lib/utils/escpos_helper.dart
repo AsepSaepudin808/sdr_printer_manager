@@ -197,7 +197,7 @@ class EscPosHelper {
     return txt(line);
   }
 
-  // Full-width section header line (fill full width, centered label)
+  // SECTION HEADER LINE
   static String sectionHeaderLine(String label, PaperSize size, String char) {
     final w = charsPerLine(size);
     final inner = label;
@@ -377,9 +377,7 @@ class EscPosHelper {
     return _buildFullReceipt(data, size);
   }
 
-  // ===========================================================================
-  // ========================== PRINT FULL RECEIPT =============================
-  // ===========================================================================
+  // PRINT FULL RECEIPT
   static Uint8List _buildFullReceipt(Map<String, dynamic> d, PaperSize size) {
     final List<int> b = [];
     b.addAll(init());
@@ -520,7 +518,7 @@ class EscPosHelper {
       }
     }
 
-    // Global discount ditampilkan di paling bawah daftar item, tanpa qty/UoM
+    // GLOBAL DISCOUNT
     if (globalDiscountLineAmt > 0) {
       final globalDiscStr = rp(-globalDiscountLineAmt.round(),
           symbol: symbol, decimals: decimals);
@@ -535,7 +533,6 @@ class EscPosHelper {
     final totalVal = (d['total_with_tax'] ?? 0).toDouble();
     final paidVal = (d['total_paid'] ?? totalVal).toDouble();
     final changeVal = (d['change'] ?? (paidVal - totalVal)).toDouble();
-    // total_discount sudah mencakup semua diskon (item Rp/%, global Rp/%)
     final allDiscount = (d['total_discount'] ?? 0).toDouble();
     final dppVal = subtotalVal - allDiscount;
 
@@ -631,9 +628,7 @@ class EscPosHelper {
     return Uint8List.fromList(b);
   }
 
-  // ===========================================================================
-  // ========================= PRINT BASIC RECEIPT =============================
-  // ===========================================================================
+  // PRINT BASIC RECEIPT
   static Uint8List _buildBasicReceipt(Map<String, dynamic> d, PaperSize size) {
     final List<int> b = [];
     b.addAll(init());
@@ -812,9 +807,7 @@ class EscPosHelper {
     }
   }
 
-  // ===========================================================================
-  // ============================ SUMMARY REPORT SESSION =======================
-  // ===========================================================================
+  // SUMMARY REPORT SESSION
   static Uint8List buildSessionSummary(Map<String, dynamic> d, PaperSize size) {
     final List<int> b = [];
     b.addAll(init());
@@ -830,7 +823,7 @@ class EscPosHelper {
         (currency['position'] as String? ?? 'before') == 'after';
     final w = charsPerLine(size);
 
-    // Header: SESSION SUMMARY REPORT with solid + dashed line
+    // REPORT TITLE
     b.addAll(align(1));
     b.addAll(bold(true));
     b.addAll(txt('SESSION SUMMARY REPORT'));
@@ -844,7 +837,7 @@ class EscPosHelper {
     final startAt = d['start_at'] as String? ?? '-';
     final stopAt = d['stop_at'] as String? ?? '-';
 
-    // Header fields - all values right-aligned with :
+    // HEADER INFO
     b.addAll(align(0));
     b.addAll(rowLR('PoS Name :', posName, size));
     b.addAll(rowLR('Session ID :', sessionName, size));
@@ -852,7 +845,7 @@ class EscPosHelper {
     b.addAll(rowLR('Opening :', startAt, size));
     b.addAll(rowLR('Closing :', stopAt, size));
 
-    // SALES SUMMARY section
+    // SALES SUMMARY
     b.addAll(align(1));
     b.addAll(bold(true));
     b.addAll(txt(sectionHeaderLine('', size, '-')));
@@ -897,7 +890,7 @@ class EscPosHelper {
         size));
     b.addAll(bold(false));
 
-    // RETURNS/REFUNDS section - ALWAYS SHOW
+    // RETURNS / REFUNDS
     b.addAll(align(1));
     b.addAll(bold(true));
     b.addAll(txt(sectionHeaderLine('', size, '-')));
@@ -912,7 +905,7 @@ class EscPosHelper {
         rp(refundAmount.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
 
-    // PAYMENT METHOD section
+    // PAYMENT METHOD
     b.addAll(align(1));
     b.addAll(bold(true));
     b.addAll(txt(sectionHeaderLine('', size, '-')));
@@ -940,7 +933,7 @@ class EscPosHelper {
         size));
     b.addAll(bold(false));
 
-    // CASH DRAWER SUMMARY section
+    // CASH DRAWER SUMMARY
     b.addAll(align(1));
     b.addAll(bold(true));
     b.addAll(txt(sectionHeaderLine('', size, '-')));
@@ -983,7 +976,7 @@ class EscPosHelper {
         size));
     b.addAll(bold(false));
 
-    // SESSION TRANSACTIONS section
+    // SESSION TRANSACTIONS
     b.addAll(align(1));
     b.addAll(bold(true));
     b.addAll(txt(sectionHeaderLine('', size, '-')));
@@ -1002,6 +995,7 @@ class EscPosHelper {
     b.addAll(rowLR('Returns/Refunds', '$refundTransactions', size));
     b.addAll(rowLR('Items Sold', '$totalQtySold', size));
 
+    // CLOSING BALANCE
     final countedCash = (d['counted_cash'] ?? 0).toDouble();
     final differenceCash = (d['difference_cash'] ?? 0).toDouble();
     final totalCreditAmount = (d['total_credit_amount'] ?? 0).toDouble();
@@ -1031,6 +1025,8 @@ class EscPosHelper {
     }
 
     b.addAll(txt('=' * w));
+
+    // POWERED BY
     b.addAll(feed(1));
     b.addAll(align(1));
     b.addAll(bold(true));

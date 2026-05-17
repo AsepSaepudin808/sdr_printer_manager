@@ -1,3 +1,4 @@
+// PRINTER DEVICE MODEL
 class PrinterDevice {
   final String address;
   final String name;

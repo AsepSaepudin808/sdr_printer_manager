@@ -467,7 +467,7 @@ class _TextTabState extends State<TextTab> with SingleTickerProviderStateMixin {
                     ),
                     child: Stack(
                       children: [
-                        // Perforated edge effect
+                        // PERFORATED EDGE EFFECT
                         Positioned(
                           left: 0,
                           right: 0,

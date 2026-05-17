@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+// LANGUAGE MODEL
 class SLanguage {
   final String code;
   final String name;
@@ -14,6 +15,7 @@ class SLanguage {
   String get displayLabel => '$nativeName ($code)';
 }
 
+// LOCALIZATION STRINGS
 class S {
   static String _langCode = 'id';
   static String get langCode => _langCode;

@@ -1,14 +1,14 @@
 import 'dart:convert';
 
-/// Represents one print job entry for the history log.
+// PRINT HISTORY MODEL
 class PrintHistory {
   final String id;
-  final String type;       // 'receipt_full', 'receipt_basic', 'session_summary', 'text', 'image', 'pdf', 'test', 'escpos'
-  final String label;      // Human-readable label, e.g. "Order #12345"
+  final String type;
+  final String label;
   final DateTime timestamp;
   final bool success;
-  final int dataSize;      // bytes sent
-  final String source;     // 'pos', 'manual', 'android_print_service'
+  final int dataSize;
+  final String source;
 
   PrintHistory({
     required this.id,
@@ -52,7 +52,7 @@ class PrintHistory {
     }
   }
 
-  /// Human-readable type label
+  // TYPE LABEL
   String get typeLabel {
     switch (type) {
       case 'receipt_full':
@@ -76,7 +76,7 @@ class PrintHistory {
     }
   }
 
-  /// Icon-friendly type category
+  // TYPE ICON
   String get typeIcon {
     switch (type) {
       case 'receipt_full':

@@ -18,7 +18,7 @@ class PrintServerService {
   Function(String)? onLog;
   Function()? onPrintSuccess;
   Function(bool)? onStatusChange;
-  /// Rich callback: (type, label, success, dataSize)
+  // PRINT JOB CALLBACK
   Function(String type, String label, bool success, int dataSize)? onPrintJob;
 
   PaperSize _paperSize = PaperSize.mm80;
@@ -49,7 +49,7 @@ class PrintServerService {
 
     final router = Router();
 
-    // GET /status
+    // STATUS ENDPOINT
     router.get('/status', (Request req) {
       final body = jsonEncode({
         'status': 'ok',
@@ -63,7 +63,7 @@ class PrintServerService {
       });
     });
 
-    // GET /test-print
+    // TEST PRINT ENDPOINT
     router.get('/test-print', (Request req) async {
       final action = req.url.queryParameters['type'] ?? 'test_short';
       final size = _paperSize;
@@ -101,7 +101,7 @@ class PrintServerService {
       }
     });
 
-    // OPTIONS preflight
+    // OPTIONS PREFLIGHT
     router.options('/print', (Request req) {
       return Response.ok('', headers: const {
         'Access-Control-Allow-Origin': '*',
@@ -121,7 +121,7 @@ class PrintServerService {
       });
     });
 
-    // POST /print
+    // PRINT ENDPOINT
     router.post('/print', (Request req) async {
       onLog?.call('📥 Request masuk dari Odoo!');
 

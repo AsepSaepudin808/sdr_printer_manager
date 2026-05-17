@@ -19,6 +19,7 @@ class PdfTab extends StatefulWidget {
 
 class _PdfTabState extends State<PdfTab> with SingleTickerProviderStateMixin {
   static const _primary = Color(0xFF2BBCC4);
+  // STATE VARIABLES
   File? _pdfFile;
   String? _fileName;
   Uint8List? _pdfBytes;
@@ -52,6 +53,7 @@ class _PdfTabState extends State<PdfTab> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
+  // PDF PICKER
   Future<void> _pickPdf() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -94,6 +96,7 @@ class _PdfTabState extends State<PdfTab> with SingleTickerProviderStateMixin {
     }
   }
 
+  // CLEAR PDF
   void _clearPdf() {
     if (_isPrinting) return;
     setState(() {
@@ -117,6 +120,7 @@ class _PdfTabState extends State<PdfTab> with SingleTickerProviderStateMixin {
     }
   }
 
+  // IMAGE ENHANCEMENT
   img.Image _enhanceForThermal(img.Image source) {
     img.Image out = img.grayscale(source);
 
@@ -130,6 +134,7 @@ class _PdfTabState extends State<PdfTab> with SingleTickerProviderStateMixin {
     return out;
   }
 
+  // PRINT LOGIC
   Future<void> _printPdfContent() async {
     if (_pdfBytes == null || _fileName == null) return;
 
@@ -196,6 +201,7 @@ class _PdfTabState extends State<PdfTab> with SingleTickerProviderStateMixin {
     }
   }
 
+  // UI COMPONENTS
   Widget _buildButton({
     IconData? icon,
     required String label,
@@ -403,6 +409,7 @@ class _PdfTabState extends State<PdfTab> with SingleTickerProviderStateMixin {
     );
   }
 
+  // QUALITY CONTROLS
   Widget _buildQualityControls() {
     return Container(
       padding: const EdgeInsets.all(14),
@@ -519,6 +526,7 @@ class _PdfTabState extends State<PdfTab> with SingleTickerProviderStateMixin {
     );
   }
 
+  // BUILD TAB
   @override
   Widget build(BuildContext context) {
     final viewPadding = MediaQuery.viewPaddingOf(context);

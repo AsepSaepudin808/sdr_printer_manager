@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+// LOG SCREEN
 class LogScreen extends StatelessWidget {
   final List<String> logs;
   const LogScreen({super.key, required this.logs});
 
+  // BUILD UI
   @override
   Widget build(BuildContext context) {
     return Scaffold(

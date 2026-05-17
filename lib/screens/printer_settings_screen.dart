@@ -14,6 +14,7 @@ class PrinterSettingsScreen extends StatefulWidget {
 class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
   static const Color _primary = Color(0xFF2BBCC4);
 
+  // STATE VARIABLES
   PaperSize _paperSize = PaperSize.mm80;
   final TextEditingController _charsCtrl = TextEditingController();
   bool _autoCut = false;
@@ -32,6 +33,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     super.dispose();
   }
 
+  // LOAD PREFS
   Future<void> _loadPrefs() async {
     final p = await SharedPreferences.getInstance();
     final ps = p.getString('paper_size') ?? 'mm80';
@@ -61,6 +63,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     });
   }
 
+  // TEST PRINT
   Future<void> _testPrint(bool isFull) async {
     final isConnected = await PrintBluetoothThermal.connectionStatus;
     if (!isConnected) {
@@ -129,6 +132,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     }
   }
 
+  // SAVE LOGIC
   Future<void> _save() async {
     final p = await SharedPreferences.getInstance();
     final key = switch (_paperSize) {
@@ -171,6 +175,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     }
   }
 
+  // UI COMPONENTS
   Widget _buildSection(String label, {required Widget child, IconData? icon, Color? iconColor}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -217,6 +222,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     );
   }
 
+  // BUILD SCREEN
   @override
   Widget build(BuildContext context) {
     if (!_loaded) {

@@ -18,6 +18,7 @@ class ImageTab extends StatefulWidget {
 
 class _ImageTabState extends State<ImageTab> with SingleTickerProviderStateMixin {
   static const _primary = Color(0xFF2BBCC4);
+  // STATE VARIABLES
   File? _imageFile;
   bool _isPrinting = false;
   String _status = '';
@@ -38,6 +39,7 @@ class _ImageTabState extends State<ImageTab> with SingleTickerProviderStateMixin
     super.dispose();
   }
 
+  // IMAGE PICKER
   Future<void> _pickImage() async {
     final result = await FilePicker.platform.pickFiles(type: FileType.image);
     if (result != null && result.files.single.path != null) {
@@ -48,6 +50,7 @@ class _ImageTabState extends State<ImageTab> with SingleTickerProviderStateMixin
     }
   }
 
+  // PRINT LOGIC
   Future<void> _printImage() async {
     if (_imageFile == null) return;
     setState(() {
@@ -88,6 +91,7 @@ class _ImageTabState extends State<ImageTab> with SingleTickerProviderStateMixin
     }
   }
 
+  // ESCPOS CONVERSION
   Uint8List _imageToEscPos(img.Image image, int maxW) {
     final w = image.width;
     final h = image.height;
@@ -125,6 +129,7 @@ class _ImageTabState extends State<ImageTab> with SingleTickerProviderStateMixin
     return Uint8List.fromList(buf);
   }
 
+  // UI COMPONENTS
   Widget _buildImageButton({
     IconData? icon,
     required String label,
@@ -188,6 +193,7 @@ class _ImageTabState extends State<ImageTab> with SingleTickerProviderStateMixin
     );
   }
 
+  // BUILD TAB
   @override
   Widget build(BuildContext context) {
     final viewPadding = MediaQuery.viewPaddingOf(context);

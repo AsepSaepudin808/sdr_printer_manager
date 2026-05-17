@@ -10,12 +10,14 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
+  // STATE VARIABLES
   late AnimationController _ctrl;
   late Animation<double> _fadeAnim;
   late Animation<double> _scaleAnim;
 
   static const _primary = Color(0xFF2BBCC4);
 
+  // INIT STATE
   @override
   void initState() {
     super.initState();
@@ -31,6 +33,7 @@ class _SplashScreenState extends State<SplashScreen>
     Future.delayed(const Duration(seconds: 3), _goHome);
   }
 
+  // NAVIGATION LOGIC
   void _goHome() {
     if (!mounted) return;
     Navigator.pushReplacement(
@@ -50,6 +53,7 @@ class _SplashScreenState extends State<SplashScreen>
     super.dispose();
   }
 
+  // BUILD UI
   @override
   Widget build(BuildContext context) {
     return Scaffold(

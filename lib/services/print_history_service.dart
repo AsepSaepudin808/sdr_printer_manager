@@ -1,7 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/print_history.dart';
 
-/// Manages persistent print history storage using SharedPreferences.
+/// PRINT HISTORY SERVICE
 class PrintHistoryService {
   static const String _key = 'print_history_v1';
   static const int _maxEntries = 500;
@@ -13,7 +13,7 @@ class PrintHistoryService {
   int get successCount => _items.where((e) => e.success).length;
   int get failCount => _items.where((e) => !e.success).length;
 
-  /// Load history from disk
+  // LOAD HISTORY
   Future<void> load() async {
     final p = await SharedPreferences.getInstance();
     final raw = p.getString(_key);
@@ -24,30 +24,30 @@ class PrintHistoryService {
     }
   }
 
-  /// Add a new print history entry and persist
+  // ADD ENTRY
   Future<void> add(PrintHistory entry) async {
     _items.insert(0, entry);
-    // Trim to max
+    // TRIM TO MAX
     if (_items.length > _maxEntries) {
       _items = _items.sublist(0, _maxEntries);
     }
     await _save();
   }
 
-  /// Clear all history
+  // CLEAR HISTORY
   Future<void> clear() async {
     _items.clear();
     final p = await SharedPreferences.getInstance();
     await p.remove(_key);
   }
 
-  /// Persist to disk
+  // PERSIST TO DISK
   Future<void> _save() async {
     final p = await SharedPreferences.getInstance();
     await p.setString(_key, PrintHistory.encode(_items));
   }
 
-  /// Get count by type
+  // COUNT BY TYPE
   Map<String, int> get countByType {
     final map = <String, int>{};
     for (final item in _items.where((e) => e.success)) {
@@ -56,7 +56,7 @@ class PrintHistoryService {
     return map;
   }
 
-  /// Get count by date (last 7 days)
+  // COUNT BY DATE
   Map<String, int> get countByDate {
     final map = <String, int>{};
     final now = DateTime.now();
@@ -75,7 +75,7 @@ class PrintHistoryService {
     return map;
   }
 
-  /// Total bytes printed
+  // TOTAL BYTES
   int get totalBytes {
     int sum = 0;
     for (final item in _items.where((e) => e.success)) {
@@ -84,7 +84,7 @@ class PrintHistoryService {
     return sum;
   }
 
-  /// Today's count
+  // TODAY COUNT
   int get todayCount {
     final now = DateTime.now();
     return _items

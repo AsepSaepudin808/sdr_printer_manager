@@ -372,7 +372,7 @@ class _MainShellState extends State<MainShell> {
     final newCount = p.getInt('print_count') ?? 0;
     setState(() {
       _printCount = newCount;
-      // If data was reset, clear in-memory logs too
+      // CLEAR IN-MEMORY LOGS
       if (newCount == 0 && _historyService.items.isEmpty) {
         _logs.clear();
       }
@@ -453,7 +453,7 @@ class _MainShellState extends State<MainShell> {
     }
   }
 
-  /// Record a print job to persistent history
+  // RECORD PRINT JOB
   void _recordHistory(String type, String label, bool success, int dataSize) {
     final entry = PrintHistory(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -900,7 +900,7 @@ class _MainShellState extends State<MainShell> {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(1)}MB';
     }
 
-    // Type label & color map
+    // TYPE COLOR MAP
     final typeInfo = <String, (String, Color, IconData)>{
       'receipt_full': (S.receiptFull, const Color(0xFF2BBCC4), Icons.receipt_long_rounded),
       'receipt_basic': (S.receiptBasic, const Color(0xFF7B2FBE), Icons.receipt_rounded),
@@ -912,7 +912,7 @@ class _MainShellState extends State<MainShell> {
       'escpos': ('ESC/POS', const Color(0xFF6366F1), Icons.code_rounded),
     };
 
-    // Max for chart
+    // CHART MAX
     int maxDay = 1;
     for (final v in byDate.values) {
       if (v > maxDay) maxDay = v;
@@ -1278,8 +1278,7 @@ class _MainShellState extends State<MainShell> {
       PaperSize.mm80 => '80mm',
       PaperSize.mm100 => '100mm'
     };
-    // extendBody:false → Flutter sudah reserve ruang bottom bar otomatis.
-    // Padding bawah cukup 16px breathing room saja.
+    // BOTTOM PADDING
     const double bottomPad = 16.0;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, bottomPad),
@@ -2067,7 +2066,7 @@ class _MainShellState extends State<MainShell> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // App Icon
+              // APP ICON
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -2077,13 +2076,13 @@ class _MainShellState extends State<MainShell> {
                 child: const Icon(Icons.print_rounded, size: 48, color: _primary),
               ),
               const SizedBox(height: 16),
-              // App Name
+              // APP NAME
               const Text(
                 'dPrinter Mart',
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 4),
-              // Version
+              // VERSION
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
@@ -2103,14 +2102,14 @@ class _MainShellState extends State<MainShell> {
               const SizedBox(height: 20),
               const Divider(),
               const SizedBox(height: 12),
-              // Description
+              // DESCRIPTION
               const Text(
                 'Aplikasi pengelola koneksi printer Bluetooth thermal untuk PoS dRetail Mart.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 13, color: Colors.grey),
               ),
               const SizedBox(height: 20),
-              // Buttons
+              // BUTTONS
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [

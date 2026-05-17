@@ -131,7 +131,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
             )
           : Column(
               children: [
-                // Bluetooth status card
+                // BLUETOOTH STATUS CARD
                 Container(
                   width: double.infinity,
                   margin: const EdgeInsets.all(16),
@@ -222,7 +222,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                   ),
                 ),
 
-                // Instructions
+                // INSTRUCTIONS
                 if (_btEnabled && _pairedDevices.isEmpty)
                   Expanded(
                     child: Center(
