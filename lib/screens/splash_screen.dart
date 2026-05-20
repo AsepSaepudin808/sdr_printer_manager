@@ -112,6 +112,12 @@ class _SplashScreenState extends State<SplashScreen>
                   child: CircularProgressIndicator(
                       strokeWidth: 2.5, color: _primary),
                 ),
+                const SizedBox(height: 60),
+                const Text('V1.0.0.1',
+                    style: TextStyle(fontSize: 12, color: Colors.grey)),
+                const SizedBox(height: 4),
+                const Text('Powered by dRetail',
+                    style: TextStyle(fontSize: 12, color: Colors.grey)),
               ]),
             ),
           ),
