@@ -50,6 +50,7 @@ class _MainShellState extends State<MainShell> {
   bool _btConnected = false;
   PaperSize _paperSize = PaperSize.mm80;
   CashDrawerMode _cashDrawerMode = CashDrawerMode.off;
+  bool _sessionSummaryCashDrawer = false;
   bool _isPrinting = false;
   String _printStatus = '';
   final TextEditingController _portCtrl = TextEditingController();
@@ -247,6 +248,8 @@ class _MainShellState extends State<MainShell> {
               ? CashDrawerMode.openBeforePrint
               : CashDrawerMode.off;
       EscPosHelper.setCashDrawerMode(_cashDrawerMode);
+      _sessionSummaryCashDrawer = p.getBool('session_summary_cash_drawer') ?? false;
+      EscPosHelper.setSessionSummaryCashDrawer(_sessionSummaryCashDrawer);
       final addr = p.getString('printer_address');
       final name = p.getString('printer_name');
       if (addr != null && name != null) {
@@ -318,6 +321,7 @@ class _MainShellState extends State<MainShell> {
     setState(() => _btConnected = true);
     _addLog(S.printerConnected);
     _server.setCashDrawerMode(_cashDrawerMode);
+    _server.setSessionSummaryCashDrawer(_sessionSummaryCashDrawer);
     try {
       await _server.start(
           port: _serverPort, bluetoothService: _bt, paperSize: _paperSize);
@@ -396,6 +400,7 @@ class _MainShellState extends State<MainShell> {
     if (_serverRunning) {
       _server.setPaperSize(_paperSize);
       _server.setCashDrawerMode(_cashDrawerMode);
+      _server.setSessionSummaryCashDrawer(_sessionSummaryCashDrawer);
     }
   }
 

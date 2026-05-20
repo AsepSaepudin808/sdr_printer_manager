@@ -23,6 +23,7 @@ class PrintServerService {
 
   PaperSize _paperSize = PaperSize.mm80;
   CashDrawerMode _cashDrawerMode = CashDrawerMode.off;
+  bool _sessionSummaryCashDrawer = false;
 
   bool get isRunning => _server != null;
 
@@ -32,6 +33,10 @@ class PrintServerService {
 
   void setCashDrawerMode(CashDrawerMode mode) {
     _cashDrawerMode = mode;
+  }
+
+  void setSessionSummaryCashDrawer(bool value) {
+    _sessionSummaryCashDrawer = value;
   }
 
   Future<String> getLocalIp() async {
@@ -252,6 +257,12 @@ class PrintServerService {
           // CASH DRAWER: Open after print (receipt only)
           if (isReceiptJob && _cashDrawerMode == CashDrawerMode.openAfterPrint) {
             onLog?.call('🔓 Membuka cash drawer setelah cetak...');
+            await Future.delayed(const Duration(milliseconds: 1000));
+            await _btService?.sendRaw(EscPosHelper.openCashDrawer());
+          }
+          // CASH DRAWER: Open for session summary (if enabled)
+          if (jobType == 'session_summary' && _sessionSummaryCashDrawer) {
+            onLog?.call('🔓 Membuka cash drawer untuk Session Summary...');
             await Future.delayed(const Duration(milliseconds: 1000));
             await _btService?.sendRaw(EscPosHelper.openCashDrawer());
           }

@@ -23,18 +23,21 @@ class EscPosHelper {
   static bool _autoCut = false;
   static bool _useFontB = false;
   static CashDrawerMode _cashDrawerMode = CashDrawerMode.off;
+  static bool _sessionSummaryCashDrawer = false;
 
   static void setCustomCharsPerLine(int value) => _customCharsPerLine = value;
   static void setExtraFeed(int value) => _extraFeed = value;
   static void setAutoCut(bool value) => _autoCut = value;
   static void setUseFontB(bool value) => _useFontB = value;
   static void setCashDrawerMode(CashDrawerMode mode) => _cashDrawerMode = mode;
+  static void setSessionSummaryCashDrawer(bool value) => _sessionSummaryCashDrawer = value;
 
   static int get customCharsPerLineSetting => _customCharsPerLine;
   static int get extraFeedSetting => _extraFeed;
   static bool get autoCutSetting => _autoCut;
   static bool get useFontBSetting => _useFontB;
   static CashDrawerMode get cashDrawerModeSetting => _cashDrawerMode;
+  static bool get sessionSummaryCashDrawerSetting => _sessionSummaryCashDrawer;
 
   /// Opens the cash drawer using ESC/POS command.
   /// Standard command: ESC p 0 25 250 (0x1B 0x70 0x00 0x19 0xFA)

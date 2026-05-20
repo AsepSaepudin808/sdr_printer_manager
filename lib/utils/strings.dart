@@ -491,6 +491,21 @@ class S {
         en: 'Cash drawer opened!',
         ms: 'Laci tunai terbuka!',
       );
+  static String get cashDrawerOnSessionSummary => withLang(
+        id: 'Buka laci untuk Session Summary',
+        en: 'Open drawer for Session Summary',
+        ms: 'Buka laci untuk Session Summary',
+      );
+  static String get cashDrawerSessionSummaryOn => withLang(
+        id: 'Ya, buka laci',
+        en: 'Yes, open drawer',
+        ms: 'Ya, buka laci',
+      );
+  static String get cashDrawerSessionSummaryOff => withLang(
+        id: 'Tidak',
+        en: 'No',
+        ms: 'Tidak',
+      );
   static String get version => withLang(
         id: 'Versi',
         en: 'Version',

@@ -20,6 +20,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
   bool _autoCut = false;
   int _extraFeed = 3;
   CashDrawerMode _cashDrawerMode = CashDrawerMode.off;
+  bool _sessionSummaryCashDrawer = false;
   bool _loaded = false;
 
   @override
@@ -50,6 +51,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
         : savedCashDrawer == 'before'
             ? CashDrawerMode.openBeforePrint
             : CashDrawerMode.off;
+    final sessionSummaryCashDrawer = p.getBool('session_summary_cash_drawer') ?? false;
     setState(() {
       _paperSize = paperSize;
       _charsCtrl.text = (savedChars > 0
@@ -59,6 +61,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
       _autoCut = p.getBool('auto_cut') ?? false;
       _extraFeed = p.getInt('extra_feed') ?? 3;
       _cashDrawerMode = cashDrawerMode;
+      _sessionSummaryCashDrawer = sessionSummaryCashDrawer;
       _loaded = true;
     });
   }
@@ -185,6 +188,9 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     };
     await p.setString('cash_drawer_mode', cashDrawerKey);
     EscPosHelper.setCashDrawerMode(_cashDrawerMode);
+
+    await p.setBool('session_summary_cash_drawer', _sessionSummaryCashDrawer);
+    EscPosHelper.setSessionSummaryCashDrawer(_sessionSummaryCashDrawer);
 
     await p.setInt('extra_feed', _extraFeed);
     EscPosHelper.setExtraFeed(_extraFeed);
@@ -434,12 +440,44 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                     thumbColor: WidgetStateProperty.resolveWith((s) =>
                         s.contains(WidgetState.selected) ? Colors.white : Colors.grey),
                     onChanged: (v) => setState(() {
-                      _cashDrawerMode = v ? CashDrawerMode.openAfterPrint : CashDrawerMode.off;
+                      _cashDrawerMode = v ? CashDrawerMode.openBeforePrint : CashDrawerMode.off;
                     }),
                   ),
                 ]),
                 if (_cashDrawerMode != CashDrawerMode.off) ...[
                   const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: InkWell(
+                      onTap: () => setState(() => _sessionSummaryCashDrawer = !_sessionSummaryCashDrawer),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Row(children: [
+                        Icon(
+                          _sessionSummaryCashDrawer
+                              ? Icons.check_box_rounded
+                              : Icons.check_box_outline_blank_rounded,
+                          size: 20,
+                          color: _sessionSummaryCashDrawer ? Colors.purple.shade600 : Colors.grey.shade500,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            S.cashDrawerOnSessionSummary,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: _sessionSummaryCashDrawer ? Colors.purple.shade700 : Colors.grey.shade600,
+                              fontWeight: _sessionSummaryCashDrawer ? FontWeight.w600 : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ]),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
@@ -450,17 +488,17 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                       children: [
                         Expanded(
                           child: _buildCashDrawerChip(
-                            mode: CashDrawerMode.openAfterPrint,
-                            label: S.cashDrawerOpenAfterPrint,
-                            icon: Icons.print_rounded,
+                            mode: CashDrawerMode.openBeforePrint,
+                            label: S.cashDrawerOpenBeforePrint,
+                            icon: Icons.front_hand_rounded,
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: _buildCashDrawerChip(
-                            mode: CashDrawerMode.openBeforePrint,
-                            label: S.cashDrawerOpenBeforePrint,
-                            icon: Icons.front_hand_rounded,
+                            mode: CashDrawerMode.openAfterPrint,
+                            label: S.cashDrawerOpenAfterPrint,
+                            icon: Icons.print_rounded,
                           ),
                         ),
                       ],
