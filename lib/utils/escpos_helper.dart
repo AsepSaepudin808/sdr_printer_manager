@@ -8,6 +8,12 @@ enum PaperSize {
   mm100,
 }
 
+enum CashDrawerMode {
+  off,
+  openAfterPrint,
+  openBeforePrint,
+}
+
 class EscPosHelper {
   static const int escCmd = 0x1B;
   static const int gsCmd = 0x1D;
@@ -16,16 +22,24 @@ class EscPosHelper {
   static int _extraFeed = 3;
   static bool _autoCut = false;
   static bool _useFontB = false;
+  static CashDrawerMode _cashDrawerMode = CashDrawerMode.off;
 
   static void setCustomCharsPerLine(int value) => _customCharsPerLine = value;
   static void setExtraFeed(int value) => _extraFeed = value;
   static void setAutoCut(bool value) => _autoCut = value;
   static void setUseFontB(bool value) => _useFontB = value;
+  static void setCashDrawerMode(CashDrawerMode mode) => _cashDrawerMode = mode;
 
   static int get customCharsPerLineSetting => _customCharsPerLine;
   static int get extraFeedSetting => _extraFeed;
   static bool get autoCutSetting => _autoCut;
   static bool get useFontBSetting => _useFontB;
+  static CashDrawerMode get cashDrawerModeSetting => _cashDrawerMode;
+
+  /// Opens the cash drawer using ESC/POS command.
+  /// Standard command: ESC p 0 25 250 (0x1B 0x70 0x00 0x19 0xFA)
+  static Uint8List openCashDrawer() =>
+      Uint8List.fromList([escCmd, 0x70, 0x00, 0x19, 0xFA]);
 
   static int defaultCharsPerLine(PaperSize size) => switch (size) {
         PaperSize.mm58 => 32,
@@ -800,10 +814,36 @@ class EscPosHelper {
 
   static String _formatDateShort(String raw) {
     try {
-      final dt = DateTime.parse(raw).toLocal();
-      return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      if (raw.isEmpty) return '';
+      final dt = DateTime.parse(raw);
+      if (dt.isUtc) {
+        return '${dt.toLocal().day.toString().padLeft(2, '0')}/'
+            '${dt.toLocal().month.toString().padLeft(2, '0')}/'
+            '${dt.toLocal().year} '
+            '${dt.toLocal().hour.toString().padLeft(2, '0')}:'
+            '${dt.toLocal().minute.toString().padLeft(2, '0')}';
+      }
+      return '${dt.day.toString().padLeft(2, '0')}/'
+          '${dt.month.toString().padLeft(2, '0')}/'
+          '${dt.year} '
+          '${dt.hour.toString().padLeft(2, '0')}:'
+          '${dt.minute.toString().padLeft(2, '0')}';
     } catch (_) {
-      return raw;
+      // Fallback: coba parse manual DD/MM/YYYY or DD-MM-YYYY
+      final s = raw.trim();
+      final isoCandidate = s
+          .replaceFirst(RegExp(r'^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})'), r'$3-$2-$1')
+          .replaceFirst(RegExp(r'^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})'), r'$1-$2-$3');
+      try {
+        final dt2 = DateTime.parse(isoCandidate);
+        return '${dt2.day.toString().padLeft(2, '0')}/'
+            '${dt2.month.toString().padLeft(2, '0')}/'
+            '${dt2.year} '
+            '${dt2.hour.toString().padLeft(2, '0')}:'
+            '${dt2.minute.toString().padLeft(2, '0')}';
+      } catch (_) {
+        return raw; // Kembalikan apa adanya jika semua gagal
+      }
     }
   }
 

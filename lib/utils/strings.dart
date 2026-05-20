@@ -461,6 +461,36 @@ class S {
         ms: 'Baris kosong tambahan selepas cetak untuk mudah koyak',
       );
   static String get lines => withLang(id: 'baris', en: 'lines', ms: 'baris');
+  static String get cashDrawer => withLang(
+        id: 'Cash Drawer',
+        en: 'Cash Drawer',
+        ms: 'Laci Tunai',
+      );
+  static String get cashDrawerDesc => withLang(
+        id: 'Buka laci kasir secara otomatis',
+        en: 'Automatically open the cash drawer',
+        ms: 'Buka laci tunai secara automatik',
+      );
+  static String get cashDrawerOff => withLang(
+        id: 'Nonaktif',
+        en: 'Off',
+        ms: 'Mati',
+      );
+  static String get cashDrawerOpenAfterPrint => withLang(
+        id: 'Terbuka setelah cetak',
+        en: 'Open after print',
+        ms: 'Terbuka selepas cetak',
+      );
+  static String get cashDrawerOpenBeforePrint => withLang(
+        id: 'Terbuka sebelum cetak',
+        en: 'Open before print',
+        ms: 'Terbuka sebelum cetak',
+      );
+  static String get cashDrawerOpened => withLang(
+        id: 'Laci kasir terbuka!',
+        en: 'Cash drawer opened!',
+        ms: 'Laci tunai terbuka!',
+      );
   static String get version => withLang(
         id: 'Versi',
         en: 'Version',

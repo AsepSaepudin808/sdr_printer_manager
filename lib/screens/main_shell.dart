@@ -49,6 +49,7 @@ class _MainShellState extends State<MainShell> {
   bool _connecting = false;
   bool _btConnected = false;
   PaperSize _paperSize = PaperSize.mm80;
+  CashDrawerMode _cashDrawerMode = CashDrawerMode.off;
   bool _isPrinting = false;
   String _printStatus = '';
   final TextEditingController _portCtrl = TextEditingController();
@@ -239,6 +240,13 @@ class _MainShellState extends State<MainShell> {
       EscPosHelper.setCustomCharsPerLine(customChars);
       EscPosHelper.setExtraFeed(p.getInt('extra_feed') ?? 3);
       EscPosHelper.setAutoCut(p.getBool('auto_cut') ?? false);
+      final savedCashDrawer = p.getString('cash_drawer_mode') ?? 'off';
+      _cashDrawerMode = savedCashDrawer == 'after'
+          ? CashDrawerMode.openAfterPrint
+          : savedCashDrawer == 'before'
+              ? CashDrawerMode.openBeforePrint
+              : CashDrawerMode.off;
+      EscPosHelper.setCashDrawerMode(_cashDrawerMode);
       final addr = p.getString('printer_address');
       final name = p.getString('printer_name');
       if (addr != null && name != null) {
@@ -309,6 +317,7 @@ class _MainShellState extends State<MainShell> {
     }
     setState(() => _btConnected = true);
     _addLog(S.printerConnected);
+    _server.setCashDrawerMode(_cashDrawerMode);
     try {
       await _server.start(
           port: _serverPort, bluetoothService: _bt, paperSize: _paperSize);
@@ -386,6 +395,7 @@ class _MainShellState extends State<MainShell> {
     await _loadPrefs();
     if (_serverRunning) {
       _server.setPaperSize(_paperSize);
+      _server.setCashDrawerMode(_cashDrawerMode);
     }
   }
 

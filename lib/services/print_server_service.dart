@@ -22,11 +22,16 @@ class PrintServerService {
   Function(String type, String label, bool success, int dataSize)? onPrintJob;
 
   PaperSize _paperSize = PaperSize.mm80;
+  CashDrawerMode _cashDrawerMode = CashDrawerMode.off;
 
   bool get isRunning => _server != null;
 
   void setPaperSize(PaperSize size) {
     _paperSize = size;
+  }
+
+  void setCashDrawerMode(CashDrawerMode mode) {
+    _cashDrawerMode = mode;
   }
 
   Future<String> getLocalIp() async {
@@ -232,8 +237,24 @@ class PrintServerService {
           onLog?.call('Terima job (BINARY, ${printData.length}B)');
         }
 
+        // Check if this is a receipt print job (cash drawer trigger only for receipts)
+        final isReceiptJob = jobType == 'receipt_full' || jobType == 'receipt_basic';
+
+        // CASH DRAWER: Open before print (receipt only)
+        if (isReceiptJob && _cashDrawerMode == CashDrawerMode.openBeforePrint) {
+          onLog?.call('🔓 Membuka cash drawer sebelum cetak...');
+          await _btService?.sendRaw(EscPosHelper.openCashDrawer());
+          await Future.delayed(const Duration(milliseconds: 1500));
+        }
+
         final ok = await _btService?.sendRaw(printData) ?? false;
         if (ok) {
+          // CASH DRAWER: Open after print (receipt only)
+          if (isReceiptJob && _cashDrawerMode == CashDrawerMode.openAfterPrint) {
+            onLog?.call('🔓 Membuka cash drawer setelah cetak...');
+            await Future.delayed(const Duration(milliseconds: 1000));
+            await _btService?.sendRaw(EscPosHelper.openCashDrawer());
+          }
           onLog?.call('✅ Print berhasil (${printData.length}B dikirim)');
           onPrintSuccess?.call();
           onPrintJob?.call(jobType, jobLabel, true, printData.length);

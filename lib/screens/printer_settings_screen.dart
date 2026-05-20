@@ -19,6 +19,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
   final TextEditingController _charsCtrl = TextEditingController();
   bool _autoCut = false;
   int _extraFeed = 3;
+  CashDrawerMode _cashDrawerMode = CashDrawerMode.off;
   bool _loaded = false;
 
   @override
@@ -43,6 +44,12 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
             ? PaperSize.mm100
             : PaperSize.mm80;
     final savedChars = p.getInt('chars_per_line') ?? 0;
+    final savedCashDrawer = p.getString('cash_drawer_mode') ?? 'off';
+    final cashDrawerMode = savedCashDrawer == 'after'
+        ? CashDrawerMode.openAfterPrint
+        : savedCashDrawer == 'before'
+            ? CashDrawerMode.openBeforePrint
+            : CashDrawerMode.off;
     setState(() {
       _paperSize = paperSize;
       _charsCtrl.text = (savedChars > 0
@@ -51,6 +58,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
           .toString();
       _autoCut = p.getBool('auto_cut') ?? false;
       _extraFeed = p.getInt('extra_feed') ?? 3;
+      _cashDrawerMode = cashDrawerMode;
       _loaded = true;
     });
   }
@@ -85,6 +93,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     final originalChars = EscPosHelper.customCharsPerLineSetting;
     final originalFeed = EscPosHelper.extraFeedSetting;
     final originalCut = EscPosHelper.autoCutSetting;
+    final originalCashDrawer = EscPosHelper.cashDrawerModeSetting;
 
     final chars = int.tryParse(_charsCtrl.text.trim()) ??
         EscPosHelper.defaultCharsPerLine(_paperSize);
@@ -92,13 +101,26 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     EscPosHelper.setCustomCharsPerLine(chars != defaultChars ? chars : 0);
     EscPosHelper.setExtraFeed(_extraFeed);
     EscPosHelper.setAutoCut(_autoCut);
+    EscPosHelper.setCashDrawerMode(_cashDrawerMode);
 
     try {
       final bytes = isFull
           ? TestPrintTemplate.buildTestLong(_paperSize)
           : TestPrintTemplate.buildTestShort(_paperSize);
 
+      // CASH DRAWER: Open before print
+      if (_cashDrawerMode == CashDrawerMode.openBeforePrint) {
+        await PrintBluetoothThermal.writeBytes(EscPosHelper.openCashDrawer());
+        await Future.delayed(const Duration(milliseconds: 1500));
+      }
+
       await PrintBluetoothThermal.writeBytes(bytes);
+
+      // CASH DRAWER: Open after print
+      if (_cashDrawerMode == CashDrawerMode.openAfterPrint) {
+        await Future.delayed(const Duration(milliseconds: 1000));
+        await PrintBluetoothThermal.writeBytes(EscPosHelper.openCashDrawer());
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -129,6 +151,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
       EscPosHelper.setCustomCharsPerLine(originalChars);
       EscPosHelper.setExtraFeed(originalFeed);
       EscPosHelper.setAutoCut(originalCut);
+      EscPosHelper.setCashDrawerMode(originalCashDrawer);
     }
   }
 
@@ -154,6 +177,14 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
 
     await p.setBool('auto_cut', _autoCut);
     EscPosHelper.setAutoCut(_autoCut);
+
+    final cashDrawerKey = switch (_cashDrawerMode) {
+      CashDrawerMode.openAfterPrint => 'after',
+      CashDrawerMode.openBeforePrint => 'before',
+      CashDrawerMode.off => 'off',
+    };
+    await p.setString('cash_drawer_mode', cashDrawerKey);
+    EscPosHelper.setCashDrawerMode(_cashDrawerMode);
 
     await p.setInt('extra_feed', _extraFeed);
     EscPosHelper.setExtraFeed(_extraFeed);
@@ -218,6 +249,51 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
           const SizedBox(height: 14),
           child,
         ],
+      ),
+    );
+  }
+
+  Widget _buildCashDrawerChip({
+    required CashDrawerMode mode,
+    required String label,
+    required IconData icon,
+  }) {
+    final isSelected = _cashDrawerMode == mode;
+    return InkWell(
+      onTap: () => setState(() => _cashDrawerMode = mode),
+      borderRadius: BorderRadius.circular(8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? _primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? _primary : Colors.grey.shade400,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? Colors.white : Colors.grey.shade600,
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? Colors.white : Colors.grey.shade700,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -336,6 +412,63 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                 onChanged: (v) => setState(() => _autoCut = v),
               ),
             ]),
+          ),
+
+          _buildSection(
+            S.cashDrawer,
+            icon: Icons.lock_clock_rounded,
+            iconColor: Colors.teal.shade700,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Expanded(
+                    child: Text(
+                      S.cashDrawerDesc,
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                  Switch.adaptive(
+                    value: _cashDrawerMode != CashDrawerMode.off,
+                    activeTrackColor: _primary,
+                    thumbColor: WidgetStateProperty.resolveWith((s) =>
+                        s.contains(WidgetState.selected) ? Colors.white : Colors.grey),
+                    onChanged: (v) => setState(() {
+                      _cashDrawerMode = v ? CashDrawerMode.openAfterPrint : CashDrawerMode.off;
+                    }),
+                  ),
+                ]),
+                if (_cashDrawerMode != CashDrawerMode.off) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _buildCashDrawerChip(
+                            mode: CashDrawerMode.openAfterPrint,
+                            label: S.cashDrawerOpenAfterPrint,
+                            icon: Icons.print_rounded,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildCashDrawerChip(
+                            mode: CashDrawerMode.openBeforePrint,
+                            label: S.cashDrawerOpenBeforePrint,
+                            icon: Icons.front_hand_rounded,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
 
           _buildSection(
