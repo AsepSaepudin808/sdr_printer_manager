@@ -1605,7 +1605,7 @@ class _MainShellState extends ConsumerState<MainShell> {
   static const String _licenseText = '''
 LISENSI PENGGUNA AKHIR (EULA)
 
-Copyright (c) 2025 dRetail Mart
+Copyright (c) 2026 dRetail Mart
 Hak Cipta Dilindungi Undang-Undang
 
 Dengan mengunduh, menginstal, atau menggunakan aplikasi "dPrinter Mart", Anda setuju untuk terikat dengan syarat-syarat berikut:

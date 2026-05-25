@@ -1,6 +1,6 @@
 # 🖨️ dPrinter Mart
 
-**Versi 1.0.0+12** | Package: `id.dprinter.mart` | Dibuat oleh **Sarana Digital Retail**
+**Versi 1.0.2** | Package: `id.dprinter.mart` | Dibuat oleh **Sarana Digital Retail**
 
 Aplikasi Android berbasis **Flutter** yang berfungsi sebagai **Local Print Server** — menjembatani sistem kasir **Odoo 18 Point of Sale (POS)** dengan **Printer Thermal Bluetooth**, tanpa memerlukan perangkat keras IoT Box.
 
@@ -15,6 +15,8 @@ Sistem ini bekerja bersama modul Odoo **`sdr_print_direct_pos`** (versi `18.0.1.
 | 🚀 **Bypass IoT Box** | Mengubah HP/Tablet Android menjadi print server mandiri |
 | 🧾 **Full & Basic Receipt** | Dua mode struk — lengkap (detail item, diskon, pajak) dan ringkas (nama produk & qty saja) |
 | 📊 **Session Summary Report** | Cetak laporan ringkasan sesi kasir (Gross Sales, DPP, PPN, Pembayaran, Kas) |
+| 💰 **Cash Drawer** | Kontrol laci kasir otomatis sebelum/sesudah cetak |
+| 🔄 **Print Queue** | Antrian otomatis untuk job yang gagal, retry saat koneksi kembali |
 | ⚡ **Auto-Print** | Cetak otomatis setelah validasi pembayaran di Odoo POS |
 | 📝 **Free Text Print** | Cetak teks bebas langsung dari aplikasi (tab Teks) |
 | 🖼️ **Image Print** | Cetak gambar dari galeri ke printer thermal (tab Gambar) |
@@ -50,7 +52,7 @@ graph TD
 
 1. **Odoo POS** (via modul `sdr_print_direct_pos`) mengirim `POST /print` dengan payload JSON ke HTTP Server dPrinter Mart.
 2. **dPrinter Mart** mem-parsing JSON, mengkonversinya ke perintah **ESC/POS bytes**, dan mengirimnya ke **Printer Thermal** via Bluetooth.
-3. Status **sukses / error** dikembalikan ke Odoo POS secara *realtime* dalam format JSON.
+3. **Status** sukses / error dikembalikan ke Odoo POS secara *realtime* dalam format JSON.
 
 ---
 
@@ -62,27 +64,51 @@ sdr_printer_manager/
 ├── lib/
 │   ├── main.dart                       # Entry point aplikasi
 │   ├── models/                         # Model data
+│   │   ├── printer_device.dart
+│   │   └── print_history.dart
+│   ├── providers/                      # Riverpod state management
+│   │   ├── app_state_provider.dart     # Application state
+│   │   ├── logs_provider.dart          # Activity logs
+│   │   ├── bluetooth_provider.dart
+│   │   ├── server_provider.dart
+│   │   ├── history_provider.dart
+│   │   └── print_queue_provider.dart   # Print queue state
+│   ├── services/                      # Business logic
+│   │   ├── bluetooth_service.dart      # Bluetooth connection + retry
+│   │   ├── print_server_service.dart   # HTTP Server (port 8080)
+│   │   ├── print_queue_service.dart    # Offline queue management
+│   │   └── print_history_service.dart
 │   ├── screens/
-│   │   ├── splash_screen.dart          # Layar pembuka
-│   │   ├── main_shell.dart             # Shell navigasi + logic print job
-│   │   ├── home_screen.dart            # Dashboard utama (status, log, kontrol)
-│   │   ├── scan_screen.dart            # Scan & pairing Bluetooth printer
-│   │   ├── settings_screen.dart        # Pengaturan aplikasi (bahasa, port, dll)
-│   │   ├── printer_settings_screen.dart # Pengaturan printer (kertas, feed, cut)
-│   │   ├── log_screen.dart             # Riwayat log cetak
-│   │   ├── text_tab.dart               # Tab cetak teks bebas (preview realtime)
-│   │   ├── image_tab.dart              # Tab cetak gambar
-│   │   └── pdf_tab.dart                # Tab cetak dokumen PDF
-│   ├── services/
-│   │   ├── bluetooth_service.dart      # Manajemen koneksi & pengiriman Bluetooth
-│   │   └── print_server_service.dart   # HTTP Server (port 8080, shelf)
+│   │   ├── splash_screen.dart
+│   │   ├── main_shell.dart            # Main shell + navigation
+│   │   ├── scan_screen.dart
+│   │   ├── settings_screen.dart
+│   │   ├── printer_settings_screen.dart
+│   │   ├── text_tab.dart
+│   │   ├── image_tab.dart
+│   │   ├── pdf_tab.dart
+│   │   ├── log_screen.dart
+│   │   └── widgets/                    # Reusable components
+│   │       ├── status_card.dart
+│   │       ├── printer_card.dart
+│   │       ├── stats_row.dart
+│   │       ├── port_card.dart
+│   │       ├── test_print_card.dart
+│   │       ├── log_card.dart
+│   │       ├── auto_start_card.dart
+│   │       └── home_tab.dart
 │   └── utils/
-│       ├── escpos_helper.dart          # Builder ESC/POS: Full Receipt, Basic Receipt, Summary Report
-│       ├── test_print_template.dart    # Template test print (Short & Long)
-│       └── strings.dart               # Terjemahan multi-bahasa (id/en)
+│       ├── escpos_helper.dart          # ESC/POS builder
+│       ├── test_print_template.dart
+│       ├── strings.dart
+│       ├── constants.dart
+│       └── colors.dart
+├── test/
+│   ├── escpos_helper_test.dart        # 43 unit tests
+│   └── widget_test.dart
 └── android/
     └── app/src/main/kotlin/
-        └── SdrPrintService.kt          # Android Print Service (system integration)
+        └── SdrPrintService.kt          # Android Print Service
 ```
 
 ---
@@ -131,8 +157,8 @@ Server berjalan di **port 8080** dan mendukung endpoint berikut:
 {
   "format": "odoo_json",
   "data": {
-    "name": "POS/2025/00123",
-    "date": "2025-05-15T11:00:00.000Z",
+    "name": "POS/2026/00123",
+    "date": "2026-05-15T11:00:00.000Z",
     "cashier": "Kasir 1",
     "receipt_type": "full",
     "company": {
@@ -178,11 +204,11 @@ Server berjalan di **port 8080** dan mendukung endpoint berikut:
 {
   "format": "session_summary",
   "data": {
-    "session_name": "POS/2025/0012",
+    "session_name": "POS/2026/0012",
     "pos_name": "Kasir Utama",
     "cashier_name": "Kasir 1",
-    "start_at": "2025-05-15 08:00",
-    "stop_at": "2025-05-15 17:00",
+    "start_at": "2026-05-15 08:00",
+    "stop_at": "2026-05-15 17:00",
     "gross_sales": 1500000,
     "total_discount": 50000,
     "total_taxes": 132450,
@@ -221,6 +247,7 @@ Server berjalan di **port 8080** dan mendukung endpoint berikut:
 | Teknologi | Versi | Fungsi |
 |-----------|-------|--------|
 | **Flutter & Dart** | SDK ^3.5.0 | Framework & bahasa pemrograman |
+| **flutter_riverpod** | ^3.3.1 | State management |
 | **print_bluetooth_thermal** | Local | Komunikasi Bluetooth & protokol ESC/POS |
 | **shelf & shelf_router** | ^1.4.1 / ^1.1.4 | HTTP Local Server (port 8080) |
 | **pdfx** | ^2.6.0 | Render dokumen PDF untuk cetak thermal |
@@ -251,8 +278,8 @@ Server berjalan di **port 8080** dan mendukung endpoint berikut:
 |-----------|-------|
 | **Nama Aplikasi** | dPrinter Mart |
 | **Package ID** | `id.dprinter.mart` |
-| **Versi** | 1.0.0 |
-| **Version Code** | 12 |
+| **Versi** | 1.0.2 |
+| **Version Code** | 13 |
 | **Min SDK** | Android 5.0+ (SDK 21) |
 | **Target SDK** | 36 |
 | **Orientasi** | Portrait Only |
@@ -337,4 +364,4 @@ Atau langsung dari aplikasi: **Pengaturan Printer > Cetak Percobaan (Pendek / Le
 
 Proyek ini dilisensikan di bawah **MIT License** — lihat file [LICENSE](LICENSE) untuk detailnya.
 
-&copy; 2025 Sarana Digital Retail — dRetail Mart
+&copy; 2026 Sarana Digital Retail — dRetail Mart
