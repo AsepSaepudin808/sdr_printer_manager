@@ -50,6 +50,12 @@ class EscPosHelper {
         PaperSize.mm100 => 64,
       };
 
+  static int paperMaxWidth(PaperSize size) => switch (size) {
+        PaperSize.mm58 => 384,
+        PaperSize.mm80 => 576,
+        PaperSize.mm100 => 768,
+      };
+
   static int charsPerLine(PaperSize size) =>
       _customCharsPerLine > 0 ? _customCharsPerLine : defaultCharsPerLine(size);
 

@@ -1,10 +1,11 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/print_history.dart';
+import '../utils/constants.dart';
 
 /// PRINT HISTORY SERVICE
 class PrintHistoryService {
   static const String _key = 'print_history_v1';
-  static const int _maxEntries = 500;
+  static const int _maxEntries = AppConstants.maxHistoryItems;
 
   List<PrintHistory> _items = [];
   List<PrintHistory> get items => List.unmodifiable(_items);

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/splash_screen.dart';
 
-// MAIN FUNCTION
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -17,10 +17,9 @@ void main() async {
   ));
 
   await SharedPreferences.getInstance();
-  runApp(const SdrPrinterApp());
+  runApp(const ProviderScope(child: SdrPrinterApp()));
 }
 
-// APP ROOT
 class SdrPrinterApp extends StatelessWidget {
   const SdrPrinterApp({super.key});
 

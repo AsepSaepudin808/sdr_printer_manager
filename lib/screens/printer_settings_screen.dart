@@ -1,26 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
+import '../providers/app_state_provider.dart';
 import '../utils/escpos_helper.dart';
 import '../utils/strings.dart';
 import '../utils/test_print_template.dart';
 
-class PrinterSettingsScreen extends StatefulWidget {
+class PrinterSettingsScreen extends ConsumerStatefulWidget {
   const PrinterSettingsScreen({super.key});
   @override
-  State<PrinterSettingsScreen> createState() => _PrinterSettingsScreenState();
+  ConsumerState<PrinterSettingsScreen> createState() => _PrinterSettingsScreenState();
 }
 
-class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
-  static const Color _primary = Color(0xFF2BBCC4);
-
-  // STATE VARIABLES
-  PaperSize _paperSize = PaperSize.mm80;
+class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
   final TextEditingController _charsCtrl = TextEditingController();
-  bool _autoCut = false;
   int _extraFeed = 3;
-  CashDrawerMode _cashDrawerMode = CashDrawerMode.off;
-  bool _sessionSummaryCashDrawer = false;
+  bool _autoCut = false;
   bool _loaded = false;
 
   @override
@@ -35,46 +31,21 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     super.dispose();
   }
 
-  // LOAD PREFS
   Future<void> _loadPrefs() async {
     final p = await SharedPreferences.getInstance();
-    final ps = p.getString('paper_size') ?? 'mm80';
-    final paperSize = ps == 'mm58'
-        ? PaperSize.mm58
-        : ps == 'mm100'
-            ? PaperSize.mm100
-            : PaperSize.mm80;
+    final paperSize = ref.read(appStateProvider).paperSize;
     final savedChars = p.getInt('chars_per_line') ?? 0;
-    final savedCashDrawer = p.getString('cash_drawer_mode') ?? 'off';
-    final cashDrawerMode = savedCashDrawer == 'after'
-        ? CashDrawerMode.openAfterPrint
-        : savedCashDrawer == 'before'
-            ? CashDrawerMode.openBeforePrint
-            : CashDrawerMode.off;
-    final sessionSummaryCashDrawer = p.getBool('session_summary_cash_drawer') ?? false;
     setState(() {
-      _paperSize = paperSize;
       _charsCtrl.text = (savedChars > 0
               ? savedChars
               : EscPosHelper.defaultCharsPerLine(paperSize))
           .toString();
       _autoCut = p.getBool('auto_cut') ?? false;
       _extraFeed = p.getInt('extra_feed') ?? 3;
-      _cashDrawerMode = cashDrawerMode;
-      _sessionSummaryCashDrawer = sessionSummaryCashDrawer;
       _loaded = true;
     });
   }
 
-  void _onPaperSizeChanged(Set<PaperSize> v) {
-    final s = v.first;
-    setState(() {
-      _paperSize = s;
-      _charsCtrl.text = EscPosHelper.defaultCharsPerLine(s).toString();
-    });
-  }
-
-  // TEST PRINT
   Future<void> _testPrint(bool isFull) async {
     final isConnected = await PrintBluetoothThermal.connectionStatus;
     if (!isConnected) {
@@ -93,34 +64,34 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
       return;
     }
 
+    final paperSize = ref.read(appStateProvider).paperSize;
+    final cashDrawerMode = ref.read(appStateProvider).cashDrawerMode;
     final originalChars = EscPosHelper.customCharsPerLineSetting;
     final originalFeed = EscPosHelper.extraFeedSetting;
     final originalCut = EscPosHelper.autoCutSetting;
     final originalCashDrawer = EscPosHelper.cashDrawerModeSetting;
 
     final chars = int.tryParse(_charsCtrl.text.trim()) ??
-        EscPosHelper.defaultCharsPerLine(_paperSize);
-    final defaultChars = EscPosHelper.defaultCharsPerLine(_paperSize);
+        EscPosHelper.defaultCharsPerLine(paperSize);
+    final defaultChars = EscPosHelper.defaultCharsPerLine(paperSize);
     EscPosHelper.setCustomCharsPerLine(chars != defaultChars ? chars : 0);
     EscPosHelper.setExtraFeed(_extraFeed);
     EscPosHelper.setAutoCut(_autoCut);
-    EscPosHelper.setCashDrawerMode(_cashDrawerMode);
+    EscPosHelper.setCashDrawerMode(cashDrawerMode);
 
     try {
       final bytes = isFull
-          ? TestPrintTemplate.buildTestLong(_paperSize)
-          : TestPrintTemplate.buildTestShort(_paperSize);
+          ? TestPrintTemplate.buildTestLong(paperSize)
+          : TestPrintTemplate.buildTestShort(paperSize);
 
-      // CASH DRAWER: Open before print
-      if (_cashDrawerMode == CashDrawerMode.openBeforePrint) {
+      if (cashDrawerMode == CashDrawerMode.openBeforePrint) {
         await PrintBluetoothThermal.writeBytes(EscPosHelper.openCashDrawer());
         await Future.delayed(const Duration(milliseconds: 1500));
       }
 
       await PrintBluetoothThermal.writeBytes(bytes);
 
-      // CASH DRAWER: Open after print
-      if (_cashDrawerMode == CashDrawerMode.openAfterPrint) {
+      if (cashDrawerMode == CashDrawerMode.openAfterPrint) {
         await Future.delayed(const Duration(milliseconds: 1000));
         await PrintBluetoothThermal.writeBytes(EscPosHelper.openCashDrawer());
       }
@@ -158,10 +129,13 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     }
   }
 
-  // SAVE LOGIC
   Future<void> _save() async {
     final p = await SharedPreferences.getInstance();
-    final key = switch (_paperSize) {
+    final paperSize = ref.read(appStateProvider).paperSize;
+    final cashDrawerMode = ref.read(appStateProvider).cashDrawerMode;
+    final sessionSummaryCashDrawer = ref.read(appStateProvider).sessionSummaryCashDrawer;
+
+    final key = switch (paperSize) {
       PaperSize.mm58 => 'mm58',
       PaperSize.mm80 => 'mm80',
       PaperSize.mm100 => 'mm100'
@@ -169,8 +143,8 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     await p.setString('paper_size', key);
 
     final chars = int.tryParse(_charsCtrl.text.trim()) ??
-        EscPosHelper.defaultCharsPerLine(_paperSize);
-    final defaultChars = EscPosHelper.defaultCharsPerLine(_paperSize);
+        EscPosHelper.defaultCharsPerLine(paperSize);
+    final defaultChars = EscPosHelper.defaultCharsPerLine(paperSize);
     if (chars != defaultChars && chars > 0) {
       await p.setInt('chars_per_line', chars);
     } else {
@@ -181,16 +155,16 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     await p.setBool('auto_cut', _autoCut);
     EscPosHelper.setAutoCut(_autoCut);
 
-    final cashDrawerKey = switch (_cashDrawerMode) {
+    final cashDrawerKey = switch (cashDrawerMode) {
       CashDrawerMode.openAfterPrint => 'after',
       CashDrawerMode.openBeforePrint => 'before',
       CashDrawerMode.off => 'off',
     };
     await p.setString('cash_drawer_mode', cashDrawerKey);
-    EscPosHelper.setCashDrawerMode(_cashDrawerMode);
+    EscPosHelper.setCashDrawerMode(cashDrawerMode);
 
-    await p.setBool('session_summary_cash_drawer', _sessionSummaryCashDrawer);
-    EscPosHelper.setSessionSummaryCashDrawer(_sessionSummaryCashDrawer);
+    await p.setBool('session_summary_cash_drawer', sessionSummaryCashDrawer);
+    EscPosHelper.setSessionSummaryCashDrawer(sessionSummaryCashDrawer);
 
     await p.setInt('extra_feed', _extraFeed);
     EscPosHelper.setExtraFeed(_extraFeed);
@@ -212,7 +186,6 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     }
   }
 
-  // UI COMPONENTS
   Widget _buildSection(String label, {required Widget child, IconData? icon, Color? iconColor}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -236,10 +209,10 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: (iconColor ?? _primary).withValues(alpha: 0.1),
+                  color: (iconColor ?? Theme.of(context).colorScheme.primary).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, size: 18, color: iconColor ?? _primary),
+                child: Icon(icon, size: 18, color: iconColor ?? Theme.of(context).colorScheme.primary),
               ),
               const SizedBox(width: 10),
             ],
@@ -264,18 +237,19 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     required String label,
     required IconData icon,
   }) {
-    final isSelected = _cashDrawerMode == mode;
+    final cashDrawerMode = ref.watch(appStateProvider).cashDrawerMode;
+    final isSelected = cashDrawerMode == mode;
     return InkWell(
-      onTap: () => setState(() => _cashDrawerMode = mode),
+      onTap: () => ref.read(appStateProvider.notifier).setCashDrawerMode(mode),
       borderRadius: BorderRadius.circular(8),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? _primary : Colors.transparent,
+          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? _primary : Colors.grey.shade400,
+            color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey.shade400,
           ),
         ),
         child: Row(
@@ -304,19 +278,23 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     );
   }
 
-  // BUILD SCREEN
   @override
   Widget build(BuildContext context) {
+    final paperSize = ref.watch(appStateProvider.select((s) => s.paperSize));
+    final cashDrawerMode = ref.watch(appStateProvider.select((s) => s.cashDrawerMode));
+    final sessionSummaryCashDrawer = ref.watch(appStateProvider.select((s) => s.sessionSummaryCashDrawer));
+    final themeColor = Theme.of(context).colorScheme.primary;
+
     if (!_loaded) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
     }
-    final defaultChars = EscPosHelper.defaultCharsPerLine(_paperSize);
+    final defaultChars = EscPosHelper.defaultCharsPerLine(paperSize);
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FC),
       appBar: AppBar(
-        backgroundColor: _primary,
+        backgroundColor: themeColor,
         foregroundColor: Colors.white,
         title: Text(
           S.isEn ? 'Printer Settings' : 'Pengaturan Printer',
@@ -330,7 +308,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
           _buildSection(
             S.printerSize,
             icon: Icons.straighten_rounded,
-            iconColor: _primary,
+            iconColor: themeColor,
             child: SegmentedButton<PaperSize>(
               segments: const [
                 ButtonSegment(
@@ -346,11 +324,14 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                   label: Text('100mm', style: TextStyle(fontSize: 12)),
                 ),
               ],
-              selected: {_paperSize},
-              onSelectionChanged: _onPaperSizeChanged,
+              selected: {paperSize},
+              onSelectionChanged: (v) {
+                ref.read(appStateProvider.notifier).setPaperSize(v.first);
+                _charsCtrl.text = EscPosHelper.defaultCharsPerLine(v.first).toString();
+              },
               style: ButtonStyle(
                 backgroundColor: WidgetStateProperty.resolveWith((s) =>
-                    s.contains(WidgetState.selected) ? _primary : null),
+                    s.contains(WidgetState.selected) ? themeColor : null),
                 foregroundColor: WidgetStateProperty.resolveWith((s) =>
                     s.contains(WidgetState.selected) ? Colors.white : null),
               ),
@@ -391,8 +372,8 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                 const SizedBox(height: 8),
                 Text(
                   S.isEn
-                      ? 'Default for ${_paperSize.name}: $defaultChars chars'
-                      : 'Default untuk ${_paperSize.name}: $defaultChars kar',
+                      ? 'Default for ${paperSize.name}: $defaultChars chars'
+                      : 'Default untuk ${paperSize.name}: $defaultChars kar',
                   style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                 ),
               ],
@@ -412,7 +393,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
               ),
               Switch.adaptive(
                 value: _autoCut,
-                activeTrackColor: _primary,
+                activeTrackColor: themeColor,
                 thumbColor: WidgetStateProperty.resolveWith((s) =>
                     s.contains(WidgetState.selected) ? Colors.white : Colors.grey),
                 onChanged: (v) => setState(() => _autoCut = v),
@@ -435,16 +416,17 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                     ),
                   ),
                   Switch.adaptive(
-                    value: _cashDrawerMode != CashDrawerMode.off,
-                    activeTrackColor: _primary,
+                    value: cashDrawerMode != CashDrawerMode.off,
+                    activeTrackColor: themeColor,
                     thumbColor: WidgetStateProperty.resolveWith((s) =>
                         s.contains(WidgetState.selected) ? Colors.white : Colors.grey),
-                    onChanged: (v) => setState(() {
-                      _cashDrawerMode = v ? CashDrawerMode.openBeforePrint : CashDrawerMode.off;
-                    }),
+                    onChanged: (v) {
+                      ref.read(appStateProvider.notifier).setCashDrawerMode(
+                          v ? CashDrawerMode.openBeforePrint : CashDrawerMode.off);
+                    },
                   ),
                 ]),
-                if (_cashDrawerMode != CashDrawerMode.off) ...[
+                if (cashDrawerMode != CashDrawerMode.off) ...[
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -453,15 +435,16 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: InkWell(
-                      onTap: () => setState(() => _sessionSummaryCashDrawer = !_sessionSummaryCashDrawer),
+                      onTap: () => ref.read(appStateProvider.notifier)
+                          .setSessionSummaryCashDrawer(!sessionSummaryCashDrawer),
                       borderRadius: BorderRadius.circular(8),
                       child: Row(children: [
                         Icon(
-                          _sessionSummaryCashDrawer
+                          sessionSummaryCashDrawer
                               ? Icons.check_box_rounded
                               : Icons.check_box_outline_blank_rounded,
                           size: 20,
-                          color: _sessionSummaryCashDrawer ? Colors.purple.shade600 : Colors.grey.shade500,
+                          color: sessionSummaryCashDrawer ? Colors.purple.shade600 : Colors.grey.shade500,
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -469,8 +452,8 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                             S.cashDrawerOnSessionSummary,
                             style: TextStyle(
                               fontSize: 12,
-                              color: _sessionSummaryCashDrawer ? Colors.purple.shade700 : Colors.grey.shade600,
-                              fontWeight: _sessionSummaryCashDrawer ? FontWeight.w600 : FontWeight.w500,
+                              color: sessionSummaryCashDrawer ? Colors.purple.shade700 : Colors.grey.shade600,
+                              fontWeight: sessionSummaryCashDrawer ? FontWeight.w600 : FontWeight.w500,
                             ),
                           ),
                         ),
@@ -481,7 +464,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
-                      color: _primary.withValues(alpha: 0.08),
+                      color: themeColor.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Row(
@@ -519,9 +502,9 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                   Expanded(
                     child: SliderTheme(
                       data: SliderThemeData(
-                        activeTrackColor: _primary,
-                        thumbColor: _primary,
-                        inactiveTrackColor: _primary.withValues(alpha: 0.2),
+                        activeTrackColor: themeColor,
+                        thumbColor: themeColor,
+                        inactiveTrackColor: themeColor.withValues(alpha: 0.2),
                       ),
                       child: Slider(
                         value: _extraFeed.toDouble(),
@@ -537,7 +520,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: _primary.withValues(alpha: 0.1),
+                      color: themeColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -621,7 +604,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
               child: ElevatedButton(
                 onPressed: _save,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _primary,
+                  backgroundColor: themeColor,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
