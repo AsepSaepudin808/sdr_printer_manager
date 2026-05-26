@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import '../models/printer_device.dart';
+import '../utils/strings.dart';
 
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
@@ -87,9 +88,9 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
       appBar: AppBar(
         backgroundColor: primary,
         foregroundColor: Colors.white,
-        title: const Text(
-          'Pilih Printer',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+        title: Text(
+          S.selectPrinterTitle,
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
         ),
         elevation: 0,
         actions: [
@@ -123,7 +124,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Memuat perangkat...',
+                    S.loadingDevices,
                     style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
                   ),
                 ],
@@ -183,7 +184,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _btEnabled ? 'Bluetooth Aktif' : 'Bluetooth Nonaktif',
+                              _btEnabled ? S.bluetoothActive : S.bluetoothInactive,
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 16,
@@ -193,8 +194,16 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                             const SizedBox(height: 4),
                             Text(
                               _btEnabled
-                                  ? 'Menampilkan ${_pairedDevices.length} perangkat'
-                                  : 'Aktifkan Bluetooth di pengaturan Android',
+                                  ? S.withLang(
+                                      id: 'Menampilkan ${_pairedDevices.length} perangkat',
+                                      en: 'Showing ${_pairedDevices.length} devices',
+                                      ms: 'Menunjukkan ${_pairedDevices.length} peranti',
+                                    )
+                                  : S.withLang(
+                                      id: 'Aktifkan Bluetooth di pengaturan Android',
+                                      en: 'Enable Bluetooth in Android settings',
+                                      ms: 'Aktifkan Bluetooth di tetapan Android',
+                                    ),
                               style: const TextStyle(
                                 color: Colors.white70,
                                 fontSize: 12,
@@ -243,7 +252,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                           ),
                           const SizedBox(height: 20),
                           Text(
-                            'Tidak ada perangkat ditemukan',
+                            S.noDevicesFound,
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
@@ -254,7 +263,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 40),
                             child: Text(
-                              'Pastikan printer sudah di-pair dengan Bluetooth Android',
+                              S.ensurePrinterPaired,
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 13,
@@ -300,7 +309,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                           ),
                           const SizedBox(height: 20),
                           Text(
-                            'Bluetooth Nonaktif',
+                            S.bluetoothInactive,
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
@@ -311,7 +320,11 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 40),
                             child: Text(
-                              'Aktifkan Bluetooth di pengaturan Android untuk melihat printer',
+                              S.withLang(
+                                id: 'Aktifkan Bluetooth untuk melihat printer',
+                                en: 'Enable Bluetooth to see printers',
+                                ms: 'Aktifkan Bluetooth untuk melihat pencetak',
+                              ),
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 13,
@@ -430,20 +443,20 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
                     color: primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.bluetooth_rounded,
                         size: 14,
                         color: primary,
                       ),
-                      SizedBox(width: 4),
+                      const SizedBox(width: 4),
                       Text(
-                        'Paired',
-                        style: TextStyle(
+                        S.paired,
+                        style: const TextStyle(
                           fontSize: 11,
-                          color: primary,
+                          color: Color(0xFF2BBCC4),
                           fontWeight: FontWeight.w600,
                         ),
                       ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../utils/strings.dart';
 
 // LOG SCREEN
 class LogScreen extends StatelessWidget {
@@ -11,15 +12,15 @@ class LogScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Log Lengkap'),
+        title: Text(S.fullLog),
         actions: [
           IconButton(
             icon: const Icon(Icons.copy, color: Colors.white),
-            tooltip: 'Salin semua log',
+            tooltip: S.copyAllLogs,
             onPressed: () {
               Clipboard.setData(ClipboardData(text: logs.join('\n')));
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Log disalin!')),
+                SnackBar(content: Text(S.logsCopied)),
               );
             },
           ),

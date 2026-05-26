@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/splash_screen.dart';
+import 'utils/strings.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,7 +18,29 @@ void main() async {
   ));
 
   await SharedPreferences.getInstance();
-  runApp(const ProviderScope(child: SdrPrinterApp()));
+  await S.load();
+  runApp(
+    const ProviderScope(
+      child: InheritedLangWrapper(
+        child: SdrPrinterApp(),
+      ),
+    ),
+  );
+}
+
+/// Wrapper that rebuilds children when language changes
+class InheritedLangWrapper extends StatelessWidget {
+  final Widget child;
+  const InheritedLangWrapper({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: langProvider,
+      builder: (context, child) => child!,
+      child: child,
+    );
+  }
 }
 
 class SdrPrinterApp extends StatelessWidget {

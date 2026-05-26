@@ -289,7 +289,7 @@ class _MainShellState extends ConsumerState<MainShell> {
       return;
     }
     if (_serverRunning) {
-      _toast('Server sudah berjalan');
+      _toast(S.serverAlreadyRunning);
       return;
     }
     _appNotifier.setConnecting(true);
@@ -311,7 +311,7 @@ class _MainShellState extends ConsumerState<MainShell> {
       _addLog(S.serverReady);
       _toast(S.printerReady);
     } catch (e) {
-      _toast('Gagal mengaktifkan layanan: $e', err: true);
+      _toast('${S.serverStartFailed}: $e', err: true);
       _appNotifier.setServerRunning(false);
     }
   }
@@ -487,7 +487,7 @@ class _MainShellState extends ConsumerState<MainShell> {
               Row(children: [
                 const Icon(Icons.analytics_rounded, color: _primary, size: 22),
                 const SizedBox(width: 8),
-                Text(S.isEn ? 'Print Statistics' : 'Statistik Cetak',
+                Text(S.printStatistics,
                     style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
@@ -502,7 +502,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                 child: Row(children: [
                   Expanded(
                       child: _statItem(
-                          S.isEn ? 'Total Printed' : 'Total Dicetak',
+                          S.totalPrintedLabel,
                           '${_appState.printCount}',
                           Icons.receipt_long_rounded)),
                   Container(
@@ -510,19 +510,19 @@ class _MainShellState extends ConsumerState<MainShell> {
                       height: 40,
                       color: _primary.withValues(alpha: 0.2)),
                   Expanded(
-                      child: _statItem(S.isEn ? 'Paper' : 'Kertas', paperLabel,
+                      child: _statItem(S.paper, paperLabel,
                           Icons.description_rounded)),
                   Container(
                       width: 1,
                       height: 40,
                       color: _primary.withValues(alpha: 0.2)),
                   Expanded(
-                      child: _statItem(S.isEn ? 'Chars' : 'Karakter', '${w}kar',
+                      child: _statItem(S.chars, '${w}kar',
                           Icons.text_fields_rounded)),
                 ]),
               ),
               const SizedBox(height: 16),
-              Text(S.isEn ? 'Recent Print Activity' : 'Aktivitas Cetak Terbaru',
+              Text(S.recentPrintActivity,
                   style: const TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w700, color: _dark)),
               const SizedBox(height: 8),
@@ -587,7 +587,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     final titles = [
       S.home,
       S.freeText,
-      S.isEn ? 'Statistics' : 'Statistik',
+      S.statistics,
       S.printImage,
       S.printPdf
     ];
@@ -660,7 +660,7 @@ class _MainShellState extends ConsumerState<MainShell> {
             icon: const Icon(Icons.refresh_rounded,
                 color: Colors.white, size: 24),
             onPressed: () {
-              _toast('Refreshed');
+              _toast(S.refreshed);
             },
           ),
         ],
@@ -787,7 +787,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                       color: Colors.white70, size: 18),
                   const SizedBox(width: 8),
                   Text(
-                    appState.printer?.name ?? 'No Printer',
+                    appState.printer?.name ?? S.noPrinterSelected,
                     style: const TextStyle(color: Colors.white70, fontSize: 12),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -1225,9 +1225,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                         historyDateRange != null
                             ? '${historyDateRange.start.day}/${historyDateRange.start.month}/${historyDateRange.start.year}'
                                 ' — ${historyDateRange.end.day}/${historyDateRange.end.month}/${historyDateRange.end.year}'
-                            : S.isEn
-                                ? 'Filter by date'
-                                : 'Filter tanggal',
+                            : S.filterByDate,
                         style: TextStyle(
                           fontSize: 11,
                           color: historyDateRange != null
@@ -1516,9 +1514,9 @@ class _MainShellState extends ConsumerState<MainShell> {
                     const Icon(Icons.print_rounded, size: 48, color: _primary),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'dPrinter Mart',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+              Text(
+                S.appName,
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 4),
               Container(
@@ -1528,9 +1526,9 @@ class _MainShellState extends ConsumerState<MainShell> {
                   color: _primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Text(
-                  'Versi V1.0.2',
-                  style: TextStyle(
+                child: Text(
+                  '${S.versionLabel} V1.0.2',
+                  style: const TextStyle(
                       fontSize: 12,
                       color: _primary,
                       fontWeight: FontWeight.w600),
@@ -1558,12 +1556,12 @@ class _MainShellState extends ConsumerState<MainShell> {
                       Navigator.pop(context);
                       _showLicenseDialog(context);
                     },
-                    child: const Text('Lisensi',
-                        style: TextStyle(color: _primary)),
+                    child: Text(S.license,
+                        style: const TextStyle(color: _primary)),
                   ),
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: Text('Tutup',
+                    child: Text(S.close,
                         style: TextStyle(color: Colors.grey.shade600)),
                   ),
                 ],

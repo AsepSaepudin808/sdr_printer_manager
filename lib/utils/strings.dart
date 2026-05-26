@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // LANGUAGE MODEL
@@ -15,10 +16,33 @@ class SLanguage {
   String get displayLabel => '$nativeName ($code)';
 }
 
-// LOCALIZATION STRINGS
+// ─── REACTIVE LANGUAGE STATE ────────────────────────────────────────────────
+/// ChangeNotifier for reactive language switching.
+/// Use with ref.watch(langProvider) to trigger rebuild on language change.
+class LangNotifier extends ChangeNotifier {
+  @override
+  void notifyListeners() {
+    super.notifyListeners();
+    S._onLanguageChanged();
+  }
+}
+
+/// Provider for reactive language state
+final langProvider = LangNotifier();
+
+/// Hook to use langProvider in widgets without Provider scope
+/// Usage: LangNotifier.instance.addListener(...) or use langProvider directly with ref.watch()
+
+// ─── LOCALIZATION STRINGS ──────────────────────────────────────────────────
 class S {
   static String _langCode = 'id';
   static String get langCode => _langCode;
+
+  // Internal callback for language change notifications
+  static void Function()? _languageChangeCallback;
+  static void _onLanguageChanged() {
+    _languageChangeCallback?.call();
+  }
 
   static const List<SLanguage> languages = [
     SLanguage(code: 'id', name: 'Indonesian', nativeName: 'Indonesia'),
@@ -55,6 +79,8 @@ class S {
     await p.setString('language_code', code);
     // keep legacy key for compatibility with old app state
     await p.setString('language', _codeToLegacy(code));
+    // Trigger reactive rebuild
+    langProvider.notifyListeners();
   }
 
   static String _normalizeLang(String input) {
@@ -721,5 +747,210 @@ class S {
         id: 'Ringkasan',
         en: 'Overview',
         ms: 'Ringkasan',
+      );
+
+  // Hardcoded strings from screens
+  static String get serverAlreadyRunning => withLang(
+        id: 'Server sudah berjalan',
+        en: 'Server already running',
+        ms: 'Pelayan sudah berjalan',
+      );
+  static String get serverStartFailed => withLang(
+        id: 'Gagal mengaktifkan layanan',
+        en: 'Failed to activate service',
+        ms: 'Gagal mengaktifkan perkhidmatan',
+      );
+  static String get refreshed => withLang(
+        id: 'Disegarkan',
+        en: 'Refreshed',
+        ms: 'Disegarkan',
+      );
+  static String get noPrinterSelected => withLang(
+        id: 'Belum ada printer',
+        en: 'No printer',
+        ms: 'Tiada pencetak',
+      );
+  static String get versionLabel => withLang(
+        id: 'Versi',
+        en: 'Version',
+        ms: 'Versi',
+      );
+  static String get license => withLang(
+        id: 'Lisensi',
+        en: 'License',
+        ms: 'Lesen',
+      );
+  static String get close => withLang(
+        id: 'Tutup',
+        en: 'Close',
+        ms: 'Tutup',
+      );
+  static String get statistics => withLang(
+        id: 'Statistik',
+        en: 'Statistics',
+        ms: 'Statistik',
+        th: 'สถิติ',
+        zh: '统计',
+        ar: 'إحصائيات',
+      );
+  static String get totalPrintedLabel => withLang(
+        id: 'Total Dicetak',
+        en: 'Total Printed',
+        ms: 'Jumlah Dicetak',
+      );
+  static String get paper => withLang(
+        id: 'Kertas',
+        en: 'Paper',
+        ms: 'Kertas',
+      );
+  static String get chars => withLang(
+        id: 'Karakter',
+        en: 'Chars',
+        ms: 'Aksara',
+      );
+  static String get printStatistics => withLang(
+        id: 'Statistik Cetak',
+        en: 'Print Statistics',
+        ms: 'Statistik Cetak',
+      );
+  static String get recentPrintActivity => withLang(
+        id: 'Aktivitas Cetak Terbaru',
+        en: 'Recent Print Activity',
+        ms: 'Aktiviti Cetak Terbaru',
+      );
+  static String get filterByDate => withLang(
+        id: 'Filter tanggal',
+        en: 'Filter by date',
+        ms: 'Tapis tarikh',
+      );
+
+  // Scan screen
+  static String get selectPrinterTitle => withLang(
+        id: 'Pilih Printer',
+        en: 'Select Printer',
+        ms: 'Pilih Pencetak',
+      );
+  static String get loadingDevices => withLang(
+        id: 'Memuat perangkat...',
+        en: 'Loading devices...',
+        ms: 'Memuatkan peranti...',
+      );
+  static String get bluetoothActive => withLang(
+        id: 'Bluetooth Aktif',
+        en: 'Bluetooth Active',
+        ms: 'Bluetooth Aktif',
+      );
+  static String get bluetoothInactive => withLang(
+        id: 'Bluetooth Nonaktif',
+        en: 'Bluetooth Inactive',
+        ms: 'Bluetooth Tidak Aktif',
+      );
+  static String get showingDevices => withLang(
+        id: 'Menampilkan %d perangkat',
+        en: 'Showing %d devices',
+        ms: 'Menunjukkan %d peranti',
+      );
+  static String get noDevicesFound => withLang(
+        id: 'Tidak ada perangkat ditemukan',
+        en: 'No devices found',
+        ms: 'Tiada peranti dijumpai',
+      );
+  static String get ensurePrinterPaired => withLang(
+        id: 'Pastikan printer sudah di-pair dengan perangkat ini',
+        en: 'Make sure the printer is paired with this device',
+        ms: 'Pastikan pencetak sudah dipadankan dengan peranti ini',
+      );
+  static String get paired => withLang(
+        id: 'Tersambung',
+        en: 'Paired',
+        ms: 'Dipadankan',
+      );
+
+  // Log screen
+  static String get fullLog => withLang(
+        id: 'Log Lengkap',
+        en: 'Full Log',
+        ms: 'Log Penuh',
+      );
+  static String get copyAllLogs => withLang(
+        id: 'Salin semua log',
+        en: 'Copy all logs',
+        ms: 'Salin semua log',
+      );
+  static String get logsCopied => withLang(
+        id: 'Log disalin!',
+        en: 'Logs copied!',
+        ms: 'Log disalin!',
+      );
+
+  // Text tab
+  static String get typeTextFirst => withLang(
+        id: 'Ketik teks terlebih dahulu',
+        en: 'Type text first',
+        ms: 'Taip teks terlebih dahulu',
+      );
+  static String get alignLeft => withLang(
+        id: 'Rata Kiri',
+        en: 'Align Left',
+        ms: 'Rata kiri',
+      );
+  static String get center => withLang(
+        id: 'Rata Tengah',
+        en: 'Center',
+        ms: 'Tengah',
+      );
+  static String get right => withLang(
+        id: 'Rata Kanan',
+        en: 'Right',
+        ms: 'Kanan',
+      );
+  static String get justify => withLang(
+        id: 'Rata Kiri Kanan',
+        en: 'Justify',
+        ms: 'Kiri Kanan',
+      );
+  static String get bold => withLang(
+        id: 'Tebal',
+        en: 'Bold',
+        ms: 'Tebal',
+      );
+  static String get italic => withLang(
+        id: 'Miring',
+        en: 'Italic',
+        ms: 'Condong',
+      );
+  static String get deleteAll => withLang(
+        id: 'Hapus Semua?',
+        en: 'Delete All?',
+        ms: 'Padam Semua?',
+      );
+  static String get deleteAllConfirm => withLang(
+        id: 'Semua teks yang sudah diketik akan dihapus.',
+        en: 'All typed text will be deleted.',
+        ms: 'Semua teks yang diketik akan dipadam.',
+      );
+  static String get touchToEnterText => withLang(
+        id: 'Sentuh masukan text',
+        en: 'Tap to enter text',
+        ms: 'Sentuh masuk teks',
+      );
+
+  // Test print card
+  static String get shortReceiptPrint => withLang(
+        id: 'Struk Pendek',
+        en: 'Short Receipt',
+        ms: 'Resit Pendek',
+      );
+  static String get fullReceiptPrint => withLang(
+        id: 'Struk Lengkap',
+        en: 'Full Receipt',
+        ms: 'Resit Lengkap',
+      );
+
+  // Port card
+  static String get portLabel => withLang(
+        id: 'Port',
+        en: 'Port',
+        ms: 'Port',
       );
 }

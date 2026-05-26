@@ -65,7 +65,7 @@ class _TextTabState extends ConsumerState<TextTab>
 
   Future<void> _print() async {
     if (_textCtrl.text.isEmpty) {
-      _showSnackBar('Ketik teks terlebih dahulu', isError: true);
+      _showSnackBar(S.typeTextFirst, isError: true);
       return;
     }
 
@@ -342,27 +342,27 @@ class _TextTabState extends ConsumerState<TextTab>
                   _alignMode = 0;
                   if (_isTestPattern) _insertTestPattern();
                 });
-              }, 'Rata Kiri', themeColor),
+              }, S.alignLeft, themeColor),
               _formatBtn(Icons.format_align_center_rounded, _alignMode == 1,
                   () {
                 setState(() {
                   _alignMode = 1;
                   if (_isTestPattern) _insertTestPattern();
                 });
-              }, 'Rata Tengah', themeColor),
+              }, S.center, themeColor),
               _formatBtn(Icons.format_align_right_rounded, _alignMode == 2, () {
                 setState(() {
                   _alignMode = 2;
                   if (_isTestPattern) _insertTestPattern();
                 });
-              }, 'Rata Kanan', themeColor),
+              }, S.right, themeColor),
               _formatBtn(Icons.format_align_justify_rounded, _alignMode == 3,
                   () {
                 setState(() {
                   _alignMode = 3;
                   if (_isTestPattern) _insertTestPattern();
                 });
-              }, 'Rata Kiri Kanan', themeColor),
+              }, S.justify, themeColor),
               const SizedBox(width: 6),
               Container(width: 1.5, height: 22, color: Colors.grey.shade200),
               const SizedBox(width: 6),
@@ -370,13 +370,13 @@ class _TextTabState extends ConsumerState<TextTab>
                   Icons.format_bold_rounded,
                   _isBold,
                   () => setState(() => _isBold = !_isBold),
-                  'Tebal',
+                  S.bold,
                   themeColor),
               _formatBtn(
                   Icons.format_italic_rounded,
                   _isItalic,
                   () => setState(() => _isItalic = !_isItalic),
-                  'Miring',
+                  S.italic,
                   themeColor),
             ]),
           )),
@@ -450,7 +450,7 @@ class _TextTabState extends ConsumerState<TextTab>
                         borderRadius: BorderRadius.circular(10)),
                     child: const Icon(Icons.delete_sweep_rounded,
                         size: 20, color: Colors.red))),
-        ]),
+          ]),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -589,7 +589,7 @@ class _TextTabState extends ConsumerState<TextTab>
                           Positioned.fill(
                               child: IgnorePointer(
                                   child: Center(
-                                      child: Text('Sentuh masukan text',
+                                      child: Text(S.touchToEnterText,
                                           textAlign: TextAlign.center,
                                           style: TextStyle(
                                               color: Colors.grey.shade300,

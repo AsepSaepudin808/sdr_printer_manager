@@ -38,24 +38,24 @@ class TestPrintCard extends StatelessWidget {
         Row(children: [
           Expanded(
             child: _tpBtn(
-              S.shortReceipt,
+              S.shortReceiptPrint,
               Icons.receipt_rounded,
               AppColors.primary,
               isPrinting ? null : () => onTestPrint(
                 TestPrintTemplate.buildTestShort(paperSize),
-                'Struk pendek',
+                S.shortReceiptPrint,
               ),
             ),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: _tpBtn(
-              S.fullReceipt,
+              S.fullReceiptPrint,
               Icons.receipt_long_rounded,
               const Color(0xFF7B2FBE),
               isPrinting ? null : () => onTestPrint(
                 TestPrintTemplate.buildTestLong(paperSize),
-                'Struk lengkap',
+                S.fullReceiptPrint,
               ),
             ),
           ),

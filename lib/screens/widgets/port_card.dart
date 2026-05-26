@@ -36,7 +36,7 @@ class PortCard extends StatelessWidget {
               controller: portController,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                labelText: 'Port',
+                labelText: S.portLabel,
                 labelStyle: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 isDense: true,
