@@ -1514,7 +1514,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Text(
-                  'Versi V1.0.0.1',
+                  'Versi V1.0.2',
                   style: TextStyle(
                       fontSize: 12,
                       color: _primary,

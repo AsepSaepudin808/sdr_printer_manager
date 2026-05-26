@@ -446,7 +446,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 decoration: BoxDecoration(
                     color: themeColor.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(20)),
-                child: const Text('V1.0.0.1',
+                child: const Text('V1.0.2',
                     style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,

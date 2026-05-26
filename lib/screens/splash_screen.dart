@@ -113,7 +113,7 @@ class _SplashScreenState extends State<SplashScreen>
                       strokeWidth: 2.5, color: _primary),
                 ),
                 const SizedBox(height: 60),
-                const Text('V1.0.0.1',
+                const Text('V1.0.2',
                     style: TextStyle(fontSize: 12, color: Colors.grey)),
                 const SizedBox(height: 4),
                 const Text('Powered by dRetail',
