@@ -105,7 +105,8 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   img.Image _enhanceForThermal(img.Image source) {
     img.Image out = img.grayscale(source);
-    out = img.luminanceThreshold(out, threshold: AppConstants.defaultImageThreshold / 255.0);
+    out = img.luminanceThreshold(out,
+        threshold: AppConstants.defaultImageThreshold / 255.0);
     return out;
   }
 
@@ -611,10 +612,34 @@ class _MainShellState extends ConsumerState<MainShell> {
         backgroundColor: _primary,
         foregroundColor: Colors.white,
         title: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
+          duration: const Duration(milliseconds: 150),
+          transitionBuilder: (child, animation) {
+            return FadeTransition(
+              opacity: animation,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 0.3),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeOut,
+                )),
+                child: child,
+              ),
+            );
+          },
+          layoutBuilder: (currentChild, previousChildren) {
+            return Stack(
+              alignment: Alignment.centerLeft,
+              children: [
+                ...previousChildren,
+                if (currentChild != null) currentChild,
+              ],
+            );
+          },
           child: Text(
             titles[appState.tabIndex],
-            key: ValueKey(titles[appState.tabIndex]),
+            key: ValueKey(appState.tabIndex),
             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
           ),
         ),
@@ -641,12 +666,15 @@ class _MainShellState extends ConsumerState<MainShell> {
         ],
       ),
       drawer: _buildDrawer(appState, logs),
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        transitionBuilder: (child, animation) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-        child: _buildBody(appState, isKeyboardVisible),
+      body: IndexedStack(
+        index: appState.tabIndex,
+        children: [
+          _buildHomeTab(appState),
+          TextTab(isKeyboardVisible: isKeyboardVisible),
+          _buildStatsTab(appState),
+          const ImageTab(),
+          const PdfTab(),
+        ],
       ),
       bottomNavigationBar: isKeyboardVisible ? null : _buildBottomBar(appState),
     );
@@ -834,23 +862,6 @@ class _MainShellState extends ConsumerState<MainShell> {
     );
   }
 
-  Widget _buildBody(AppState appState, bool isKeyboardVisible) {
-    switch (appState.tabIndex) {
-      case 0:
-        return _buildHomeTab(appState);
-      case 1:
-        return TextTab(isKeyboardVisible: isKeyboardVisible);
-      case 2:
-        return _buildStatsTab(appState);
-      case 3:
-        return const ImageTab();
-      case 4:
-        return const PdfTab();
-      default:
-        return _buildHomeTab(appState);
-    }
-  }
-
   Widget _buildBottomBar(AppState appState) {
     // Dari docs curved_navigation_bar:
     //   backgroundColor = warna body di belakang lengkungan (harus = Scaffold backgroundColor)
@@ -864,8 +875,8 @@ class _MainShellState extends ConsumerState<MainShell> {
         color: Colors.white,
         buttonBackgroundColor: _primary,
         height: 75,
-        animationDuration: const Duration(milliseconds: 350),
-        animationCurve: Curves.easeOutCubic,
+        animationDuration: const Duration(milliseconds: 180),
+        animationCurve: Curves.easeOut,
         index: appState.tabIndex,
         items: [
           _buildNavItem(Icons.home_rounded, appState.tabIndex == 0, 'Home'),
@@ -1430,7 +1441,10 @@ class _MainShellState extends ConsumerState<MainShell> {
         const SizedBox(height: 14),
         LogCard(
           logs: ref.watch(logsProvider),
-          onViewAll: () => Navigator.push(context, MaterialPageRoute(builder: (_) => LogScreen(logs: ref.read(logsProvider)))),
+          onViewAll: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => LogScreen(logs: ref.read(logsProvider)))),
         ),
         const SizedBox(height: 14),
         AutoStartCard(
@@ -1466,7 +1480,8 @@ class _MainShellState extends ConsumerState<MainShell> {
       decoration: BoxDecoration(
         color: (ok ? _success : _danger).withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: (ok ? _success : _danger).withValues(alpha: 0.3)),
+        border:
+            Border.all(color: (ok ? _success : _danger).withValues(alpha: 0.3)),
       ),
       child: Text(appState.printStatus,
           style: TextStyle(
