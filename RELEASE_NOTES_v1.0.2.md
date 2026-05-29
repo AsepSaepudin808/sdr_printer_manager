@@ -1,67 +1,112 @@
-🚀 RELEASE NOTES: dPrinter Mart v1.0.2 (25 Mei 2026)
+🚀 RELEASE NOTES: dPrinter Mart v1.0.2 (26 Mei 2026)
 
 ---
 
-## 📌 Apa yang Baru di v1.0.2
-
-### 🆕 Fitur Baru
-
-#### 1. Antrian Cetak (Print Queue)
-Cetak tidak berhasil karena printer mati atau terputus? Sekarang tidak perlu khawatir!
-- Job cetak yang gagal akan otomatis masuk antrian
-- Saat koneksi kembali, job akan dicetak otomatis
-- Jika tetap gagal setelah 3x percobaan, baru akan ditandai gagal
-- Jumlah antrian terlihat di dashboard
-
-#### 2. Cash Drawer Support
-- Buka laci kasir otomatis sebelum atau sesudah cetak
-- Cocok untuk alur kasir yang butuh laci terbuka saat pembayaran
-
-#### 3. Unit Tests
-- 43 tes otomatis untuk memastikan fungsi cetak bekerja dengan benar
-- Setiap perubahan kode baru akan diuji sebelum dirilis
+⚙️ *---- Application Profile ----*
+*Spesifikasi Teknis Aplikasi:*
+• *Nama Aplikasi:* dPrinter Mart (id.dretail.sdr_printer_manager)
+• *Versi Aplikasi:* v1.0.2 (Version Code: 13)
+• *Framework:* Flutter (Android Native Service)
 
 ---
 
-## 🔧 Perbaikan & Peningkatan
-
-### Upgrade ke Riverpod State Management
-- Struktur project lebih rapi dan mudah dikembangkan
-- Aplikasi lebih stabil dengan error handling yang lebih baik
-- Responsif saat switching antar tab dan lebih efisien dalam penggunaan memori
-- Konsistensi data antar fitur lebih terjamin
-
-### Perbaikan Bluetooth
-- Koneksi printer lebih stabil dengan sistem retry otomatis hingga 3x
-- Pesan error lebih jelas jika koneksi gagal
-- Timeout lebih optimal untuk berbagai kondisi jaringan
-
-### Cleanup & Refactoring
-- File yang tidak terpakai sudah dihapus
-- Kode dipisah-pisah agar tidak campur aduk
-- 8 komponen widget reusable baru untuk modularitas
+📄 *---- Overview Product ----*
+*Tentang dPrinter Mart:*
+Aplikasi Android berbasis Flutter yang berfungsi sebagai Local Print Server mandiri. Aplikasi ini dirancang khusus sebagai middleware untuk menjembatani dRetail Mart dengan Printer Thermal Bluetooth secara langsung, menghilangkan ketergantungan pada hardware tambahan seperti IoT Box.
 
 ---
 
-## 📝 Catatan Upgrade
+## 🔄 *Perubahan & Peningkatan Utama*
 
-**Untuk upgrade dari v1.0.1:**
-- Pastikan printer Bluetooth sudah ter-pair dengan perangkat
-- Port default masih 8080 (bisa diubah di pengaturan)
-- Antrian cetak tidak otomatis migrasi dari versi lama
+### ⚡ 1. Performa Tab Switching - Instant Navigation
+*Masalah:* Perpindahan antar tab terasa lambat dan judul tab bertumpuk saat switching cepat.
+*Solusi:* Mengganti `AnimatedSwitcher` dengan `IndexedStack` untuk caching tab content.
+*Hasil:* Tab switching sekarang instant tanpa delay atau animasi fade.
 
-**Tips:**
-- Aktifkan Auto-Start agar server langsung aktif saat buka aplikasi
-- Gunakan Test Print untuk cek koneksi sebelum digunakan
+### 🌐 2. Multi-Language System - Reactive Localization
+*Masalah:*
+- 40+ string hardcoded di berbagai file (tidak bisa diterjemahkan)
+- Sistem `S.isEn ? 'English' : 'Indonesia'` tidak scale ke bahasa lain (ms, th, zh, ar)
+- Perpindahan bahasa memerlukan restart aplikasi
+
+*Solusi:*
+- Centralized semua string ke `strings.dart`
+- Membuat `LangNotifier extends ChangeNotifier` untuk reactive rebuild
+- `ListenableBuilder` wrapper di root app
+
+*Hasil:* UI berubah secara real-time saat bahasa dipilih, tanpa restart aplikasi.
+
+### 🛠️ 3. Refactoring & Code Quality
+*Yang dilakukan:*
+- Upgrade state management ke Riverpod
+- Ekstrak 8 reusable widget components
+- Hapus file unused
+- Standarisasi naming conventions
+
+*Hasil:* Project lebih maintainable dan mudah dikembangkan.
 
 ---
 
-## 📥 Download
+## 🆕 *Fitur Baru*
 
-APK dPrinter Mart v1.0.2:
+### 💰 1. Cash Drawer Integration
+Fitur buka laci kasir otomatis untuk alur kasir modern.
+
+*Konfigurasi:*
+- *Off:* Cash drawer tidak aktif
+- *Open Before Print:* Laci terbuka sebelum proses cetak
+- *Open After Print:* Laci terbuka setelah proses cetak selesai
+
+*Opsi Tambahan:*
+- Trigger laci pada Session Summary Report
+
+### 📊 2. Filter Tanggal di Statistik
+Filter riwayat cetak berdasarkan rentang tanggal tertentu untuk analisis yang lebih granular.
+
+### 🎨 3. Tab Alignment Text Enhancements
+Toolbar format teks dengan 4 mode alignment:
+- Rata Kiri
+- Rata Tengah
+- Rata Kanan
+- Rata Kiri Kanan (Justify)
+
+---
+
+## 🐛 *Perbaikan Bug*
+
+### Bluetooth
+- Sistem retry otomatis hingga 3x attempt saat koneksi terputus
+- Pesan error lebih informatif
+- Timeout handling lebih optimal
+
+### UI/UX
+- Smooth scroll physics di berbagai list
+- Consistent spacing dan padding
+- Loading states yang lebih jelas
+
+---
+
+## 📝 *Daftar File yang Diubah*
+
+| File | Perubahan |
+|------|----------|
+| `lib/main.dart` | ListenableBuilder wrapper, S.load() initialization |
+| `lib/utils/strings.dart` | 40+ string baru, LangNotifier class |
+| `lib/screens/main_shell.dart` | IndexedStack, S.strings replacement |
+| `lib/screens/scan_screen.dart` | S.strings replacement |
+| `lib/screens/log_screen.dart` | S.strings replacement |
+| `lib/screens/text_tab.dart` | S.strings replacement, alignment toolbar |
+| `lib/screens/widgets/test_print_card.dart` | S.strings replacement |
+| `lib/screens/widgets/port_card.dart` | S.strings replacement |
+
+---
+
+## 📥 *Download & Dokumentasi*
+
+*Link Download APK dPrinter Mart V1.0.2:*
 https://drive.google.com/drive/folders/1pOkfdMvTN6aLepIp5EtWG5cM5sGkgwWt
 
-Panduan & Dokumentasi:
+*Dokumentasi & Panduan Quick Start Guide:*
 https://drive.google.com/drive/folders/1B55JHtoyIgKmt9SwJa-eMoLblGfqt0ay
 
 ---
