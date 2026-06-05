@@ -1,25 +1,59 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Bluetooth -->
+    <!-- ========================================== -->
+    <!-- BLUETOOTH PERMISSIONS                     -->
+    <!-- ========================================== -->
+
+    <!-- Bluetooth Classic (Android 5.0+) -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+
+    <!-- Bluetooth Connect/Scan (Android 12+ / API 31+) -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
 
-    <!-- Network -->
+    <!-- Nearby Devices (Android 13+ / API 33+) -->
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
+        android:usesPermissionFlags="neverForLocation" />
+
+    <!-- ========================================== -->
+    <!-- LOCATION PERMISSIONS                      -->
+    <!-- Wajib untuk scan Bluetooth di Android  -->
+    <!-- ========================================== -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- ========================================== -->
+    <!-- NETWORK PERMISSIONS                      -->
+    <!-- ========================================== -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
-    <!-- Location (wajib untuk scan Bluetooth di Android) -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- ========================================== -->
+    <!-- FOREGROUND SERVICE PERMISSIONS           -->
+    <!-- Menjaga app aktif di background -->
+    <!-- ========================================== -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <!-- Notifications (Android 13+ / API 33+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- ========================================== -->
+    <!-- BLUETOOTH FEATURE DECLARATION            -->
+    <!-- ========================================== -->
+    <uses-feature android:name="android.hardware.bluetooth" android:required="true" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
 
     <application
         android:label="dPrinter Mart"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:enableOnBackInvokedCallback="true">
+        android:enableOnBackInvokedCallback="true"
+        android:usesCleartextTraffic="true">
 
         <activity
             android:name=".MainActivity"
@@ -56,5 +90,11 @@
                 android:name="android.printservice"
                 android:resource="@xml/sdr_print_service_config" />
         </service>
+
+        <!-- Foreground Service untuk menjaga HTTP server tetap aktif -->
+        <service
+            android:name=".SdrForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
     </application>
 </manifest>

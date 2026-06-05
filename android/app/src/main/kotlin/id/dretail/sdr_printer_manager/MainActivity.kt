@@ -14,7 +14,8 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private val SETTINGS_CHANNEL = "id.dretail.sdr_printer_manager/settings"
     private val PRINT_JOB_CHANNEL = "id.dretail.sdr_printer_manager/print_job"
-    
+    private val SERVICE_CHANNEL = "id.dretail.sdr_printer_manager/foreground_service"
+
     private var pendingPrintJobPath: String? = null
     private var pendingPrintJobName: String? = null
     private var printJobMethodChannel: MethodChannel? = null
@@ -24,13 +25,13 @@ class MainActivity : FlutterActivity() {
             if (intent.action == "id.dretail.sdr_printer_manager.NEW_PRINT_JOB") {
                 val filePath = intent.getStringExtra("PRINT_JOB_FILE_PATH")
                 val jobName = intent.getStringExtra("PRINT_JOB_NAME")
-                
+
                 if (filePath != null) {
                     val jobData = mapOf(
                         "path" to filePath,
                         "name" to jobName
                     )
-                    
+
                     if (printJobMethodChannel != null) {
                         printJobMethodChannel?.invokeMethod("onNewPrintJob", jobData)
                     } else {
@@ -44,7 +45,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         val filter = IntentFilter("id.dretail.sdr_printer_manager.NEW_PRINT_JOB")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(printJobReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -64,7 +65,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SETTINGS_CHANNEL).setMethodCallHandler { call, result ->
             if (call.method == "openPrintSettings") {
                 try {
@@ -76,6 +77,38 @@ class MainActivity : FlutterActivity() {
                 }
             } else {
                 result.notImplemented()
+            }
+        }
+
+        // Foreground Service control
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SERVICE_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "startService" -> {
+                    try {
+                        SdrForegroundService.start(this)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("ERROR", "Failed to start foreground service", null)
+                    }
+                }
+                "stopService" -> {
+                    try {
+                        SdrForegroundService.stop(this)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("ERROR", "Failed to stop foreground service", null)
+                    }
+                }
+                "openBatteryOptimization" -> {
+                    try {
+                        val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                        startActivity(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("UNAVAILABLE", "Could not open battery settings", null)
+                    }
+                }
+                else -> result.notImplemented()
             }
         }
 

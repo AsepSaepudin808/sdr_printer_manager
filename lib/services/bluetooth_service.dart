@@ -12,14 +12,18 @@ enum BluetoothConnectionState {
 }
 
 /// Bluetooth service dengan error handling dan retry mechanism
+/// Dioptimasi untuk stabilitas di semua device Android (Xiaomi, Samsung, dll)
 class SdrBluetoothService {
   BluetoothConnectionState _state = BluetoothConnectionState.disconnected;
   String? _lastAddress;
   String? _lastError;
   DateTime? _lastConnectedAt;
 
-  static const int _maxRetryAttempts = 3;
-  static const Duration _retryDelay = Duration(milliseconds: 500);
+  // Retry configuration - dioptimasi untuk stability
+  static const int _maxRetryAttempts = 5;
+  static const Duration _baseRetryDelay = Duration(milliseconds: 800);
+  static const Duration _connectionTimeout = Duration(seconds: 15);
+  static const Duration _writeTimeout = Duration(seconds: 30);
 
   BluetoothConnectionState get state => _state;
   bool get isConnected => _state == BluetoothConnectionState.connected;
@@ -49,7 +53,8 @@ class SdrBluetoothService {
     }
   }
 
-  /// Connect to printer with retry mechanism
+  /// Connect to printer with robust retry mechanism
+  /// Menggunakan exponential backoff untuk retry yang lebih stabil
   Future<bool> connect(String address) async {
     _state = BluetoothConnectionState.connecting;
     _lastError = null;
@@ -61,15 +66,16 @@ class SdrBluetoothService {
         // Disconnect first if already connected
         if (_state == BluetoothConnectionState.connected) {
           await disconnect();
-          await Future.delayed(const Duration(milliseconds: 200));
+          await Future.delayed(const Duration(milliseconds: 300));
         }
 
+        // Try to connect with timeout
         final result = await PrintBluetoothThermal.connect(
           macPrinterAddress: address,
         ).timeout(
-          const Duration(seconds: 10),
+          _connectionTimeout,
           onTimeout: () {
-            debugPrint('[SDR-BT] Connect timeout');
+            debugPrint('[SDR-BT] Connect attempt $attempt timeout');
             return false;
           },
         );
@@ -78,19 +84,22 @@ class SdrBluetoothService {
           _state = BluetoothConnectionState.connected;
           _lastAddress = address;
           _lastConnectedAt = DateTime.now();
-          debugPrint('[SDR-BT] Connected successfully to $address');
+          debugPrint('[SDR-BT] Connected successfully to $address on attempt $attempt');
           return true;
         }
 
+        // Calculate delay with exponential backoff
         if (attempt < _maxRetryAttempts) {
-          debugPrint('[SDR-BT] Attempt $attempt failed, retrying...');
-          await Future.delayed(_retryDelay * attempt);
+          final delay = _baseRetryDelay * attempt;
+          debugPrint('[SDR-BT] Attempt $attempt failed, retrying in ${delay.inMilliseconds}ms...');
+          await Future.delayed(delay);
         }
       } catch (e) {
         _lastError = e.toString();
         debugPrint('[SDR-BT] Connect attempt $attempt exception: $e');
         if (attempt < _maxRetryAttempts) {
-          await Future.delayed(_retryDelay * attempt);
+          final delay = _baseRetryDelay * attempt;
+          await Future.delayed(delay);
         }
       }
     }
@@ -118,13 +127,13 @@ class SdrBluetoothService {
       _state = status ? BluetoothConnectionState.connected : BluetoothConnectionState.disconnected;
       return status;
     } catch (e) {
-      debugPrint('[SDR-BT-j] checkConnection error: $e');
+      debugPrint('[SDR-BT] checkConnection error: $e');
       _state = BluetoothConnectionState.error;
       return false;
     }
   }
 
-  /// Send raw bytes to printer with auto-reconnect
+  /// Send raw bytes to printer with auto-reconnect and retry
   Future<bool> sendRaw(Uint8List data) async {
     // First check connection status
     await checkConnection();
@@ -144,35 +153,43 @@ class SdrBluetoothService {
       return false;
     }
 
-    try {
-      final List<int> bytes = data.toList();
-      debugPrint('[SDR-BT] Sending ${bytes.length} bytes...');
+    // Retry sending data if it fails
+    for (int attempt = 1; attempt <= 3; attempt++) {
+      try {
+        final List<int> bytes = data.toList();
+        debugPrint('[SDR-BT] Sending ${bytes.length} bytes (attempt $attempt/3)...');
 
-      // Small delay before sending
-      await Future.delayed(const Duration(milliseconds: AppConstants.reconnectDelayMs));
+        // Small delay before sending
+        await Future.delayed(const Duration(milliseconds: AppConstants.reconnectDelayMs));
 
-      bool ok = await PrintBluetoothThermal.writeBytes(bytes).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          debugPrint('[SDR-BT] writeBytes timeout');
-          return false;
-        },
-      );
+        bool ok = await PrintBluetoothThermal.writeBytes(bytes).timeout(
+          _writeTimeout,
+          onTimeout: () {
+            debugPrint('[SDR-BT] writeBytes timeout on attempt $attempt');
+            return false;
+          },
+        );
 
-      if (!ok) {
-        debugPrint('[SDR-BT] FAILED to send data');
-        _state = BluetoothConnectionState.error;
-        return false;
+        if (ok) {
+          debugPrint('[SDR-BT] All ${bytes.length} bytes sent successfully');
+          return true;
+        }
+
+        debugPrint('[SDR-BT] FAILED to send data on attempt $attempt');
+        if (attempt < 3) {
+          await Future.delayed(Duration(milliseconds: 200 * attempt));
+        }
+      } catch (e) {
+        debugPrint('[SDR-BT] sendRaw exception on attempt $attempt: $e');
+        if (attempt < 3) {
+          await Future.delayed(Duration(milliseconds: 200 * attempt));
+        }
       }
-
-      debugPrint('[SDR-BT] All ${bytes.length} bytes sent successfully');
-      return true;
-    } catch (e) {
-      debugPrint('[SDR-BT] sendRaw exception: $e');
-      _lastError = e.toString();
-      _state = BluetoothConnectionState.error;
-      return false;
     }
+
+    _state = BluetoothConnectionState.error;
+    debugPrint('[SDR-BT] Failed to send data after 3 attempts');
+    return false;
   }
 
   /// Send text to printer

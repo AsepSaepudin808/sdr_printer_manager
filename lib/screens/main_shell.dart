@@ -14,6 +14,7 @@ import '../providers/server_provider.dart';
 import '../providers/history_provider.dart';
 import '../services/print_server_service.dart';
 import '../services/bluetooth_service.dart';
+import '../services/foreground_service_helper.dart';
 import '../models/printer_device.dart';
 import '../models/print_history.dart';
 import '../utils/escpos_helper.dart';
@@ -271,12 +272,20 @@ class _MainShellState extends ConsumerState<MainShell> {
   }
 
   Future<void> _requestPerms() async {
-    await [
+    // Request permissions based on Android version
+    final permissions = <Permission>[
       Permission.bluetooth,
       Permission.bluetoothConnect,
       Permission.bluetoothScan,
-      Permission.locationWhenInUse
-    ].request();
+      Permission.locationWhenInUse,
+      Permission.notification, // For foreground service notification
+    ];
+
+    // Android 13+ requires NEARBY_WIFI_DEVICES for Bluetooth device discovery
+    // This permission is handled by permission_handler automatically
+    // No need to add manually as it's covered by bluetoothScan
+
+    await permissions.request();
   }
 
   void _addLog(String m) {
@@ -292,6 +301,10 @@ class _MainShellState extends ConsumerState<MainShell> {
       _toast(S.serverAlreadyRunning);
       return;
     }
+
+    // ✅ Start foreground service untuk menjaga app tetap aktif
+    await ForegroundServiceHelper.start();
+
     _appNotifier.setConnecting(true);
     final ok = await _bt.connect(_printer!.address);
     _appNotifier.setConnecting(false);
@@ -322,6 +335,8 @@ class _MainShellState extends ConsumerState<MainShell> {
     _appNotifier.setServerRunning(false);
     _appNotifier.setBtConnected(false);
     _addLog(S.printerStopped);
+    // ✅ Stop foreground service saat server dihentikan
+    await ForegroundServiceHelper.stop();
   }
 
   void _toast(String m, {bool err = false}) {

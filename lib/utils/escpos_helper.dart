@@ -509,9 +509,10 @@ class EscPosHelper {
       final discountType = m['discount_type'] as String? ?? '%';
       final customerNote = m['customer_note'] as String? ?? '';
 
-      final w = charsPerLine(size);
-      final nameLines = _wordWrap(name, w);
+      // ✅ FIX: Always reset alignment to LEFT before printing product name
+      b.addAll(align(0));
       b.addAll(bold(true));
+      final nameLines = _wordWrap(name, w);
       for (final nl in nameLines) {
         b.addAll(txt(nl));
       }
