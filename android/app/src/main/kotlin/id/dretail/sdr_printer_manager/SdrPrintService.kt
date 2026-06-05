@@ -71,7 +71,7 @@ class SdrPrintService : PrintService() {
             printJob.start()
             
             val document = printJob.document
-            val fileDescriptor: ParcelFileDescriptor? = document?.data
+            val fileDescriptor: ParcelFileDescriptor? = document.data
 
             if (fileDescriptor != null) {
                 val tempFile = File(cacheDir, "print_job_${System.currentTimeMillis()}.pdf")
