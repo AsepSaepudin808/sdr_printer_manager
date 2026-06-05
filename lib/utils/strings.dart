@@ -953,4 +953,96 @@ class S {
         en: 'Port',
         ms: 'Port',
       );
+
+  // Onboarding Permissions
+  static String get backgroundPermissionTitle => withLang(
+        id: 'Izinkan Mulai Otomatis di Latar Belakang',
+        en: 'Allow Auto-Start in Background',
+        ms: 'Benarkan Mula Automatik di Latar Belakang',
+      );
+  static String get backgroundPermissionDesc => withLang(
+        id: 'Agar printer tetap aktif saat aplikasi di-minimize, aktifkan "Mulai otomatis di latar belakang" di pengaturan aplikasi.',
+        en: 'To keep the printer active when the app is minimized, enable "Auto-start in background" in app settings.',
+        ms: 'Untuk memastikan pencetak kekal aktif apabila aplikasi di-minimize, aktifkan "Mula automatik di latar belakang" dalam tetapan aplikasi.',
+      );
+  static String get backgroundPermissionBtn => withLang(
+        id: 'Buka Pengaturan Aplikasi',
+        en: 'Open App Settings',
+        ms: 'Buka Tetapan Aplikasi',
+      );
+  static String get backgroundActive => withLang(
+        id: 'Mulai otomatis aktif',
+        en: 'Auto-start active',
+        ms: 'Mula automatik aktif',
+      );
+  static String get backgroundNotActive => withLang(
+        id: 'Mulai otomatis belum aktif',
+        en: 'Auto-start not active',
+        ms: 'Mula automatik belum aktif',
+      );
+  static String get permissionOnboardingTitle => withLang(
+        id: 'Izin yang Diperlukan',
+        en: 'Required Permissions',
+        ms: 'Kebenaran yang Diperlukan',
+      );
+  static String get permissionBluetooth => withLang(
+        id: 'Bluetooth',
+        en: 'Bluetooth',
+        ms: 'Bluetooth',
+      );
+  static String get permissionBluetoothDesc => withLang(
+        id: 'Untuk menghubungkan printer thermal via Bluetooth',
+        en: 'To connect thermal printer via Bluetooth',
+        ms: 'Untuk menyambung pencetak terma melalui Bluetooth',
+      );
+  static String get permissionLocation => withLang(
+        id: 'Lokasi',
+        en: 'Location',
+        ms: 'Lokasi',
+      );
+  static String get permissionLocationDesc => withLang(
+        id: 'Diperlukan untuk scan perangkat Bluetooth (Android 5+)',
+        en: 'Required to scan Bluetooth devices (Android 5+)',
+        ms: 'Diperlukan untuk mengimbas peranti Bluetooth (Android 5+)',
+      );
+  static String get permissionNotification => withLang(
+        id: 'Notifikasi',
+        en: 'Notifications',
+        ms: 'Notifikasi',
+      );
+  static String get permissionNotificationDesc => withLang(
+        id: 'Untuk menampilkan status printer dan print job',
+        en: 'To show printer status and print job notifications',
+        ms: 'Untuk memaparkan status pencetak dan notifikasi cetakan',
+      );
+  static String get permissionBackground => withLang(
+        id: 'Latar Belakang',
+        en: 'Background',
+        ms: 'Latar Belakang',
+      );
+  static String get permissionBackgroundDesc => withLang(
+        id: 'Agar printer tetap aktif saat app di-minimize',
+        en: 'To keep printer active when app is minimized',
+        ms: 'Untuk memastikan pencetak kekal aktif apabila aplikasi diminimize',
+      );
+  static String get permissionGrantAll => withLang(
+        id: 'Izinkan Semua',
+        en: 'Grant All',
+        ms: 'Benarkan Semua',
+      );
+  static String get permissionSkip => withLang(
+        id: 'Lewati',
+        en: 'Skip',
+        ms: 'Lewati',
+      );
+  static String get permissionGranted => withLang(
+        id: 'Izin diberikan',
+        en: 'Permission granted',
+        ms: 'Kebenaran diberikan',
+      );
+  static String get permissionDenied => withLang(
+        id: 'Izin belum diberikan',
+        en: 'Permission not granted',
+        ms: 'Kebenaran belum diberikan',
+      );
 }

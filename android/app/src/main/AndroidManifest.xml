@@ -1,56 +1,68 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- ========================================== -->
-    <!-- BLUETOOTH PERMISSIONS                     -->
-    <!-- ========================================== -->
-
-    <!-- Bluetooth Classic (Android 5.0+) -->
-    <uses-permission android:name="android.permission.BLUETOOTH" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-
-    <!-- Bluetooth Connect/Scan (Android 12+ / API 31+) -->
+    <!-- ════════════════════════════════════════════════════════════
+         BLUETOOTH PERMISSIONS
+         - BLUETOOTH + BLUETOOTH_ADMIN : legacy, hanya Android ≤ 11 (API ≤ 30)
+         - BLUETOOTH_SCAN + BLUETOOTH_CONNECT : runtime, Android 12+ (API 31+)
+         - neverForLocation + tools:targetApi="s" sesuai rekomendasi resmi Android
+         ════════════════════════════════════════════════════════════ -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="s" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
 
-    <!-- Nearby Devices (Android 13+ / API 33+) -->
-    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
-        android:usesPermissionFlags="neverForLocation" />
+    <!-- ════════════════════════════════════════════════════════════
+         LOCATION PERMISSIONS
+         - ACCESS_FINE_LOCATION wajib untuk scan Bluetooth di Android 5–11
+         - Di Android 12+ tidak diperlukan jika BLUETOOTH_SCAN pakai neverForLocation
+         - maxSdkVersion="30" agar tidak diminta di Android 12+
+         ════════════════════════════════════════════════════════════ -->
+    <uses-permission
+        android:name="android.permission.ACCESS_FINE_LOCATION"
+        android:maxSdkVersion="30" />
+    <uses-permission
+        android:name="android.permission.ACCESS_COARSE_LOCATION"
+        android:maxSdkVersion="30" />
 
-    <!-- ========================================== -->
-    <!-- LOCATION PERMISSIONS                      -->
-    <!-- Wajib untuk scan Bluetooth di Android  -->
-    <!-- ========================================== -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-
-    <!-- ========================================== -->
-    <!-- NETWORK PERMISSIONS                      -->
-    <!-- ========================================== -->
+    <!-- ════════════════════════════════════════════════════════════
+         NETWORK PERMISSIONS (install-time, tidak perlu runtime request)
+         ════════════════════════════════════════════════════════════ -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
-    <!-- ========================================== -->
-    <!-- FOREGROUND SERVICE PERMISSIONS           -->
-    <!-- Menjaga app aktif di background -->
-    <!-- ========================================== -->
+    <!-- ════════════════════════════════════════════════════════════
+         FOREGROUND SERVICE PERMISSIONS
+         ════════════════════════════════════════════════════════════ -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
-    <!-- Notifications (Android 13+ / API 33+) -->
+    <!-- Notifikasi runtime (Android 13+ / API 33+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- ========================================== -->
-    <!-- BLUETOOTH FEATURE DECLARATION            -->
-    <!-- ========================================== -->
-    <uses-feature android:name="android.hardware.bluetooth" android:required="true" />
-    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+    <!-- ════════════════════════════════════════════════════════════
+         BLUETOOTH FEATURE DECLARATION
+         ════════════════════════════════════════════════════════════ -->
+    <uses-feature
+        android:name="android.hardware.bluetooth"
+        android:required="true" />
+    <uses-feature
+        android:name="android.hardware.bluetooth_le"
+        android:required="false" />
 
     <application
-        android:label="dPrinter Mart"
         android:name="${applicationName}"
+        android:label="dPrinter Mart"
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true"
         android:usesCleartextTraffic="true">
@@ -91,10 +103,10 @@
                 android:resource="@xml/sdr_print_service_config" />
         </service>
 
-        <!-- Foreground Service untuk menjaga HTTP server tetap aktif -->
         <service
             android:name=".SdrForegroundService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
+
     </application>
 </manifest>

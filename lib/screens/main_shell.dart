@@ -36,6 +36,8 @@ import 'widgets/port_card.dart';
 import 'widgets/test_print_card.dart';
 import 'widgets/log_card.dart';
 import 'widgets/auto_start_card.dart';
+import 'widgets/background_permissions_card.dart';
+import 'widgets/onboarding_permissions_sheet.dart';
 
 class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key});
@@ -75,11 +77,45 @@ class _MainShellState extends ConsumerState<MainShell> {
   void initState() {
     super.initState();
     _loadPrefs();
-    _requestPerms();
     _setupListeners();
     _setupPrintJobChannel();
     ref.read(historyNotifierProvider.notifier).load();
     TestPrintTemplate.preloadLogo();
+    _checkPermissionsAndOnboard();
+  }
+
+  /// Cek semua permission yang dibutuhkan tanpa langsung meminta.
+  /// Onboarding sheet hanya muncul jika ada yang belum diberikan.
+  /// Tidak ada request permission ganda — sheet yang akan menangani semuanya.
+  Future<void> _checkPermissionsAndOnboard() async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+
+    final btStatus = await Permission.bluetoothConnect.status;
+    final locStatus = await Permission.locationWhenInUse.status;
+    final notifStatus = await Permission.notification.status;
+    final batteryGranted =
+        await Permission.ignoreBatteryOptimizations.isGranted;
+    final autoStartAck =
+        await ForegroundServiceHelper.isAutoStartAcknowledged();
+
+    final allGranted = btStatus.isGranted &&
+        locStatus.isGranted &&
+        notifStatus.isGranted &&
+        batteryGranted &&
+        autoStartAck;
+
+    if (allGranted) return;
+
+    if (!mounted) return;
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+      builder: (_) => OnboardingPermissionsSheet(onComplete: () {}),
+    );
   }
 
   void _setupPrintJobChannel() {
@@ -269,23 +305,6 @@ class _MainShellState extends ConsumerState<MainShell> {
       _recordHistory(type, label, success, dataSize);
     };
     _server.onStatusChange = (r) => _appNotifier.setServerRunning(r);
-  }
-
-  Future<void> _requestPerms() async {
-    // Request permissions based on Android version
-    final permissions = <Permission>[
-      Permission.bluetooth,
-      Permission.bluetoothConnect,
-      Permission.bluetoothScan,
-      Permission.locationWhenInUse,
-      Permission.notification, // For foreground service notification
-    ];
-
-    // Android 13+ requires NEARBY_WIFI_DEVICES for Bluetooth device discovery
-    // This permission is handled by permission_handler automatically
-    // No need to add manually as it's covered by bluetoothScan
-
-    await permissions.request();
   }
 
   void _addLog(String m) {
@@ -525,15 +544,15 @@ class _MainShellState extends ConsumerState<MainShell> {
                       height: 40,
                       color: _primary.withValues(alpha: 0.2)),
                   Expanded(
-                      child: _statItem(S.paper, paperLabel,
-                          Icons.description_rounded)),
+                      child: _statItem(
+                          S.paper, paperLabel, Icons.description_rounded)),
                   Container(
                       width: 1,
                       height: 40,
                       color: _primary.withValues(alpha: 0.2)),
                   Expanded(
-                      child: _statItem(S.chars, '${w}kar',
-                          Icons.text_fields_rounded)),
+                      child: _statItem(
+                          S.chars, '${w}kar', Icons.text_fields_rounded)),
                 ]),
               ),
               const SizedBox(height: 16),
@@ -599,13 +618,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     final appState = ref.watch(appStateProvider);
     final logs = ref.watch(logsProvider);
 
-    final titles = [
-      S.home,
-      S.freeText,
-      S.statistics,
-      S.printImage,
-      S.printPdf
-    ];
+    final titles = [S.home, S.freeText, S.statistics, S.printImage, S.printPdf];
     final isKeyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
 
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -1425,6 +1438,8 @@ class _MainShellState extends ConsumerState<MainShell> {
           onCopyUrl: () => _toast(S.urlCopied),
         ),
         const SizedBox(height: 14),
+        const BackgroundPermissionsCard(),
+        const SizedBox(height: 14),
         PrinterCard(
           appState: appState,
           onSelectPrinter: _goScan,
@@ -1531,7 +1546,8 @@ class _MainShellState extends ConsumerState<MainShell> {
               const SizedBox(height: 16),
               Text(
                 S.appName,
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                style:
+                    const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 4),
               Container(
