@@ -17,7 +17,7 @@ dependencies:
   print_bluetooth_thermal:
     path: ./packages/print_bluetooth_thermal
   shared_preferences: ^2.3.2
-  permission_handler: ^11.3.1
+  permission_handler: ^12.0.3
   network_info_plus: ^6.0.1
   file_picker: ^8.0.0
   image: ^4.2.0
@@ -27,7 +27,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^4.0.0
+  flutter_lints: ^6.0.0
   riverpod_lint: ^3.1.3
 
 flutter:
