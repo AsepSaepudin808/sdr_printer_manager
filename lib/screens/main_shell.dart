@@ -65,7 +65,6 @@ class _MainShellState extends ConsumerState<MainShell> {
   SdrBluetoothService get _bt => ref.read(bluetoothServiceProvider);
   PrintServerService get _server => ref.read(printServerServiceProvider);
 
-  // ── Shorthand local state reads (used in async methods, not in build) ─────
   bool get _serverRunning => _appState.serverRunning;
   int get _serverPort => _appState.serverPort;
   PrinterDevice? get _printer => _appState.printer;
@@ -84,12 +83,11 @@ class _MainShellState extends ConsumerState<MainShell> {
     _checkPermissionsAndOnboard();
   }
 
-  /// Cek semua permission yang dibutuhkan tanpa langsung meminta.
-  /// Onboarding sheet hanya muncul jika ada yang belum diberikan.
-  /// Tidak ada request permission ganda — sheet yang akan menangani semuanya.
   Future<void> _checkPermissionsAndOnboard() async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    if (!mounted) return;
+    await Future.delayed(const Duration(milliseconds: 400));
+    if (!mounted) {
+      return;
+    }
 
     final btStatus = await Permission.bluetoothConnect.status;
     final locStatus = await Permission.locationWhenInUse.status;
@@ -105,9 +103,13 @@ class _MainShellState extends ConsumerState<MainShell> {
         batteryGranted &&
         autoStartAck;
 
-    if (allGranted) return;
+    if (allGranted) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
 
-    if (!mounted) return;
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1518,9 +1520,6 @@ class _MainShellState extends ConsumerState<MainShell> {
               fontSize: 12)),
     );
   }
-
-  // NOTE: Old _statusCard, _printerCard, _statsRow, _portCard, _testPrintCard, _logCard, _autoStartCard
-  // methods are now in widgets/ folder. Keeping for reference until fully migrated.
 
   // ─── ABOUT & LICENSE DIALOGS ───────────────────────────────────────────────
   void _showCustomAboutDialog(BuildContext context) {

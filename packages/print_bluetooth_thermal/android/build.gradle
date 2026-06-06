@@ -2,15 +2,12 @@ group = "app.web.groons.print_bluetooth_thermal"
 version = "1.0-SNAPSHOT"
 
 buildscript {
-    ext.kotlin_version = "1.8.22"
     repositories {
         google()
         mavenCentral()
     }
-
     dependencies {
         classpath("com.android.tools.build:gradle:8.1.0")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version")
     }
 }
 
@@ -22,7 +19,6 @@ allprojects {
 }
 
 apply plugin: "com.android.library"
-apply plugin: "kotlin-android"
 
 android {
     if (project.android.hasProperty("namespace")) {
@@ -37,7 +33,7 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_1_8
+        jvmTarget = "1.8"
     }
 
     sourceSets {
@@ -57,7 +53,6 @@ android {
     testOptions {
         unitTests.all {
             useJUnitPlatform()
-
             testLogging {
                events "passed", "skipped", "failed", "standardOut", "standardError"
                outputs.upToDateWhen {false}

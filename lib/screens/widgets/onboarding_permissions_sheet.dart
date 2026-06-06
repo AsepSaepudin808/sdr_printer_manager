@@ -3,12 +3,6 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../services/foreground_service_helper.dart';
 import '../../utils/strings.dart';
 
-/// Bottom sheet onboarding permission.
-/// Muncul hanya jika ada permission yang belum diberikan.
-/// Menggunakan permission_handler sesuai best practice:
-/// - cek status sebelum request
-/// - handle isPermanentlyDenied dengan openAppSettings()
-/// - tidak double-request permission yang sudah granted
 class OnboardingPermissionsSheet extends StatefulWidget {
   final VoidCallback? onComplete;
   const OnboardingPermissionsSheet({super.key, this.onComplete});
@@ -18,8 +12,8 @@ class OnboardingPermissionsSheet extends StatefulWidget {
       _OnboardingPermissionsSheetState();
 }
 
-class _OnboardingPermissionsSheetState
-    extends State<OnboardingPermissionsSheet> {
+class _OnboardingPermissionsSheetState extends State<OnboardingPermissionsSheet>
+    with WidgetsBindingObserver {
   static const _primary = Color(0xFF2BBCC4);
 
   bool _bluetoothGranted = false;
@@ -28,34 +22,48 @@ class _OnboardingPermissionsSheetState
   bool _batteryGranted = false;
   bool _autoStartAcknowledged = false;
 
-  // Track permanently denied untuk tampilkan hint buka settings
   bool _bluetoothPermanent = false;
   bool _locationPermanent = false;
   bool _notificationPermanent = false;
 
+  bool _isRequesting = false;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _checkAll();
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkAll();
+    }
+  }
+
   Future<void> _checkAll() async {
-    // Cek status semua permission sekaligus tanpa meminta dulu
     final btStatus = await Permission.bluetoothConnect.status;
     final locStatus = await Permission.locationWhenInUse.status;
     final notifStatus = await Permission.notification.status;
-    final batteryGranted =
-        await ForegroundServiceHelper.isIgnoringBatteryOptimizations();
-    final autoStartAck =
-        await ForegroundServiceHelper.isAutoStartAcknowledged();
+    final batteryOk = await Permission.ignoreBatteryOptimizations.isGranted;
+    final autoStartOk = await ForegroundServiceHelper.isAutoStartAcknowledged();
 
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _bluetoothGranted = btStatus.isGranted;
       _locationGranted = locStatus.isGranted;
       _notificationGranted = notifStatus.isGranted;
-      _batteryGranted = batteryGranted;
-      _autoStartAcknowledged = autoStartAck;
+      _batteryGranted = batteryOk;
+      _autoStartAcknowledged = autoStartOk;
 
       _bluetoothPermanent = btStatus.isPermanentlyDenied;
       _locationPermanent = locStatus.isPermanentlyDenied;
@@ -63,49 +71,64 @@ class _OnboardingPermissionsSheetState
     });
   }
 
-  /// Request semua permission sekaligus.
-  /// permission_handler menampilkan dialog OS per permission secara otomatis.
   Future<void> _grantAll() async {
-    // Kumpulkan hanya permission yang belum granted
-    final toRequest = <Permission>[];
-    if (!_bluetoothGranted) {
-      toRequest.addAll([Permission.bluetoothConnect, Permission.bluetoothScan]);
+    if (_isRequesting) {
+      return;
     }
-    if (!_locationGranted) toRequest.add(Permission.locationWhenInUse);
-    if (!_notificationGranted) toRequest.add(Permission.notification);
+    setState(() => _isRequesting = true);
 
-    if (toRequest.isNotEmpty) {
-      final results = await toRequest.request();
-      if (!mounted) return;
-      setState(() {
-        if (results.containsKey(Permission.bluetoothConnect)) {
-          _bluetoothGranted =
-              results[Permission.bluetoothConnect]?.isGranted ?? false;
-          _bluetoothPermanent =
-              results[Permission.bluetoothConnect]?.isPermanentlyDenied ??
-                  false;
-        }
-        if (results.containsKey(Permission.locationWhenInUse)) {
-          _locationGranted =
-              results[Permission.locationWhenInUse]?.isGranted ?? false;
-          _locationPermanent =
-              results[Permission.locationWhenInUse]?.isPermanentlyDenied ??
-                  false;
-        }
-        if (results.containsKey(Permission.notification)) {
-          _notificationGranted =
-              results[Permission.notification]?.isGranted ?? false;
-          _notificationPermanent =
-              results[Permission.notification]?.isPermanentlyDenied ?? false;
-        }
-      });
-    }
+    try {
+      final toRequest = <Permission>[];
+      if (!_bluetoothGranted) {
+        toRequest
+            .addAll([Permission.bluetoothConnect, Permission.bluetoothScan]);
+      }
+      if (!_locationGranted) {
+        toRequest.add(Permission.locationWhenInUse);
+      }
+      if (!_notificationGranted) {
+        toRequest.add(Permission.notification);
+      }
 
-    // Jika ada yang permanently denied, arahkan ke app settings
-    if (_bluetoothPermanent || _locationPermanent || _notificationPermanent) {
-      await openAppSettings();
-      await Future.delayed(const Duration(milliseconds: 500));
-      await _checkAll();
+      if (toRequest.isNotEmpty) {
+        final results = await toRequest.request();
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          if (results.containsKey(Permission.bluetoothConnect)) {
+            _bluetoothGranted =
+                results[Permission.bluetoothConnect]?.isGranted ?? false;
+            _bluetoothPermanent =
+                results[Permission.bluetoothConnect]?.isPermanentlyDenied ??
+                    false;
+          }
+          if (results.containsKey(Permission.locationWhenInUse)) {
+            _locationGranted =
+                results[Permission.locationWhenInUse]?.isGranted ?? false;
+            _locationPermanent =
+                results[Permission.locationWhenInUse]?.isPermanentlyDenied ??
+                    false;
+          }
+          if (results.containsKey(Permission.notification)) {
+            _notificationGranted =
+                results[Permission.notification]?.isGranted ?? false;
+            _notificationPermanent =
+                results[Permission.notification]?.isPermanentlyDenied ?? false;
+          }
+        });
+      }
+
+      if (!_batteryGranted) {
+        await _requestBattery();
+      }
+      if (!_autoStartAcknowledged) {
+        await _openAutoStart();
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isRequesting = false);
+      }
     }
   }
 
@@ -113,15 +136,14 @@ class _OnboardingPermissionsSheetState
     final status = await permission.status;
 
     if (status.isPermanentlyDenied) {
-      // Permanently denied — satu-satunya cara adalah buka app settings
       await openAppSettings();
-      await Future.delayed(const Duration(milliseconds: 500));
-      await _checkAll();
       return;
     }
 
     final result = await permission.request();
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     setState(() {
       switch (permission) {
         case Permission.bluetoothConnect:
@@ -139,32 +161,33 @@ class _OnboardingPermissionsSheetState
       }
     });
 
-    // Jika hasil akhirnya permanently denied, langsung arahkan ke settings
     if (result.isPermanentlyDenied) {
       await openAppSettings();
-      await Future.delayed(const Duration(milliseconds: 500));
-      await _checkAll();
     }
   }
 
   Future<void> _requestBattery() async {
-    final granted =
-        await ForegroundServiceHelper.requestIgnoreBatteryOptimizations();
-    if (!mounted) return;
-    setState(() => _batteryGranted = granted);
-    if (!granted) {
-      // Cek lagi setelah sedikit delay (beberapa device butuh waktu update status)
-      await Future.delayed(const Duration(milliseconds: 800));
-      final check =
-          await ForegroundServiceHelper.isIgnoringBatteryOptimizations();
-      if (mounted) setState(() => _batteryGranted = check);
+    final status = await Permission.ignoreBatteryOptimizations.request();
+    if (!mounted) {
+      return;
+    }
+    if (status.isGranted) {
+      setState(() => _batteryGranted = true);
+    } else {
+      await Future.delayed(const Duration(milliseconds: 600));
+      final check = await Permission.ignoreBatteryOptimizations.isGranted;
+      if (mounted) {
+        setState(() => _batteryGranted = check);
+      }
     }
   }
 
   Future<void> _openAutoStart() async {
     await ForegroundServiceHelper.openAutoStartSettings();
     await ForegroundServiceHelper.setAutoStartAcknowledged();
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     setState(() => _autoStartAcknowledged = true);
   }
 
@@ -229,13 +252,12 @@ class _OnboardingPermissionsSheetState
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-
             _permTile(
               icon: Icons.bluetooth_rounded,
               color: const Color(0xFF2196F3),
               title: S.permissionBluetooth,
               subtitle: _bluetoothPermanent
-                  ? 'Izin ditolak permanen — ketuk untuk buka Pengaturan Aplikasi'
+                  ? 'Ditolak permanen — ketuk untuk buka Pengaturan Aplikasi'
                   : S.permissionBluetoothDesc,
               granted: _bluetoothGranted,
               isPermanent: _bluetoothPermanent,
@@ -247,7 +269,7 @@ class _OnboardingPermissionsSheetState
               color: const Color(0xFF4CAF50),
               title: S.permissionLocation,
               subtitle: _locationPermanent
-                  ? 'Izin ditolak permanen — ketuk untuk buka Pengaturan Aplikasi'
+                  ? 'Ditolak permanen — ketuk untuk buka Pengaturan Aplikasi'
                   : S.permissionLocationDesc,
               granted: _locationGranted,
               isPermanent: _locationPermanent,
@@ -259,15 +281,13 @@ class _OnboardingPermissionsSheetState
               color: const Color(0xFFFF9800),
               title: S.permissionNotification,
               subtitle: _notificationPermanent
-                  ? 'Izin ditolak permanen — ketuk untuk buka Pengaturan Aplikasi'
+                  ? 'Ditolak permanen — ketuk untuk buka Pengaturan Aplikasi'
                   : S.permissionNotificationDesc,
               granted: _notificationGranted,
               isPermanent: _notificationPermanent,
               onTap: () => _requestSingle(Permission.notification),
             ),
             const SizedBox(height: 12),
-
-            // Battery optimization — menggunakan permission_handler standard
             _permTile(
               icon: Icons.battery_charging_full_rounded,
               color: const Color(0xFF00BCD4),
@@ -278,8 +298,6 @@ class _OnboardingPermissionsSheetState
               onTap: _requestBattery,
             ),
             const SizedBox(height: 12),
-
-            // Autostart — manufacturer-specific, tidak bisa dicek via API
             _permTile(
               icon: Icons.power_settings_new_rounded,
               color: const Color(0xFF9C27B0),
@@ -292,44 +310,58 @@ class _OnboardingPermissionsSheetState
               onTap: _openAutoStart,
             ),
             const SizedBox(height: 24),
-
             SizedBox(
               width: double.infinity,
               height: 52,
               child: ElevatedButton(
-                onPressed: _allDone ? null : _grantAll,
+                onPressed: (_allDone || _isRequesting) ? null : _grantAll,
                 style: ElevatedButton.styleFrom(
                   backgroundColor:
                       _allDone ? const Color(0xFF4CAF50) : _primary,
                   foregroundColor: Colors.white,
-                  disabledBackgroundColor: const Color(0xFF4CAF50),
+                  disabledBackgroundColor: _allDone
+                      ? const Color(0xFF4CAF50)
+                      : _primary.withValues(alpha: 0.6),
                   disabledForegroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
                   elevation: 0,
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (_allDone) ...[
-                      const Icon(Icons.check_circle_rounded, size: 20),
-                      const SizedBox(width: 8),
-                    ],
-                    Text(
-                      _allDone ? S.permissionGranted : S.permissionGrantAll,
-                      style: const TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w700),
-                    ),
-                  ],
-                ),
+                child: _isRequesting
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.5,
+                        ),
+                      )
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (_allDone) ...[
+                            const Icon(Icons.check_circle_rounded, size: 20),
+                            const SizedBox(width: 8),
+                          ],
+                          Text(
+                            _allDone
+                                ? S.permissionGranted
+                                : S.permissionGrantAll,
+                            style: const TextStyle(
+                                fontSize: 15, fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
               ),
             ),
             const SizedBox(height: 10),
             TextButton(
-              onPressed: () {
-                widget.onComplete?.call();
-                Navigator.pop(context);
-              },
+              onPressed: _isRequesting
+                  ? null
+                  : () {
+                      widget.onComplete?.call();
+                      Navigator.pop(context);
+                    },
               child: Text(
                 S.permissionSkip,
                 style: TextStyle(
@@ -354,7 +386,7 @@ class _OnboardingPermissionsSheetState
     final effectiveColor = isPermanent ? Colors.red.shade400 : color;
 
     return InkWell(
-      onTap: granted ? null : onTap,
+      onTap: (granted || _isRequesting) ? null : onTap,
       borderRadius: BorderRadius.circular(14),
       child: Container(
         padding: const EdgeInsets.all(14),

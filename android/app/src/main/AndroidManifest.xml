@@ -1,36 +1,22 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- ════════════════════════════════════════════════════════════
-         BLUETOOTH PERMISSIONS
-         - BLUETOOTH + BLUETOOTH_ADMIN : legacy, hanya Android ≤ 11 (API ≤ 30)
-         - BLUETOOTH_SCAN + BLUETOOTH_CONNECT : runtime, Android 12+ (API 31+)
-         - neverForLocation + tools:targetApi="s" sesuai rekomendasi resmi Android
-         ════════════════════════════════════════════════════════════ -->
+    <!-- Bluetooth legacy (Android ≤ 11 / API ≤ 30) -->
     <uses-permission
         android:name="android.permission.BLUETOOTH"
         android:maxSdkVersion="30" />
     <uses-permission
         android:name="android.permission.BLUETOOTH_ADMIN"
         android:maxSdkVersion="30" />
+
+    <!-- Bluetooth runtime (Android 12+ / API 31+) -->
     <uses-permission
         android:name="android.permission.BLUETOOTH_SCAN"
         android:usesPermissionFlags="neverForLocation"
         tools:targetApi="s" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-
-    <!-- ════════════════════════════════════════════════════════════
-         LOCATION PERMISSIONS
-         - ACCESS_FINE_LOCATION wajib untuk scan Bluetooth di Android 5–11
-         - Di Android 12+ tidak diperlukan jika BLUETOOTH_SCAN pakai neverForLocation
-         - maxSdkVersion="30" agar tidak diminta di Android 12+
-         ════════════════════════════════════════════════════════════ -->
-    <uses-permission
-        android:name="android.permission.ACCESS_FINE_LOCATION"
-        android:maxSdkVersion="30" />
-    <uses-permission
-        android:name="android.permission.ACCESS_COARSE_LOCATION"
-        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <!-- ════════════════════════════════════════════════════════════
          NETWORK PERMISSIONS (install-time, tidak perlu runtime request)
