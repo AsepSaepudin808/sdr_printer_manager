@@ -30,7 +30,8 @@ class EscPosHelper {
   static void setAutoCut(bool value) => _autoCut = value;
   static void setUseFontB(bool value) => _useFontB = value;
   static void setCashDrawerMode(CashDrawerMode mode) => _cashDrawerMode = mode;
-  static void setSessionSummaryCashDrawer(bool value) => _sessionSummaryCashDrawer = value;
+  static void setSessionSummaryCashDrawer(bool value) =>
+      _sessionSummaryCashDrawer = value;
 
   static int get customCharsPerLineSetting => _customCharsPerLine;
   static int get extraFeedSetting => _extraFeed;
@@ -85,11 +86,7 @@ class EscPosHelper {
       Uint8List.fromList([0x1D, 0x21, on ? 0x01 : 0x00]);
 
   static Uint8List imageEsc(img.Image src, PaperSize paperSize) {
-    int maxW = switch (paperSize) {
-      PaperSize.mm58 => 192,
-      PaperSize.mm80 => 288,
-      PaperSize.mm100 => 384,
-    };
+    int maxW = paperMaxWidth(paperSize);
     img.Image resized = src;
 
     if (src.numChannels == 4) {
@@ -842,8 +839,10 @@ class EscPosHelper {
       // Fallback: coba parse manual DD/MM/YYYY or DD-MM-YYYY
       final s = raw.trim();
       final isoCandidate = s
-          .replaceFirst(RegExp(r'^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})'), r'$3-$2-$1')
-          .replaceFirst(RegExp(r'^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})'), r'$1-$2-$3');
+          .replaceFirst(
+              RegExp(r'^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})'), r'$3-$2-$1')
+          .replaceFirst(
+              RegExp(r'^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})'), r'$1-$2-$3');
       try {
         final dt2 = DateTime.parse(isoCandidate);
         return '${dt2.day.toString().padLeft(2, '0')}/'
@@ -913,30 +912,36 @@ class EscPosHelper {
 
     b.addAll(rowLR(
         'Gross Sales',
-        rp(grossSales.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        rp(grossSales.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
     b.addAll(rowLR(
         'Discounts',
-        rp(-totalDiscount.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        rp(-totalDiscount.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
     b.addAll(rowLR(
         'Returns/Refunds',
-        rp(-refundUntaxed.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        rp(-refundUntaxed.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
     b.addAll(txt('.' * w));
     b.addAll(rowLR(
         'Net Sales',
-        rp(netSalesBeforeTax.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        rp(netSalesBeforeTax.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
     b.addAll(rowLR(
         'Tax',
-        rp(totalTaxes.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        rp(totalTaxes.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
     b.addAll(txt('.' * w));
     b.addAll(bold(true));
     b.addAll(rowLR(
         'Total Sales',
-        rp(totalSales.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        rp(totalSales.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
     b.addAll(bold(false));
 
@@ -952,7 +957,8 @@ class EscPosHelper {
     final refundAmount = (d['refund_amount'] ?? 0).toDouble();
     b.addAll(rowLR(
         'Total Refund Amount',
-        rp(refundAmount.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        rp(refundAmount.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
 
     // PAYMENT METHOD
@@ -971,7 +977,8 @@ class EscPosHelper {
       final payAmt = (p['amount'] ?? 0).toDouble();
       b.addAll(rowLR(
           payName,
-          rp(payAmt.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+          rp(payAmt.round(),
+              symbol: symbol, decimals: decimals, positionAfter: positionAfter),
           size));
     }
     final totalPayment = (d['total_payment_amount'] ?? 0).toDouble();
@@ -979,7 +986,8 @@ class EscPosHelper {
     b.addAll(bold(true));
     b.addAll(rowLR(
         'Total Payment',
-        rp(totalPayment.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        rp(totalPayment.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
     b.addAll(bold(false));
 
@@ -1000,29 +1008,34 @@ class EscPosHelper {
 
     b.addAll(rowLR(
         'Opening Cash',
-        rp(startingCash.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        rp(startingCash.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
     b.addAll(rowLR(
         '(+) Cash Sales',
-        rp(cashSales.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        rp(cashSales.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
     if (cashIn > 0) {
       b.addAll(rowLR(
           '(+) Cash In',
-          rp(cashIn.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+          rp(cashIn.round(),
+              symbol: symbol, decimals: decimals, positionAfter: positionAfter),
           size));
     }
     if (cashOut > 0) {
       b.addAll(rowLR(
           '(-) Cash Out',
-          rp(-cashOut.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+          rp(-cashOut.round(),
+              symbol: symbol, decimals: decimals, positionAfter: positionAfter),
           size));
     }
     b.addAll(txt('.' * w));
     b.addAll(bold(true));
     b.addAll(rowLR(
         'Total',
-        rp(expectedCash.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        rp(expectedCash.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
     b.addAll(bold(false));
 
@@ -1054,15 +1067,18 @@ class EscPosHelper {
     b.addAll(bold(true));
     b.addAll(rowLR(
         'Expected Balance :',
-        rp(expectedCash.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        rp(expectedCash.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
     b.addAll(rowLR(
         'Closing Balance :',
-        rp(countedCash.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        rp(countedCash.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
     b.addAll(rowLR(
         'Difference :',
-        rp(differenceCash.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        rp(differenceCash.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
         size));
     b.addAll(bold(false));
 
@@ -1070,7 +1086,8 @@ class EscPosHelper {
       b.addAll(txt('.' * w));
       b.addAll(rowLR(
           '* Credit(piutang) :',
-          rp(totalCreditAmount.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+          rp(totalCreditAmount.round(),
+              symbol: symbol, decimals: decimals, positionAfter: positionAfter),
           size));
     }
 
@@ -1089,5 +1106,138 @@ class EscPosHelper {
 
     b.addAll(finalize());
     return Uint8List.fromList(b);
+  }
+
+  // BUILD QRIS RECEIPT
+  static Uint8List buildQRISReceipt(Map<String, dynamic> data, PaperSize size) {
+    final List<int> b = [];
+    b.addAll(init());
+    _applyFontConfig(b);
+
+    final storeName = (data['store_name'] as String? ?? '').trim();
+    final rawAmount = data['amount'] ?? data['formatted_amount'] ?? 0;
+    final String amount =
+        rawAmount is String ? rawAmount : rp((rawAmount as num).round());
+    final orderId =
+        data['order_id'] as String? ?? data['pac_order_id'] as String? ?? '-';
+    final qrImageBase64 = data['qr_image_base64'] as String? ?? '';
+    final dateStr = data['date_str'] as String? ?? _getCurrentDateTime();
+
+    // Header: nama toko (bold) langsung diikuti subtitle tanpa garis
+    b.addAll(align(1));
+    if (storeName.isNotEmpty) {
+      b.addAll(bold(true));
+      b.addAll(txt(storeName.toUpperCase()));
+      b.addAll(bold(false));
+    }
+    b.addAll(txt('Scan QRIS to pay'));
+    b.addAll(divider(size));
+
+    // QR Code image
+    final int qrMaxW = (paperMaxWidth(size) * 0.85).round();
+    if (qrImageBase64.isNotEmpty) {
+      try {
+        final rawBase64 = qrImageBase64.contains(',')
+            ? qrImageBase64.split(',')[1]
+            : qrImageBase64;
+        final imgBytes = base64Decode(rawBase64);
+        final qrImage = img.decodeImage(imgBytes);
+        if (qrImage != null) {
+          final qrCropped = _cropWhiteBorder(qrImage);
+          final qrResized =
+              img.copyResize(qrCropped, width: qrMaxW, height: qrMaxW);
+          b.addAll(imageEsc(qrResized, size));
+        } else {
+          b.addAll(txt('[ QR CODE ]'));
+        }
+      } catch (_) {
+        b.addAll(txt('[ QR CODE ]'));
+      }
+    } else {
+      b.addAll(txt('[ QR CODE ]'));
+    }
+    b.addAll(align(0));
+    b.addAll(feed(1));
+
+    // Amount — label normal, nominal bold doubleSize
+    b.addAll(align(1));
+    b.addAll(txt('TOTAL BAYAR'));
+    b.addAll(bold(true));
+    b.addAll(doubleSize(true));
+    b.addAll(txt(amount));
+    b.addAll(doubleSize(false));
+    b.addAll(bold(false));
+    b.addAll(align(0));
+    b.addAll(divider(size));
+
+    // Info order
+    b.addAll(rowLR('Order   :', orderId, size));
+    b.addAll(rowLR('Tanggal :', dateStr, size));
+    b.addAll(divider(size));
+
+    // Footer
+    b.addAll(align(1));
+    b.addAll(txt('Powered by dRetail'));
+    b.addAll(align(0));
+
+    b.addAll(finalize());
+    return Uint8List.fromList(b);
+  }
+
+  // Crop pixel-pixel putih (quiet zone) di tepi gambar QR sebelum di-resize
+  static img.Image _cropWhiteBorder(img.Image src) {
+    const threshold = 240;
+    int top = 0, bottom = src.height - 1, left = 0, right = src.width - 1;
+
+    outer_top:
+    for (int y = 0; y < src.height; y++) {
+      for (int x = 0; x < src.width; x++) {
+        final p = src.getPixel(x, y);
+        if ((p.r + p.g + p.b) ~/ 3 < threshold) {
+          top = y;
+          break outer_top;
+        }
+      }
+    }
+    outer_bottom:
+    for (int y = src.height - 1; y >= top; y--) {
+      for (int x = 0; x < src.width; x++) {
+        final p = src.getPixel(x, y);
+        if ((p.r + p.g + p.b) ~/ 3 < threshold) {
+          bottom = y;
+          break outer_bottom;
+        }
+      }
+    }
+    outer_left:
+    for (int x = 0; x < src.width; x++) {
+      for (int y = top; y <= bottom; y++) {
+        final p = src.getPixel(x, y);
+        if ((p.r + p.g + p.b) ~/ 3 < threshold) {
+          left = x;
+          break outer_left;
+        }
+      }
+    }
+    outer_right:
+    for (int x = src.width - 1; x >= left; x--) {
+      for (int y = top; y <= bottom; y++) {
+        final p = src.getPixel(x, y);
+        if ((p.r + p.g + p.b) ~/ 3 < threshold) {
+          right = x;
+          break outer_right;
+        }
+      }
+    }
+
+    final w = right - left + 1;
+    final h = bottom - top + 1;
+    if (w <= 0 || h <= 0) return src;
+    return img.copyCrop(src, x: left, y: top, width: w, height: h);
+  }
+
+  static String _getCurrentDateTime() {
+    final now = DateTime.now();
+    return '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
   }
 }

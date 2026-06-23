@@ -282,6 +282,10 @@ class _MainShellState extends ConsumerState<MainShell> {
     _appNotifier.setSessionSummaryCashDrawer(sessionSummaryCashDrawer);
     EscPosHelper.setSessionSummaryCashDrawer(sessionSummaryCashDrawer);
 
+    final printQris = p.getBool('print_qris') ?? true;
+    _appNotifier.setPrintQris(printQris);
+    _server.setPrintQris(printQris);
+
     final addr = p.getString('printer_address');
     final name = p.getString('printer_name');
     if (addr != null && name != null) {
@@ -414,6 +418,7 @@ class _MainShellState extends ConsumerState<MainShell> {
       _server.setPaperSize(_paperSize);
       _server.setCashDrawerMode(_cashDrawerMode);
       _server.setSessionSummaryCashDrawer(_sessionSummaryCashDrawer);
+      _server.setPrintQris(_appState.printQris);
     }
   }
 

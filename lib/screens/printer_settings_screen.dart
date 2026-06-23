@@ -17,6 +17,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
   final TextEditingController _charsCtrl = TextEditingController();
   int _extraFeed = 3;
   bool _autoCut = false;
+  bool _printQris = true;
   bool _loaded = false;
 
   @override
@@ -42,6 +43,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
           .toString();
       _autoCut = p.getBool('auto_cut') ?? false;
       _extraFeed = p.getInt('extra_feed') ?? 3;
+      _printQris = p.getBool('print_qris') ?? true;
       _loaded = true;
     });
   }
@@ -168,6 +170,9 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
 
     await p.setInt('extra_feed', _extraFeed);
     EscPosHelper.setExtraFeed(_extraFeed);
+
+    await p.setBool('print_qris', _printQris);
+    ref.read(appStateProvider.notifier).setPrintQris(_printQris);
 
     if (mounted) {
       ScaffoldMessenger.of(context).clearSnackBars();
@@ -536,6 +541,27 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
                 ),
               ],
             ),
+          ),
+
+          _buildSection(
+            S.printQris,
+            icon: Icons.qr_code_rounded,
+            iconColor: Colors.deepPurple.shade700,
+            child: Row(children: [
+              Expanded(
+                child: Text(
+                  S.printQrisDesc,
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ),
+              Switch.adaptive(
+                value: _printQris,
+                activeTrackColor: themeColor,
+                thumbColor: WidgetStateProperty.resolveWith((s) =>
+                    s.contains(WidgetState.selected) ? Colors.white : Colors.grey),
+                onChanged: (v) => setState(() => _printQris = v),
+              ),
+            ]),
           ),
 
           _buildSection(

@@ -487,6 +487,16 @@ class S {
         ms: 'Baris kosong tambahan selepas cetak untuk mudah koyak',
       );
   static String get lines => withLang(id: 'baris', en: 'lines', ms: 'baris');
+  static String get printQris => withLang(
+        id: 'Cetak QRIS',
+        en: 'Print QRIS',
+        ms: 'Cetak QRIS',
+      );
+  static String get printQrisDesc => withLang(
+        id: 'Cetak struk QRIS saat tombol Print QRIS ditekan',
+        en: 'Print QRIS receipt when Print QRIS button is pressed',
+        ms: 'Cetak resit QRIS apabila butang Cetak QRIS ditekan',
+      );
   static String get cashDrawer => withLang(
         id: 'Cash Drawer',
         en: 'Cash Drawer',

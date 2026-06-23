@@ -18,6 +18,7 @@ class AppState {
   final PaperSize paperSize;
   final CashDrawerMode cashDrawerMode;
   final bool sessionSummaryCashDrawer;
+  final bool printQris;
   final bool isPrinting;
   final String printStatus;
   final DateTimeRange? historyDateRange;
@@ -35,6 +36,7 @@ class AppState {
     this.paperSize = PaperSize.mm80,
     this.cashDrawerMode = CashDrawerMode.off,
     this.sessionSummaryCashDrawer = false,
+    this.printQris = true,
     this.isPrinting = false,
     this.printStatus = '',
     this.historyDateRange,
@@ -53,6 +55,7 @@ class AppState {
     PaperSize? paperSize,
     CashDrawerMode? cashDrawerMode,
     bool? sessionSummaryCashDrawer,
+    bool? printQris,
     bool? isPrinting,
     String? printStatus,
     DateTimeRange? historyDateRange,
@@ -70,6 +73,7 @@ class AppState {
       paperSize: paperSize ?? this.paperSize,
       cashDrawerMode: cashDrawerMode ?? this.cashDrawerMode,
       sessionSummaryCashDrawer: sessionSummaryCashDrawer ?? this.sessionSummaryCashDrawer,
+      printQris: printQris ?? this.printQris,
       isPrinting: isPrinting ?? this.isPrinting,
       printStatus: printStatus ?? this.printStatus,
       historyDateRange: historyDateRange ?? this.historyDateRange,
@@ -94,6 +98,7 @@ class AppStateNotifier extends Notifier<AppState> {
   void setPaperSize(PaperSize size) => state = state.copyWith(paperSize: size);
   void setCashDrawerMode(CashDrawerMode mode) => state = state.copyWith(cashDrawerMode: mode);
   void setSessionSummaryCashDrawer(bool value) => state = state.copyWith(sessionSummaryCashDrawer: value);
+  void setPrintQris(bool value) => state = state.copyWith(printQris: value);
   void setIsPrinting(bool printing) => state = state.copyWith(isPrinting: printing);
   void setPrintStatus(String status) => state = state.copyWith(printStatus: status);
   void setHistoryDateRange(DateTimeRange? range) => state = state.copyWith(historyDateRange: range);

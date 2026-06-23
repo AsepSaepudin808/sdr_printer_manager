@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
-
+import 'package:flutter/foundation.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
@@ -24,6 +23,7 @@ class PrintServerService {
   PaperSize _paperSize = PaperSize.mm80;
   CashDrawerMode _cashDrawerMode = CashDrawerMode.off;
   bool _sessionSummaryCashDrawer = false;
+  bool _printQris = true;
 
   bool get isRunning => _server != null;
 
@@ -37,6 +37,10 @@ class PrintServerService {
 
   void setSessionSummaryCashDrawer(bool value) {
     _sessionSummaryCashDrawer = value;
+  }
+
+  void setPrintQris(bool value) {
+    _printQris = value;
   }
 
   Future<String> getLocalIp() async {
@@ -108,6 +112,68 @@ class PrintServerService {
               'Content-Type': 'application/json',
               'Access-Control-Allow-Origin': '*',
             });
+      }
+    });
+
+    // QRIS PRINT ENDPOINT
+    router.post('/print-qris', (Request req) async {
+      if (!_printQris) {
+        onLog?.call('QRIS print disabled in settings');
+        return Response.ok(
+          jsonEncode({'status': 'ok', 'message': 'QRIS print disabled'}),
+          headers: const {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+          },
+        );
+      }
+
+      onLog?.call('📥 Request print QRIS dari Odoo!');
+
+      try {
+        final bodyStr = await req.readAsString();
+        final Map<String, dynamic> json =
+            jsonDecode(bodyStr) as Map<String, dynamic>;
+
+        final qrisData = json['data'] is Map<String, dynamic>
+            ? json['data'] as Map<String, dynamic>
+            : json;
+
+        final printData = EscPosHelper.buildQRISReceipt(qrisData, _paperSize);
+
+        final ok = await _btService?.sendRaw(printData) ?? false;
+        if (ok) {
+          onLog?.call('✅ QRIS receipt printed (${printData.length}B)');
+          onPrintSuccess?.call();
+          onPrintJob?.call('qris', 'QRIS Receipt', true, printData.length);
+          return Response.ok(
+            jsonEncode({'status': 'ok', 'message': 'QRIS printed'}),
+            headers: const {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*',
+            },
+          );
+        } else {
+          onLog?.call('❌ Gagal kirim QRIS ke printer');
+          onPrintJob?.call('qris', 'QRIS Receipt', false, printData.length);
+          return Response.internalServerError(
+            body: jsonEncode({'status': 'error', 'message': 'Printer not connected'}),
+            headers: const {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*',
+            },
+          );
+        }
+      } catch (e, st) {
+        onLog?.call('❌ Error handler /print-qris: $e');
+        debugPrint('[SDR] /print-qris error:\n$e\n$st');
+        return Response.internalServerError(
+          body: jsonEncode({'status': 'error', 'message': e.toString()}),
+          headers: const {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+          },
+        );
       }
     });
 
@@ -290,8 +356,7 @@ class PrintServerService {
         }
       } catch (e, st) {
         onLog?.call('❌ Error handler /print: $e');
-        // ignore: avoid_print
-        print('[SDR] /print error:\n$e\n$st');
+        debugPrint('[SDR] /print error:\n$e\n$st');
         return Response.internalServerError(
           body: jsonEncode({'status': 'error', 'message': e.toString()}),
           headers: const {
