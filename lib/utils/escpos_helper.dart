@@ -812,11 +812,11 @@ class EscPosHelper {
   }
 
   // INTERNAL HELPERS
-  static String _formatQty(double qty) {
+  static String _formatQty(double qty, [int precision = 2]) {
     if (qty == qty.roundToDouble()) {
       return qty.round().toString();
     }
-    return qty.toStringAsFixed(2);
+    return qty.toStringAsFixed(precision);
   }
 
   static String _formatDateShort(String raw) {
@@ -893,6 +893,9 @@ class EscPosHelper {
     b.addAll(rowLR('Cashier :', cashierName, size));
     b.addAll(rowLR('Opening :', startAt, size));
     b.addAll(rowLR('Closing :', stopAt, size));
+
+    // PRODUCTS BY CATEGORY / PRODUCTS SOLD
+    _buildSessionProductSection(b, d, size, symbol, decimals, positionAfter);
 
     // SALES SUMMARY
     b.addAll(align(1));
@@ -1108,6 +1111,128 @@ class EscPosHelper {
     return Uint8List.fromList(b);
   }
 
+  // SESSION PRODUCT LIST SECTION
+  static void _buildSessionProductSection(
+    List<int> b,
+    Map<String, dynamic> d,
+    PaperSize size,
+    String symbol,
+    int decimals,
+    bool positionAfter,
+  ) {
+    final hasProductGroups = d['has_product_groups'] == true;
+    final productGroups = d['product_groups'] as List<dynamic>? ?? [];
+    final productLines = d['product_lines'] as List<dynamic>? ?? [];
+    final hasProducts = hasProductGroups || productLines.isNotEmpty;
+    if (!hasProducts) {
+      return;
+    }
+
+    final qtyPrecision = d['qty_precision'] as int? ?? 2;
+
+    b.addAll(align(1));
+    b.addAll(bold(true));
+    if (hasProductGroups) {
+      b.addAll(sectionHeader('PRODUCTS BY CATEGORY', size));
+    } else {
+      b.addAll(sectionHeader('PRODUCTS SOLD', size));
+    }
+    b.addAll(bold(false));
+    b.addAll(align(0));
+
+    if (hasProductGroups) {
+      for (final group in productGroups) {
+        final g = group as Map<String, dynamic>;
+        final categoryName = (g['category_name'] as String? ?? '-').trim();
+        final items = g['items'] as List<dynamic>? ?? [];
+        final categoryTax = (g['category_tax'] ?? 0).toDouble();
+        final categorySubtotal = (g['category_subtotal'] ?? 0).toDouble();
+
+        b.addAll(bold(true));
+        b.addAll(txt(categoryName.isEmpty ? '-' : categoryName));
+        b.addAll(bold(false));
+
+        for (final item in items) {
+          _printSessionProductRow(
+              b, item as Map<String, dynamic>, size, symbol, decimals,
+              positionAfter, qtyPrecision);
+        }
+
+        b.addAll(divider(size, char: '.'));
+        b.addAll(rowLR(
+            'Total Tax',
+            rp(categoryTax.round(),
+                symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+            size));
+        b.addAll(bold(true));
+        b.addAll(rowLR(
+            'Subtotal ${categoryName.isEmpty ? '-' : categoryName}',
+            rp(categorySubtotal.round(),
+                symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+            size));
+        b.addAll(bold(false));
+      }
+    } else {
+      final productLinesTax = (d['product_lines_tax'] ?? 0).toDouble();
+      for (final item in productLines) {
+        _printSessionProductRow(
+            b, item as Map<String, dynamic>, size, symbol, decimals,
+            positionAfter, qtyPrecision);
+      }
+      b.addAll(divider(size, char: '.'));
+      b.addAll(rowLR(
+          'Total Tax',
+          rp(productLinesTax.round(),
+              symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+          size));
+    }
+
+    final grandTotal = (d['grand_total'] ?? 0).toDouble();
+    b.addAll(divider(size, char: '='));
+    b.addAll(bold(true));
+    b.addAll(rowLR(
+        'GRAND TOTAL',
+        rp(grandTotal.round(),
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter),
+        size, boldRight: true));
+    b.addAll(bold(false));
+    b.addAll(divider(size, char: '='));
+  }
+
+  static void _printSessionProductRow(
+    List<int> b,
+    Map<String, dynamic> item,
+    PaperSize size,
+    String symbol,
+    int decimals,
+    bool positionAfter,
+    int qtyPrecision,
+  ) {
+    final productName = (item['product_name'] as String? ?? '-').trim();
+    final priceUnit = (item['price_unit'] ?? 0).toDouble();
+    final qtySold = (item['qty_sold'] ?? 0).toDouble();
+    final qtyRefunded = (item['qty_refunded'] ?? 0).toDouble();
+    final amountSold = (item['amount_sold'] ?? 0).toDouble();
+    final amountRefunded = (item['amount_refunded'] ?? 0).toDouble();
+    final qtyNet = qtySold - qtyRefunded;
+    final amountNet = amountSold - amountRefunded;
+
+    final w = charsPerLine(size);
+    b.addAll(bold(true));
+    final nameLines = _wordWrap('• ${productName.isEmpty ? '-' : productName}', w);
+    for (final line in nameLines) {
+      b.addAll(txt(line));
+    }
+    b.addAll(bold(false));
+
+    final qtyStr = _formatQty(qtyNet, qtyPrecision);
+    final priceStr = rp(priceUnit.round(),
+        symbol: symbol, decimals: decimals, positionAfter: positionAfter);
+    final totalStr = rp(amountNet.round(),
+        symbol: symbol, decimals: decimals, positionAfter: positionAfter);
+    b.addAll(rowLR('$qtyStr x $priceStr', totalStr, size, boldRight: true));
+  }
+
   // BUILD QRIS RECEIPT
   static Uint8List buildQRISReceipt(Map<String, dynamic> data, PaperSize size) {
     final List<int> b = [];
@@ -1115,9 +1240,13 @@ class EscPosHelper {
     _applyFontConfig(b);
 
     final storeName = (data['store_name'] as String? ?? '').trim();
-    final rawAmount = data['amount'] ?? data['formatted_amount'] ?? 0;
-    final String amount =
-        rawAmount is String ? rawAmount : rp((rawAmount as num).round());
+    final formattedAmount = (data['formatted_amount'] as String? ?? '')
+        .replaceAll(' ', ' ')
+        .replaceAll(RegExp(r'[^ -~]'), '');
+    final rawAmount = data['amount'] ?? 0;
+    final String amount = formattedAmount.isNotEmpty
+        ? formattedAmount
+        : rp((rawAmount as num).round());
     final orderId =
         data['order_id'] as String? ?? data['pac_order_id'] as String? ?? '-';
     final qrImageBase64 = data['qr_image_base64'] as String? ?? '';

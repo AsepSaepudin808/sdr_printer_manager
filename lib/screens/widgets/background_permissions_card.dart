@@ -16,10 +16,12 @@ class _BackgroundPermissionsCardState extends State<BackgroundPermissionsCard>
   bool _loading = true;
 
   bool _bluetoothGranted = false;
+  bool _bluetoothScanGranted = false;
   bool _locationGranted = false;
   bool _notificationGranted = false;
   bool _batteryGranted = false;
   bool _autoStartAcknowledged = false;
+
 
   @override
   void initState() {
@@ -43,6 +45,7 @@ class _BackgroundPermissionsCardState extends State<BackgroundPermissionsCard>
 
   Future<void> _check() async {
     final bt = await Permission.bluetoothConnect.status;
+    final btScan = await Permission.bluetoothScan.status;
     final loc = await Permission.locationWhenInUse.status;
     final notif = await Permission.notification.status;
     final battery = await Permission.ignoreBatteryOptimizations.isGranted;
@@ -53,6 +56,7 @@ class _BackgroundPermissionsCardState extends State<BackgroundPermissionsCard>
     }
     setState(() {
       _bluetoothGranted = bt.isGranted;
+      _bluetoothScanGranted = btScan.isGranted;
       _locationGranted = loc.isGranted;
       _notificationGranted = notif.isGranted;
       _batteryGranted = battery;
@@ -63,6 +67,7 @@ class _BackgroundPermissionsCardState extends State<BackgroundPermissionsCard>
 
   bool get _allGranted =>
       _bluetoothGranted &&
+      _bluetoothScanGranted &&
       _locationGranted &&
       _notificationGranted &&
       _batteryGranted &&
@@ -159,6 +164,9 @@ class _BackgroundPermissionsCardState extends State<BackgroundPermissionsCard>
     if (!_bluetoothGranted) {
       missing.add('Bluetooth');
     }
+    if (!_bluetoothScanGranted) {
+      missing.add('Bluetooth Scan');
+    }
     if (!_locationGranted) {
       missing.add('Lokasi');
     }
@@ -189,10 +197,12 @@ class _PermissionSheetCompactState extends State<_PermissionSheetCompact>
   static const _primary = Color(0xFF2BBCC4);
 
   bool _bluetoothGranted = false;
+  bool _bluetoothScanGranted = false;
   bool _locationGranted = false;
   bool _notificationGranted = false;
   bool _batteryGranted = false;
   bool _autoStartAcknowledged = false;
+
   bool _isRequesting = false;
 
   @override
@@ -217,6 +227,7 @@ class _PermissionSheetCompactState extends State<_PermissionSheetCompact>
 
   Future<void> _checkAll() async {
     final bt = await Permission.bluetoothConnect.status;
+    final btScan = await Permission.bluetoothScan.status;
     final loc = await Permission.locationWhenInUse.status;
     final notif = await Permission.notification.status;
     final battery = await Permission.ignoreBatteryOptimizations.isGranted;
@@ -227,6 +238,7 @@ class _PermissionSheetCompactState extends State<_PermissionSheetCompact>
     }
     setState(() {
       _bluetoothGranted = bt.isGranted;
+      _bluetoothScanGranted = btScan.isGranted;
       _locationGranted = loc.isGranted;
       _notificationGranted = notif.isGranted;
       _batteryGranted = battery;
@@ -243,8 +255,10 @@ class _PermissionSheetCompactState extends State<_PermissionSheetCompact>
     try {
       final toRequest = <Permission>[];
       if (!_bluetoothGranted) {
-        toRequest
-            .addAll([Permission.bluetoothConnect, Permission.bluetoothScan]);
+        toRequest.add(Permission.bluetoothConnect);
+      }
+      if (!_bluetoothScanGranted) {
+        toRequest.add(Permission.bluetoothScan);
       }
       if (!_locationGranted) {
         toRequest.add(Permission.locationWhenInUse);
@@ -261,6 +275,9 @@ class _PermissionSheetCompactState extends State<_PermissionSheetCompact>
         setState(() {
           _bluetoothGranted = results[Permission.bluetoothConnect]?.isGranted ??
               _bluetoothGranted;
+          _bluetoothScanGranted =
+              results[Permission.bluetoothScan]?.isGranted ??
+                  _bluetoothScanGranted;
           _locationGranted = results[Permission.locationWhenInUse]?.isGranted ??
               _locationGranted;
           _notificationGranted = results[Permission.notification]?.isGranted ??
@@ -299,6 +316,7 @@ class _PermissionSheetCompactState extends State<_PermissionSheetCompact>
 
   bool get _allDone =>
       _bluetoothGranted &&
+      _bluetoothScanGranted &&
       _locationGranted &&
       _notificationGranted &&
       _batteryGranted &&

@@ -60,12 +60,10 @@ class _PdfTabState extends ConsumerState<PdfTab>
   }
 
   Future<void> _pickPdf() async {
-    final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom, allowedExtensions: ['pdf'], withData: true);
-    if (result != null &&
-        result.files.single.path != null &&
-        result.files.single.bytes != null) {
-      final bytes = result.files.single.bytes!;
+    final result = await FilePicker.pickFiles(
+        type: FileType.custom, allowedExtensions: ['pdf']);
+    if (result.isNotEmpty && result.first.path != null) {
+      final bytes = await result.first.readAsBytes();
       Uint8List? preview;
       int pages = 0;
       try {
@@ -85,8 +83,8 @@ class _PdfTabState extends ConsumerState<PdfTab>
       } catch (_) {}
 
       setState(() {
-        _pdfFile = File(result.files.single.path!);
-        _fileName = result.files.single.name;
+        _pdfFile = File(result.first.path!);
+        _fileName = result.first.name;
         _pdfBytes = bytes;
         _previewBytes = preview;
         _pageCount = pages;

@@ -43,10 +43,10 @@ class _ImageTabState extends ConsumerState<ImageTab>
   }
 
   Future<void> _pickImage() async {
-    final result = await FilePicker.platform.pickFiles(type: FileType.image);
-    if (result != null && result.files.single.path != null) {
+    final result = await FilePicker.pickFiles(type: FileType.image);
+    if (result.isNotEmpty && result.first.path != null) {
       setState(() {
-        _imageFile = File(result.files.single.path!);
+        _imageFile = File(result.first.path!);
         _status = '';
       });
     }

@@ -17,12 +17,14 @@ class _OnboardingPermissionsSheetState extends State<OnboardingPermissionsSheet>
   static const _primary = Color(0xFF2BBCC4);
 
   bool _bluetoothGranted = false;
+  bool _bluetoothScanGranted = false;
   bool _locationGranted = false;
   bool _notificationGranted = false;
   bool _batteryGranted = false;
   bool _autoStartAcknowledged = false;
 
   bool _bluetoothPermanent = false;
+  bool _bluetoothScanPermanent = false;
   bool _locationPermanent = false;
   bool _notificationPermanent = false;
 
@@ -50,6 +52,7 @@ class _OnboardingPermissionsSheetState extends State<OnboardingPermissionsSheet>
 
   Future<void> _checkAll() async {
     final btStatus = await Permission.bluetoothConnect.status;
+    final btScanStatus = await Permission.bluetoothScan.status;
     final locStatus = await Permission.locationWhenInUse.status;
     final notifStatus = await Permission.notification.status;
     final batteryOk = await Permission.ignoreBatteryOptimizations.isGranted;
@@ -60,12 +63,14 @@ class _OnboardingPermissionsSheetState extends State<OnboardingPermissionsSheet>
     }
     setState(() {
       _bluetoothGranted = btStatus.isGranted;
+      _bluetoothScanGranted = btScanStatus.isGranted;
       _locationGranted = locStatus.isGranted;
       _notificationGranted = notifStatus.isGranted;
       _batteryGranted = batteryOk;
       _autoStartAcknowledged = autoStartOk;
 
       _bluetoothPermanent = btStatus.isPermanentlyDenied;
+      _bluetoothScanPermanent = btScanStatus.isPermanentlyDenied;
       _locationPermanent = locStatus.isPermanentlyDenied;
       _notificationPermanent = notifStatus.isPermanentlyDenied;
     });
@@ -80,8 +85,10 @@ class _OnboardingPermissionsSheetState extends State<OnboardingPermissionsSheet>
     try {
       final toRequest = <Permission>[];
       if (!_bluetoothGranted) {
-        toRequest
-            .addAll([Permission.bluetoothConnect, Permission.bluetoothScan]);
+        toRequest.add(Permission.bluetoothConnect);
+      }
+      if (!_bluetoothScanGranted) {
+        toRequest.add(Permission.bluetoothScan);
       }
       if (!_locationGranted) {
         toRequest.add(Permission.locationWhenInUse);
@@ -101,6 +108,13 @@ class _OnboardingPermissionsSheetState extends State<OnboardingPermissionsSheet>
                 results[Permission.bluetoothConnect]?.isGranted ?? false;
             _bluetoothPermanent =
                 results[Permission.bluetoothConnect]?.isPermanentlyDenied ??
+                    false;
+          }
+          if (results.containsKey(Permission.bluetoothScan)) {
+            _bluetoothScanGranted =
+                results[Permission.bluetoothScan]?.isGranted ?? false;
+            _bluetoothScanPermanent =
+                results[Permission.bluetoothScan]?.isPermanentlyDenied ??
                     false;
           }
           if (results.containsKey(Permission.locationWhenInUse)) {
@@ -147,9 +161,11 @@ class _OnboardingPermissionsSheetState extends State<OnboardingPermissionsSheet>
     setState(() {
       switch (permission) {
         case Permission.bluetoothConnect:
-        case Permission.bluetoothScan:
           _bluetoothGranted = result.isGranted;
           _bluetoothPermanent = result.isPermanentlyDenied;
+        case Permission.bluetoothScan:
+          _bluetoothScanGranted = result.isGranted;
+          _bluetoothScanPermanent = result.isPermanentlyDenied;
         case Permission.locationWhenInUse:
           _locationGranted = result.isGranted;
           _locationPermanent = result.isPermanentlyDenied;
@@ -193,6 +209,7 @@ class _OnboardingPermissionsSheetState extends State<OnboardingPermissionsSheet>
 
   bool get _allDone =>
       _bluetoothGranted &&
+      _bluetoothScanGranted &&
       _locationGranted &&
       _notificationGranted &&
       _batteryGranted &&
@@ -256,12 +273,16 @@ class _OnboardingPermissionsSheetState extends State<OnboardingPermissionsSheet>
               icon: Icons.bluetooth_rounded,
               color: const Color(0xFF2196F3),
               title: S.permissionBluetooth,
-              subtitle: _bluetoothPermanent
+              subtitle: _bluetoothPermanent || _bluetoothScanPermanent
                   ? 'Ditolak permanen — ketuk untuk buka Pengaturan Aplikasi'
-                  : S.permissionBluetoothDesc,
-              granted: _bluetoothGranted,
-              isPermanent: _bluetoothPermanent,
-              onTap: () => _requestSingle(Permission.bluetoothConnect),
+                  : (_bluetoothGranted && !_bluetoothScanGranted)
+                      ? 'Tap sekali lagi untuk memberikan izin Bluetooth Scan'
+                      : S.permissionBluetoothDesc,
+              granted: _bluetoothGranted && _bluetoothScanGranted,
+              isPermanent: _bluetoothPermanent || _bluetoothScanPermanent,
+              onTap: () => _requestSingle(_bluetoothGranted
+                  ? Permission.bluetoothScan
+                  : Permission.bluetoothConnect),
             ),
             const SizedBox(height: 12),
             _permTile(
@@ -314,7 +335,16 @@ class _OnboardingPermissionsSheetState extends State<OnboardingPermissionsSheet>
               width: double.infinity,
               height: 52,
               child: ElevatedButton(
-                onPressed: (_allDone || _isRequesting) ? null : _grantAll,
+                onPressed: _isRequesting
+                    ? null
+                    : () {
+                        if (_allDone) {
+                          widget.onComplete?.call();
+                          Navigator.pop(context);
+                        } else {
+                          _grantAll();
+                        }
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor:
                       _allDone ? const Color(0xFF4CAF50) : _primary,
@@ -345,7 +375,7 @@ class _OnboardingPermissionsSheetState extends State<OnboardingPermissionsSheet>
                           ],
                           Text(
                             _allDone
-                                ? S.permissionGranted
+                                ? S.permissionDone
                                 : S.permissionGrantAll,
                             style: const TextStyle(
                                 fontSize: 15, fontWeight: FontWeight.w700),

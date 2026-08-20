@@ -61,6 +61,8 @@ class PrintHistory {
         return 'Basic Receipt';
       case 'session_summary':
         return 'Session Summary';
+      case 'qris':
+        return 'QRIS Receipt';
       case 'text':
         return 'Text Print';
       case 'image':

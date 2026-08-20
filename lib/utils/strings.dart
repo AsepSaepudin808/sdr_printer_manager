@@ -1050,6 +1050,11 @@ class S {
         en: 'Permission granted',
         ms: 'Kebenaran diberikan',
       );
+  static String get permissionDone => withLang(
+        id: 'Selesai',
+        en: 'Done',
+        ms: 'Selesai',
+      );
   static String get permissionDenied => withLang(
         id: 'Izin belum diberikan',
         en: 'Permission not granted',
