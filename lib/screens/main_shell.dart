@@ -23,6 +23,7 @@ import '../utils/constants.dart';
 import '../utils/colors.dart';
 import '../utils/strings.dart';
 import 'scan_screen.dart';
+import 'printer_screen.dart';
 import 'log_screen.dart';
 import 'settings_screen.dart';
 import 'printer_settings_screen.dart';
@@ -422,6 +423,13 @@ class _MainShellState extends ConsumerState<MainShell> {
     }
   }
 
+  Future<void> _goPrinter() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const PrinterScreen()),
+    );
+  }
+
   Future<void> _savePort() async {
     final v = int.tryParse(_portCtrl.text.trim());
     if (v == null || v < 1024 || v > 65535) {
@@ -798,6 +806,10 @@ class _MainShellState extends ConsumerState<MainShell> {
                   Navigator.pop(context);
                   await _goSettings();
                 }),
+                _drawerItem(Icons.print_rounded, S.printerMenu, () async {
+                  Navigator.pop(context);
+                  await _goPrinter();
+                }),
                 _drawerItem(Icons.print_outlined, S.printerSize, () async {
                   Navigator.pop(context);
                   await _goPrinterSettings();
@@ -869,30 +881,33 @@ class _MainShellState extends ConsumerState<MainShell> {
             : Colors.transparent,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: ListTile(
-        leading: Icon(icon,
-            color: isDanger ? Colors.red.shade300 : Colors.white, size: 22),
-        title: Text(
-          label,
-          style: TextStyle(
-            color: isDanger ? Colors.red.shade300 : Colors.white,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-            fontSize: 14,
+      child: Material(
+        color: Colors.transparent,
+        child: ListTile(
+          leading: Icon(icon,
+              color: isDanger ? Colors.red.shade300 : Colors.white, size: 22),
+          title: Text(
+            label,
+            style: TextStyle(
+              color: isDanger ? Colors.red.shade300 : Colors.white,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              fontSize: 14,
+            ),
           ),
+          trailing: isSelected
+              ? Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                )
+              : null,
+          onTap: onTap,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         ),
-        trailing: isSelected
-            ? Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                ),
-              )
-            : null,
-        onTap: onTap,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
     );
   }

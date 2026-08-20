@@ -876,6 +876,200 @@ class S {
         ms: 'Dipadankan',
       );
 
+  // Pair Printer screen
+  static String get pairPrinterTitle => withLang(
+        id: 'Printer',
+        en: 'Printer',
+        ms: 'Pencetak',
+      );
+  static String get printerMenu => withLang(
+        id: 'Printer',
+        en: 'Printer',
+        ms: 'Pencetak',
+      );
+  static String get pairPrinterDescription => withLang(
+        id: 'Daftarkan printer Bluetooth baru ke perangkat ini.',
+        en: 'Register a new Bluetooth printer with this device.',
+        ms: 'Daftarkan pencetak Bluetooth baru ke peranti ini.',
+      );
+  static String get openBluetoothSettings => withLang(
+        id: 'Buka Pengaturan Bluetooth',
+        en: 'Open Bluetooth Settings',
+        ms: 'Buka Tetapan Bluetooth',
+      );
+  static String get bluetoothOffHint => withLang(
+        id: 'Bluetooth nonaktif. Aktifkan Bluetooth untuk melihat perangkat.',
+        en: 'Bluetooth is off. Turn on Bluetooth to see devices.',
+        ms: 'Bluetooth tidak aktif. Hidupkan Bluetooth untuk melihat peranti.',
+      );
+  static String get pairInstructions => withLang(
+        id: 'Buka Pengaturan Bluetooth untuk pairing printer, lalu kembali ke sini dan tekan Refresh.',
+        en: 'Open Bluetooth Settings to pair your printer, then come back and tap Refresh.',
+        ms: 'Buka Tetapan Bluetooth untuk memadankan pencetak, kemudian kembali dan tekan Refresh.',
+      );
+  static String get pairNewPrinter => withLang(
+        id: 'Pair Printer Baru',
+        en: 'Pair New Printer',
+        ms: 'Pasangkan Pencetak Baru',
+      );
+  static String get pairedDevicesTitle => withLang(
+        id: 'Perangkat Tersambung',
+        en: 'Paired Devices',
+        ms: 'Peranti Dipadankan',
+      );
+  static String get tabPaired => withLang(
+        id: 'Tersambung',
+        en: 'Paired',
+        ms: 'Dipadankan',
+      );
+  static String get tabAvailable => withLang(
+        id: 'Tersedia',
+        en: 'Available',
+        ms: 'Tersedia',
+      );
+  static String get deletePrinter => withLang(
+        id: 'Hapus',
+        en: 'Delete',
+        ms: 'Padam',
+      );
+  static String get confirmDeleteTitle => withLang(
+        id: 'Hapus Printer?',
+        en: 'Delete Printer?',
+        ms: 'Padam Pencetak?',
+      );
+  static String get confirmDeleteMessage => withLang(
+        id: 'Printer akan dihapus dari daftar tersambung. Anda dapat pair ulang kapan saja dari tab Tersedia.',
+        en: 'This printer will be removed from the paired list. You can re-pair anytime from the Available tab.',
+        ms: 'Pencetak akan dipadamkan daripada senarai dipadankan. Anda boleh memadankan semula bila-bila dari tab Tersedia.',
+      );
+  static String get scanDevices => withLang(
+        id: 'Pindai',
+        en: 'Scan',
+        ms: 'Imbas',
+      );
+  static String get stopScan => withLang(
+        id: 'Berhenti',
+        en: 'Stop',
+        ms: 'Berhenti',
+      );
+  static String get scanningHint => withLang(
+        id: 'Sedang memindai perangkat di sekitar...',
+        en: 'Scanning for nearby devices...',
+        ms: 'Mengimbas peranti berhampiran...',
+      );
+  static String get scanCompleteHint => withLang(
+        id: 'Pemindaian selesai. Geser ke bawah untuk menyegarkan.',
+        en: 'Scan complete. Pull to refresh.',
+        ms: 'Imbasan selesai. Tarik untuk segarkan.',
+      );
+  static String get pair => withLang(
+        id: 'Pasangkan',
+        en: 'Pair',
+        ms: 'Pasangkan',
+      );
+  static String get pairing => withLang(
+        id: 'Mem-pair...',
+        en: 'Pairing...',
+        ms: 'Sedang memadankan...',
+      );
+  static String get noPairedPrinters => withLang(
+        id: 'Belum ada printer tersambung',
+        en: 'No paired printers yet',
+        ms: 'Belum ada pencetak dipadankan',
+      );
+  static String get noAvailablePrinters => withLang(
+        id: 'Belum ada perangkat tersedia',
+        en: 'No available devices',
+        ms: 'Tiada peranti tersedia',
+      );
+  static String get tapScanToStart => withLang(
+        id: 'Tekan Pindai untuk mencari printer baru',
+        en: 'Tap Scan to find new printers',
+        ms: 'Tekan Imbas untuk mencari pencetak baru',
+      );
+  static String get unpairFailed => withLang(
+        id: 'Gagal menghapus pairing. Coba lagi atau buka Pengaturan Bluetooth.',
+        en: 'Failed to unpair. Try again or open Bluetooth Settings.',
+        ms: 'Gagal memadamkan padanan. Cuba lagi atau buka Tetapan Bluetooth.',
+      );
+  static String get pairFailed => withLang(
+        id: 'Gagal melakukan pairing. Coba lagi.',
+        en: 'Failed to pair. Try again.',
+        ms: 'Gagal memadankan. Cuba lagi.',
+      );
+
+  // Printer Screen
+  static String get bluetoothRequired => withLang(
+        id: 'Bluetooth belum aktif. Aktifkan Bluetooth untuk memindai printer.',
+        en: 'Bluetooth is not active. Turn on Bluetooth to scan for printers.',
+        ms: 'Bluetooth belum aktif. Aktifkan Bluetooth untuk mengimbas pencetak.',
+      );
+  static String get bluetoothNeedsPermission => withLang(
+        id: 'Bluetooth Perlu Izin',
+        en: 'Bluetooth Needs Permission',
+        ms: 'Bluetooth Perlu Kebenaran',
+      );
+  static String get bluetoothNeedsPermissionDesc => withLang(
+        id: 'Aktifkan Bluetooth & Lokasi untuk memindai printer.',
+        en: 'Turn on Bluetooth & Location to scan for printers.',
+        ms: 'Aktifkan Bluetooth & Lokasi untuk mengimbas pencetak.',
+      );
+  static String get savedPrinters => withLang(
+        id: 'Printer Tersimpan',
+        en: 'Saved Printers',
+        ms: 'Pencetak Tersimpan',
+      );
+  static String get noSavedPrinters => withLang(
+        id: 'Belum ada printer tersimpan',
+        en: 'No saved printers yet',
+        ms: 'Belum ada pencetak tersimpan',
+      );
+  static String get noSavedPrintersDesc => withLang(
+        id: 'Pindai untuk menemukan dan menyimpan printer baru.',
+        en: 'Scan to discover and save new printers.',
+        ms: 'Imbas untuk menjumpai dan menyimpan pencetak baharu.',
+      );
+  static String get printerDeleted => withLang(
+        id: 'Printer dihapus:',
+        en: 'Printer removed:',
+        ms: 'Pencetak dipadamkan:',
+      );
+  static String get discoveredDevices => withLang(
+        id: 'Perangkat Terdeteksi',
+        en: 'Discovered Devices',
+        ms: 'Peranti Dikesan',
+      );
+  static String get found => withLang(
+        id: 'ditemukan',
+        en: 'found',
+        ms: 'dijumpai',
+      );
+  static String get readyToScan => withLang(
+        id: 'Siap Memindai',
+        en: 'Ready to Scan',
+        ms: 'Sedia Mengimbas',
+      );
+  static String get readyToScanDesc => withLang(
+        id: 'Tekan "Mulai Pindai" untuk mencari printer Bluetooth di sekitar.',
+        en: 'Tap "Start Scan" to find Bluetooth printers nearby.',
+        ms: 'Tekan "Mula Imbas" untuk mencari pencetak Bluetooth berhampiran.',
+      );
+  static String get startScan => withLang(
+        id: 'Mulai Pindai',
+        en: 'Start Scan',
+        ms: 'Mula Imbas',
+      );
+  static String get openSettings => withLang(
+        id: 'Buka Pengaturan',
+        en: 'Open Settings',
+        ms: 'Buka Tetapan',
+      );
+  static String get scan => withLang(
+        id: 'Pindai',
+        en: 'Scan',
+        ms: 'Imbas',
+      );
+
   // Log screen
   static String get fullLog => withLang(
         id: 'Log Lengkap',

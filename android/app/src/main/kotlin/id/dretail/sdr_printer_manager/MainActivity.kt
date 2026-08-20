@@ -1,5 +1,8 @@
 package id.dretail.sdr_printer_manager
 
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
@@ -9,18 +12,36 @@ import android.content.SharedPreferences
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.widget.Toast
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val SETTINGS_CHANNEL = "id.dretail.sdr_printer_manager/settings"
     private val PRINT_JOB_CHANNEL = "id.dretail.sdr_printer_manager/print_job"
     private val SERVICE_CHANNEL = "id.dretail.sdr_printer_manager/foreground_service"
+    private val BLUETOOTH_CHANNEL = "id.dretail.sdr_printer_manager/bluetooth"
+    private val BLUETOOTH_EVENT_CHANNEL = "id.dretail.sdr_printer_manager/bluetooth_events"
 
     private var pendingPrintJobPath: String? = null
     private var pendingPrintJobName: String? = null
     private var printJobMethodChannel: MethodChannel? = null
+
+    private var bluetoothEventSink: EventChannel.EventSink? = null
+
+    // Tracks MAC of device being paired via PIN, so the PIN broadcast receiver
+    // knows which device to auto-confirm.
+    private var pendingPairMac: String? = null
+
+    // Default PIN for thermal printers (MPT-II, Panda, etc.)
+    private val defaultPin = "0000"
+
+    private val bluetoothAdapter: BluetoothAdapter? get() {
+        val manager = getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+        return manager?.adapter
+    }
 
     private val printJobReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -40,8 +61,94 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private val bluetoothReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val action = intent.action ?: return
+            when (action) {
+                BluetoothDevice.ACTION_FOUND -> {
+                    val device: BluetoothDevice? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                    }
+                    if (device != null) {
+                        emitDevice("found", mapOf(
+                            "mac" to device.address,
+                            "name" to (device.name ?: "Unknown"),
+                        ))
+                    }
+                }
+                BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> {
+                    emitEvent("discovery_finished", null)
+                }
+                BluetoothDevice.ACTION_BOND_STATE_CHANGED -> {
+                    val device: BluetoothDevice? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                    }
+                    val bondState = intent.getIntExtra(
+                        BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.ERROR
+                    )
+                    if (device != null) {
+                        emitDevice(
+                            "bond_state",
+                            mapOf(
+                                "mac" to device.address,
+                                "name" to (device.name ?: "Unknown"),
+                                "state" to bondStateToString(bondState),
+                                "paired" to (bondState == BluetoothDevice.BOND_BONDED),
+                            ),
+                        )
+                        // Clear pending PIN state if bonding ended
+                        if (bondState != BluetoothDevice.BOND_BONDING) {
+                            pendingPairMac = null
+                        }
+                    }
+                }
+                // Auto-confirm PIN when the system requests pairing authentication
+                BluetoothDevice.ACTION_PAIRING_REQUEST -> {
+                    val device: BluetoothDevice? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                    }
+                    if (device != null && device.address == pendingPairMac) {
+                        // Abort the system PIN dialog and set the PIN directly
+                        abortBroadcast()
+                        setPinOnDevice(device)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun bondStateToString(state: Int): String = when (state) {
+        BluetoothDevice.BOND_NONE -> "none"
+        BluetoothDevice.BOND_BONDING -> "bonding"
+        BluetoothDevice.BOND_BONDED -> "bonded"
+        else -> "unknown"
+    }
+
+    private fun emitEvent(type: String, payload: Map<String, Any>?) {
+        mainHandler.post {
+            val data = if (payload != null) mapOf("type" to type) + payload else mapOf("type" to type)
+            bluetoothEventSink?.success(data)
+        }
+    }
+
+    private fun emitDevice(type: String, payload: Map<String, Any>) {
+        emitEvent(type, payload)
+    }
+
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Register print job receiver
         val filter = IntentFilter("id.dretail.sdr_printer_manager.NEW_PRINT_JOB")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(printJobReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -49,11 +156,26 @@ class MainActivity : FlutterActivity() {
             @Suppress("UnspecifiedRegisterReceiverFlag")
             registerReceiver(printJobReceiver, filter)
         }
+        // Register Bluetooth discovery & PIN receivers ONCE — always listening
+        val btFilter = IntentFilter().apply {
+            addAction(BluetoothDevice.ACTION_FOUND)
+            addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
+            addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+            addAction(BluetoothDevice.ACTION_PAIRING_REQUEST)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(bluetoothReceiver, btFilter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            registerReceiver(bluetoothReceiver, btFilter)
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
         try { unregisterReceiver(printJobReceiver) } catch (_: Exception) {}
+        try { stopDiscovery() } catch (_: Exception) {}
+        try { unregisterReceiver(bluetoothReceiver) } catch (_: Exception) {}
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -67,6 +189,13 @@ class MainActivity : FlutterActivity() {
                         result.success(true)
                     } catch (e: Exception) {
                         result.error("UNAVAILABLE", "Could not open print settings", null)
+                    }
+                } else if (call.method == "openBluetoothSettings") {
+                    try {
+                        startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("UNAVAILABLE", "Could not open Bluetooth settings", null)
                     }
                 } else {
                     result.notImplemented()
@@ -93,8 +222,6 @@ class MainActivity : FlutterActivity() {
                         }
                     }
                     "openBatteryOptimization" -> {
-                        // Buka dialog sistem untuk exclude app dari battery optimization.
-                        // Ini berbeda dari autostart manufacturer — ini AOSP standar.
                         try {
                             val intent = Intent(
                                 Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
@@ -104,7 +231,6 @@ class MainActivity : FlutterActivity() {
                             startActivity(intent)
                             result.success(true)
                         } catch (e: Exception) {
-                            // Fallback ke halaman umum battery optimization settings
                             try {
                                 startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
                                 result.success(true)
@@ -121,9 +247,6 @@ class MainActivity : FlutterActivity() {
                             result.success(false)
                         }
                     }
-                    // Flag acknowledgement untuk autostart manufacturer-specific.
-                    // Autostart (Xiaomi/MIUI, Oppo, dll) tidak bisa dibaca via Android API,
-                    // sehingga kita hanya simpan flag bahwa user sudah diarahkan ke settings.
                     "isAutoStartAcknowledged" -> {
                         val prefs: SharedPreferences =
                             getSharedPreferences("sdr_prefs", Context.MODE_PRIVATE)
@@ -136,8 +259,6 @@ class MainActivity : FlutterActivity() {
                         result.success(true)
                     }
                     "openAutoStartSettings" -> {
-                        // Coba buka halaman autostart khusus per manufacturer.
-                        // Jika device tidak dikenali, fallback ke App Info.
                         val opened = tryOpenManufacturerAutoStart()
                         if (!opened) {
                             try {
@@ -159,6 +280,86 @@ class MainActivity : FlutterActivity() {
                 }
             }
 
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, BLUETOOTH_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "getPairedDevices" -> {
+                        result.success(getPairedDevicesList())
+                    }
+                    "startScan" -> {
+                        try {
+                            startDiscovery()
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("ERROR", e.message, null)
+                        }
+                    }
+                    "stopScan" -> {
+                        try {
+                            stopDiscovery()
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.success(false)
+                        }
+                    }
+                    "pairDevice" -> {
+                        val mac = call.argument<String>("mac")
+                        if (mac.isNullOrEmpty()) {
+                            result.error("INVALID", "mac address required", null)
+                            return@setMethodCallHandler
+                        }
+                        try {
+                            val adapter = bluetoothAdapter
+                            if (adapter == null || !adapter.isEnabled) {
+                                result.error("DISABLED", "Bluetooth is off", null)
+                                return@setMethodCallHandler
+                            }
+                            val device = adapter.getRemoteDevice(mac)
+                            // Mark this MAC so the PIN broadcast receiver auto-enters "0000"
+                            pendingPairMac = mac
+                            val ok = device.createBond()
+                            if (!ok) {
+                                pendingPairMac = null
+                            }
+                            result.success(ok)
+                        } catch (e: Exception) {
+                            pendingPairMac = null
+                            result.error("ERROR", e.message, null)
+                        }
+                    }
+                    "unpairDevice" -> {
+                        val mac = call.argument<String>("mac")
+                        if (mac.isNullOrEmpty()) {
+                            result.error("INVALID", "mac address required", null)
+                            return@setMethodCallHandler
+                        }
+                        try {
+                            val adapter = bluetoothAdapter
+                            if (adapter == null) {
+                                result.error("UNAVAILABLE", "No Bluetooth adapter", null)
+                                return@setMethodCallHandler
+                            }
+                            val device = adapter.getRemoteDevice(mac)
+                            result.success(removeBond(device))
+                        } catch (e: Exception) {
+                            result.error("ERROR", e.message, null)
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, BLUETOOTH_EVENT_CHANNEL)
+            .setStreamHandler(object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
+                    bluetoothEventSink = events
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    bluetoothEventSink = null
+                }
+            })
+
         printJobMethodChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger, PRINT_JOB_CHANNEL
         )
@@ -179,19 +380,87 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    /**
-     * Mencoba membuka halaman autostart khusus per manufacturer.
-     * Setiap brand punya Activity berbeda yang tidak ada di AOSP.
-     * Returns true jika berhasil membuka salah satu.
-     */
+    private fun getPairedDevicesList(): List<Map<String, String>> {
+        val adapter = bluetoothAdapter ?: return emptyList()
+        if (!adapter.isEnabled) return emptyList()
+        val result = mutableListOf<Map<String, String>>()
+        for (device in adapter.bondedDevices) {
+            val name = device.name ?: "Unknown"
+            result.add(mapOf("mac" to device.address, "name" to name))
+        }
+        return result
+    }
+
+    private fun startDiscovery() {
+        val adapter = bluetoothAdapter ?: return
+        if (!adapter.isEnabled) return
+        adapter.cancelDiscovery()
+        adapter.startDiscovery()
+        emitEvent("discovery_started", null)
+    }
+
+    private fun stopDiscovery() {
+        val adapter = bluetoothAdapter ?: return
+        if (adapter.isDiscovering) {
+            adapter.cancelDiscovery()
+        }
+        try {
+            unregisterReceiver(bluetoothReceiver)
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun removeBond(device: BluetoothDevice): Boolean {
+        return try {
+            device.javaClass.getMethod("removeBond").invoke(device) as Boolean
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun setPinOnDevice(device: BluetoothDevice) {
+        try {
+            // Convert PIN string to byte array (ASCII)
+            val pinBytes: Array<Byte> = defaultPin.toByteArray().map { it } .toTypedArray()
+            // Try setPin API (Android 12+)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                device.javaClass.getMethod("setPin", Array<Byte>::class.java)
+                    .invoke(device, pinBytes)
+            } else {
+                @Suppress("DEPRECATION")
+                device.javaClass.getMethod("setPin", Array<Byte>::class.java)
+                    .invoke(device, pinBytes)
+            }
+            // Confirm the pairing
+            device.javaClass.getMethod("confirmPairing", Boolean::class.javaPrimitiveType)
+                .invoke(device, true)
+        } catch (e: Exception) {
+            // Fallback: try legacy setPin without confirmPairing
+            try {
+                @Suppress("DEPRECATION")
+                val method = device.javaClass.getMethod("setPin", Array<Byte>::class.java)
+                val pinBytesLegacy: Array<Byte> = defaultPin.toByteArray().map { it } .toTypedArray()
+                @Suppress("DEPRECATION")
+                method.invoke(device, pinBytesLegacy)
+            } catch (e2: Exception) {
+                // PIN auto-set failed — user may need to enter manually
+                runOnUiThread {
+                    Toast.makeText(
+                        this,
+                        "PIN required. Enter $defaultPin when prompted.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+
     private fun tryOpenManufacturerAutoStart(): Boolean {
         val candidates = listOf(
-            // Xiaomi / MIUI
             ComponentName(
                 "com.miui.securitycenter",
                 "com.miui.permcenter.autostart.AutoStartManagementActivity"
             ),
-            // Oppo / ColorOS
             ComponentName(
                 "com.coloros.safecenter",
                 "com.coloros.safecenter.permission.startup.StartupAppListActivity"
@@ -200,12 +469,10 @@ class MainActivity : FlutterActivity() {
                 "com.oppo.safe",
                 "com.oppo.safe.permission.startup.StartupAppListActivity"
             ),
-            // Vivo / OriginOS
             ComponentName(
                 "com.vivo.permissionmanager",
                 "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"
             ),
-            // Huawei / HarmonyOS
             ComponentName(
                 "com.huawei.systemmanager",
                 "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"
@@ -214,27 +481,22 @@ class MainActivity : FlutterActivity() {
                 "com.huawei.systemmanager",
                 "com.huawei.systemmanager.optimize.process.ProtectActivity"
             ),
-            // Samsung One UI
             ComponentName(
                 "com.samsung.android.lool",
                 "com.samsung.android.sm.ui.battery.BatteryActivity"
             ),
-            // OnePlus / OxygenOS
             ComponentName(
                 "com.oneplus.security",
                 "com.oneplus.security.chainlaunch.view.ChainLaunchAppListActivity"
             ),
-            // Asus / ZenUI
             ComponentName(
                 "com.asus.mobilemanager",
                 "com.asus.mobilemanager.autostart.AutoStartActivity"
             ),
-            // Letv / LeEco
             ComponentName(
                 "com.letv.android.letvsafe",
                 "com.letv.android.letvsafe.AutobootManageActivity"
             ),
-            // Meizu / Flyme
             ComponentName(
                 "com.meizu.safe",
                 "com.meizu.safe.permission.SmartBGActivity"
@@ -250,7 +512,6 @@ class MainActivity : FlutterActivity() {
                 startActivity(intent)
                 return true
             } catch (_: Exception) {
-                // Intent ini tidak tersedia di device ini, lanjut ke berikutnya
             }
         }
         return false
