@@ -18,8 +18,8 @@ dependencies:
     path: ./packages/print_bluetooth_thermal
   shared_preferences: ^2.3.2
   permission_handler: ^12.0.3
-  network_info_plus: ^6.0.1
-  file_picker: ^8.0.0
+  network_info_plus: ^8.2.1
+  file_picker: ^12.0.0
   image: ^4.2.0
   pdfx: ^2.6.0
   curved_navigation_bar: ^1.0.6

@@ -293,6 +293,88 @@ void main() {
       expect(result.isNotEmpty, true);
     });
 
+    test('buildSessionSummary renders products by category', () {
+      final data = {
+        'pos_name': 'PoS 1',
+        'session_name': 'Session 1',
+        'cashier_name': 'Kasir 1',
+        'gross_sales': 50000.0,
+        'total_discount': 0.0,
+        'net_sales_before_tax': 50000.0,
+        'total_taxes': 5000.0,
+        'total_sales': 55000.0,
+        'qty_precision': 3,
+        'has_product_groups': true,
+        'product_groups': [
+          {
+            'category_id': 1,
+            'category_name': 'Makanan',
+            'category_tax': 500.0,
+            'category_subtotal': 6600.0,
+            'items': [
+              {
+                'product_id': 1,
+                'product_name': 'Indomie Goreng',
+                'price_unit': 6000.0,
+                'uom_name': 'Pcs',
+                'qty_sold': 1.0,
+                'qty_refunded': 0.0,
+                'amount_sold': 6000.0,
+                'amount_refunded': 0.0,
+              }
+            ],
+          }
+        ],
+        'product_lines': <dynamic>[],
+        'product_lines_tax': 0.0,
+        'grand_total': 6600.0,
+        'company': <String, dynamic>{
+          'currency': <String, dynamic>{'symbol': 'Rp', 'decimal_places': 0}
+        },
+      };
+
+      final result = EscPosHelper.buildSessionSummary(data, PaperSize.mm80);
+      expect(result, isA<Uint8List>());
+      expect(result.isNotEmpty, true);
+    });
+
+    test('buildSessionSummary renders ungrouped products when no categories', () {
+      final data = {
+        'pos_name': 'PoS 1',
+        'session_name': 'Session 1',
+        'cashier_name': 'Kasir 1',
+        'gross_sales': 50000.0,
+        'total_discount': 0.0,
+        'net_sales_before_tax': 50000.0,
+        'total_taxes': 5000.0,
+        'total_sales': 55000.0,
+        'qty_precision': 2,
+        'has_product_groups': false,
+        'product_groups': <dynamic>[],
+        'product_lines': [
+          {
+            'product_id': 1,
+            'product_name': 'Aqua 600ml',
+            'price_unit': 4000.0,
+            'uom_name': 'Pcs',
+            'qty_sold': 3.0,
+            'qty_refunded': 0.0,
+            'amount_sold': 12000.0,
+            'amount_refunded': 0.0,
+          }
+        ],
+        'product_lines_tax': 1200.0,
+        'grand_total': 13200.0,
+        'company': <String, dynamic>{
+          'currency': <String, dynamic>{'symbol': 'Rp', 'decimal_places': 0}
+        },
+      };
+
+      final result = EscPosHelper.buildSessionSummary(data, PaperSize.mm58);
+      expect(result, isA<Uint8List>());
+      expect(result.isNotEmpty, true);
+    });
+
     test('textToEscPos converts text to bytes', () {
       final result = EscPosHelper.textToEscPos('Hello World', PaperSize.mm80);
       expect(result, isA<Uint8List>());
