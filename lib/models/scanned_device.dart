@@ -65,3 +65,6 @@ class BluetoothDeviceEvent {
     );
   }
 }
+extension BluetoothDeviceEventExt on BluetoothDeviceEvent {
+  bool get isLocationDisabled => type == 'location_disabled';
+}

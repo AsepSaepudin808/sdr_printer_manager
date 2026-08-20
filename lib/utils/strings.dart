@@ -1004,6 +1004,11 @@ class S {
         en: 'Bluetooth is not active. Turn on Bluetooth to scan for printers.',
         ms: 'Bluetooth belum aktif. Aktifkan Bluetooth untuk mengimbas pencetak.',
       );
+  static String get locationRequiredForScan => withLang(
+        id: 'Aktifkan Lokasi di Pengaturan untuk memindai Bluetooth.',
+        en: 'Turn on Location in Settings to scan for Bluetooth devices.',
+        ms: 'Aktifkan Lokasi di Tetapan untuk mengimbas peranti Bluetooth.',
+      );
   static String get bluetoothNeedsPermission => withLang(
         id: 'Bluetooth Perlu Izin',
         en: 'Bluetooth Needs Permission',

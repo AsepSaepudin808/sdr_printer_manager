@@ -115,6 +115,10 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
     _eventSub = BluetoothScanHelper.events.listen((event) {
       if (!mounted) return;
       switch (event.type) {
+        case 'location_disabled':
+          setState(() => _isScanning = false);
+          _showLocationRequiredSnackBar();
+          break;
         case 'found':
           if (event.device != null) {
             final mac = event.device!.mac.toUpperCase();
@@ -178,6 +182,25 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
           label: S.openSettings,
           textColor: Colors.white,
           onPressed: () => BluetoothSettingsHelper.openBluetoothSettings(),
+        ),
+      ),
+    );
+  }
+
+  void _showLocationRequiredSnackBar() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(S.locationRequiredForScan),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.orange,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+        action: SnackBarAction(
+          label: S.openSettings,
+          textColor: Colors.white,
+          onPressed: () {
+            BluetoothSettingsHelper.openBluetoothSettings();
+          },
         ),
       ),
     );

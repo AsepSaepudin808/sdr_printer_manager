@@ -1,16 +1,25 @@
 package id.dretail.sdr_printer_manager
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
+import android.bluetooth.le.BluetoothLeScanner
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanResult
+import android.bluetooth.le.ScanSettings
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
+import android.os.ParcelUuid
 import android.provider.Settings
 import android.widget.Toast
 import io.flutter.embedding.android.FlutterActivity
@@ -30,13 +39,45 @@ class MainActivity : FlutterActivity() {
     private var printJobMethodChannel: MethodChannel? = null
 
     private var bluetoothEventSink: EventChannel.EventSink? = null
-
-    // Tracks MAC of device being paired via PIN, so the PIN broadcast receiver
-    // knows which device to auto-confirm.
     private var pendingPairMac: String? = null
-
-    // Default PIN for thermal printers (MPT-II, Panda, etc.)
     private val defaultPin = "0000"
+    private var bleScanner: BluetoothLeScanner? = null
+    private var isBleScanning = false
+    private val bleSeenMacs = mutableSetOf<String>()
+
+    private val bleScanCallback = object : ScanCallback() {
+        @SuppressLint("MissingPermission")
+        override fun onScanResult(callbackType: Int, result: ScanResult) {
+            val device = result.device
+            val mac = device.address
+            // Emit only new devices (deduplicate)
+            if (!bleSeenMacs.contains(mac)) {
+                bleSeenMacs.add(mac)
+                emitDevice("found", mapOf(
+                    "mac" to mac,
+                    "name" to (device.name ?: "Unknown"),
+                ))
+            }
+        }
+
+        override fun onBatchScanResults(results: List<ScanResult>) {
+            for (result in results) {
+                val device = result.device
+                val mac = device.address
+                if (!bleSeenMacs.contains(mac)) {
+                    bleSeenMacs.add(mac)
+                    emitDevice("found", mapOf(
+                        "mac" to mac,
+                        "name" to (device.name ?: "Unknown"),
+                    ))
+                }
+            }
+        }
+
+        override fun onScanFailed(errorCode: Int) {
+            isBleScanning = false
+        }
+    }
 
     private val bluetoothAdapter: BluetoothAdapter? get() {
         val manager = getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
@@ -391,22 +432,70 @@ class MainActivity : FlutterActivity() {
         return result
     }
 
+    @SuppressLint("MissingPermission")
     private fun startDiscovery() {
         val adapter = bluetoothAdapter ?: return
         if (!adapter.isEnabled) return
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+            if (!locationManager.isLocationEnabled) {
+                runOnUiThread {
+                    Toast.makeText(
+                        this,
+                        "Aktifkan Lokasi di Pengaturan untuk memindai Bluetooth.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+                emitEvent("location_disabled", null)
+                return
+            }
+        }
+
+        stopDiscovery()
+
+        bleSeenMacs.clear()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            bleScanner = adapter.bluetoothLeScanner
+            if (bleScanner != null) {
+                isBleScanning = true
+                val settings = ScanSettings.Builder()
+                    .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                    .setReportDelay(0)
+                    .build()
+                try {
+                    bleScanner?.startScan(null, settings, bleScanCallback)
+                    emitEvent("discovery_started", null)
+                    return
+                } catch (e: Exception) {
+                    isBleScanning = false
+                    bleScanner = null
+                }
+            }
+        }
+
         adapter.cancelDiscovery()
         adapter.startDiscovery()
         emitEvent("discovery_started", null)
     }
 
+    @SuppressLint("MissingPermission")
     private fun stopDiscovery() {
-        val adapter = bluetoothAdapter ?: return
-        if (adapter.isDiscovering) {
-            adapter.cancelDiscovery()
+        // Stop BLE scan
+        if (isBleScanning && bleScanner != null) {
+            try {
+                bleScanner?.stopScan(bleScanCallback)
+            } catch (_: Exception) {}
+            isBleScanning = false
         }
-        try {
-            unregisterReceiver(bluetoothReceiver)
-        } catch (_: Exception) {
+
+        // Stop classic discovery
+        val adapter = bluetoothAdapter
+        if (adapter != null && adapter.isDiscovering) {
+            try {
+                adapter.cancelDiscovery()
+            } catch (_: Exception) {}
         }
     }
 
@@ -420,9 +509,7 @@ class MainActivity : FlutterActivity() {
 
     private fun setPinOnDevice(device: BluetoothDevice) {
         try {
-            // Convert PIN string to byte array (ASCII)
             val pinBytes: Array<Byte> = defaultPin.toByteArray().map { it } .toTypedArray()
-            // Try setPin API (Android 12+)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 device.javaClass.getMethod("setPin", Array<Byte>::class.java)
                     .invoke(device, pinBytes)
@@ -431,11 +518,9 @@ class MainActivity : FlutterActivity() {
                 device.javaClass.getMethod("setPin", Array<Byte>::class.java)
                     .invoke(device, pinBytes)
             }
-            // Confirm the pairing
             device.javaClass.getMethod("confirmPairing", Boolean::class.javaPrimitiveType)
                 .invoke(device, true)
         } catch (e: Exception) {
-            // Fallback: try legacy setPin without confirmPairing
             try {
                 @Suppress("DEPRECATION")
                 val method = device.javaClass.getMethod("setPin", Array<Byte>::class.java)
@@ -443,7 +528,6 @@ class MainActivity : FlutterActivity() {
                 @Suppress("DEPRECATION")
                 method.invoke(device, pinBytesLegacy)
             } catch (e2: Exception) {
-                // PIN auto-set failed — user may need to enter manually
                 runOnUiThread {
                     Toast.makeText(
                         this,
