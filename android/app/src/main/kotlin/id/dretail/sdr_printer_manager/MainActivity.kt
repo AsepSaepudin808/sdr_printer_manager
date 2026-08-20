@@ -324,6 +324,9 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, BLUETOOTH_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
+                    "isBluetoothEnabled" -> {
+                        result.success(bluetoothAdapter?.isEnabled == true)
+                    }
                     "getPairedDevices" -> {
                         result.success(getPairedDevicesList())
                     }

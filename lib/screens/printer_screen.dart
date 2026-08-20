@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/scanned_device.dart';
 import '../services/bluetooth_scan_helper.dart';
@@ -20,8 +21,10 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   List<ScannedDevice> _pairedDevices = [];
   bool _isLoadingPaired = true;
-  bool _btEnabled = false;
+  bool _btPermissionsGranted = false;
   bool _locationEnabled = false;
+  bool _btHardwareEnabled = false;
+  String? _activePrinterMac;
 
   // Scan state
   final Map<String, ScannedDevice> _discovered = {};
@@ -81,7 +84,7 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
     final location = await Permission.locationWhenInUse.status;
     if (!mounted) return;
     setState(() {
-      _btEnabled = btConnect.isGranted;
+      _btPermissionsGranted = btConnect.isGranted && location.isGranted;
       _locationEnabled = location.isGranted;
     });
   }
@@ -96,10 +99,15 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
   Future<void> _refreshBtStatus() async {
     final btConnect = await Permission.bluetoothConnect.status;
     final location = await Permission.locationWhenInUse.status;
+    final hwEnabled = await BluetoothScanHelper.isBluetoothEnabled();
+    final prefs = await SharedPreferences.getInstance();
+    final activeMac = prefs.getString('printer_address');
     if (!mounted) return;
     setState(() {
-      _btEnabled = btConnect.isGranted && location.isGranted;
+      _btPermissionsGranted = btConnect.isGranted && location.isGranted;
       _locationEnabled = location.isGranted;
+      _btHardwareEnabled = hwEnabled;
+      _activePrinterMac = activeMac?.toUpperCase();
     });
   }
 
@@ -160,7 +168,7 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
       if (!mounted) return;
       setState(() => _isScanning = false);
     } else {
-      if (!_btEnabled) {
+      if (!_btPermissionsGranted) {
         _showBtRequiredSnackBar();
         return;
       }
@@ -230,7 +238,8 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
           content: Text(S.pairFailed),
           backgroundColor: _danger,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
         ),
       );
@@ -242,7 +251,8 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
     // so we poll getPairedDevices() directly instead.
     int attempts = 0;
     _pairPollingTimer?.cancel();
-    _pairPollingTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+    _pairPollingTimer =
+        Timer.periodic(const Duration(seconds: 1), (timer) async {
       if (!mounted) {
         timer.cancel();
         return;
@@ -256,6 +266,11 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
         timer.cancel();
         setState(() => _pairingMacs.remove(device.mac));
         await _refreshPaired();
+        // Reload active printer MAC so badge updates if this printer was selected
+        final prefs = await SharedPreferences.getInstance();
+        final activeMac = prefs.getString('printer_address');
+        if (!mounted) return;
+        setState(() => _activePrinterMac = activeMac?.toUpperCase());
         if (!mounted) return;
         final messenger = ScaffoldMessenger.of(context);
         if (found) {
@@ -264,7 +279,8 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
               content: Text('${S.printerSuccessfullyPaired} ${device.name}'),
               backgroundColor: Colors.green,
               behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
               margin: const EdgeInsets.all(16),
             ),
           );
@@ -274,7 +290,8 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
               content: Text(S.pairFailed),
               backgroundColor: _danger,
               behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
               margin: const EdgeInsets.all(16),
             ),
           );
@@ -387,7 +404,8 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
         SnackBar(
           content: Text('${S.printerDeleted} ${device.name}'),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
         ),
       );
@@ -397,12 +415,18 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
           content: Text(S.unpairFailed),
           backgroundColor: _danger,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
         ),
       );
     }
     await _refreshPaired();
+    // Reload active printer MAC in case the unpaired device was active
+    final prefs = await SharedPreferences.getInstance();
+    final activeMac = prefs.getString('printer_address');
+    if (!mounted) return;
+    setState(() => _activePrinterMac = activeMac?.toUpperCase());
   }
 
   Future<void> _refreshPairedDevices() async {
@@ -505,9 +529,8 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: _isScanning
-              ? Colors.white.withValues(alpha: 0.2)
-              : Colors.white,
+          color:
+              _isScanning ? Colors.white.withValues(alpha: 0.2) : Colors.white,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -541,23 +564,56 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
   }
 
   Widget _buildBluetoothStatusBanner() {
-    final allGranted = _btEnabled && _locationEnabled;
+    // Three states:
+    // 1. Hardware off  → red/orange, prompt to turn on BT
+    // 2. Hardware on, permissions missing → orange, prompt to grant
+    // 3. All ready      → green, show active printer info
+    final allReady =
+        _btHardwareEnabled && _btPermissionsGranted && _locationEnabled;
+    final btOff = !_btHardwareEnabled;
+
+    Color bgStart, bgEnd;
+    IconData icon;
+    String title;
+    String subtitle;
+
+    if (btOff) {
+      bgStart = Colors.red.shade700;
+      bgEnd = Colors.red.shade600;
+      icon = Icons.bluetooth_disabled_rounded;
+      title = S.bluetoothInactive;
+      subtitle = 'Aktifkan Bluetooth untuk memindai printer.';
+    } else if (!allReady) {
+      bgStart = Colors.orange.shade700;
+      bgEnd = Colors.orange.shade600;
+      icon = Icons.bluetooth_rounded;
+      title = S.bluetoothNeedsPermission;
+      subtitle = S.bluetoothNeedsPermissionDesc;
+    } else {
+      bgStart = const Color(0xFF034B2F);
+      bgEnd = const Color(0xFF06874F);
+      icon = Icons.bluetooth_rounded;
+      title = S.bluetoothActive;
+      subtitle = _activePrinterMac != null
+          ? 'Printer aktif terhubung'
+          : 'Pilih printer untuk digunakan';
+    }
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: allGranted
-              ? [const Color(0xFF034B2F), const Color(0xFF06874F)]
-              : [Colors.orange.shade700, Colors.orange.shade600],
+          colors: [bgStart, bgEnd],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: (allGranted ? Colors.green : Colors.orange)
-                .withValues(alpha: 0.3),
+            color:
+                (btOff ? Colors.red : (allReady ? Colors.green : Colors.orange))
+                    .withValues(alpha: 0.3),
             blurRadius: 14,
             offset: const Offset(0, 5),
           ),
@@ -569,7 +625,7 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
             animation: _pulseAnimation,
             builder: (context, child) {
               return Transform.scale(
-                scale: allGranted ? _pulseAnimation.value : 1.0,
+                scale: allReady ? _pulseAnimation.value : 1.0,
                 child: child,
               );
             },
@@ -579,13 +635,7 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
                 color: Colors.white.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
-                allGranted
-                    ? Icons.bluetooth_rounded
-                    : Icons.bluetooth_disabled_rounded,
-                color: Colors.white,
-                size: 24,
-              ),
+              child: Icon(icon, color: Colors.white, size: 24),
             ),
           ),
           const SizedBox(width: 14),
@@ -594,7 +644,7 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  allGranted ? S.bluetoothActive : S.bluetoothNeedsPermission,
+                  title,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 15,
@@ -603,15 +653,13 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  allGranted
-                      ? '${_pairedDevices.length} printer tersambung'
-                      : S.bluetoothNeedsPermissionDesc,
+                  subtitle,
                   style: const TextStyle(color: Colors.white70, fontSize: 11),
                 ),
               ],
             ),
           ),
-          if (!allGranted)
+          if (btOff || !allReady)
             TextButton(
               onPressed: () => BluetoothSettingsHelper.openBluetoothSettings(),
               style: TextButton.styleFrom(
@@ -791,6 +839,8 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
   }
 
   Widget _buildSavedPrinterCard(ScannedDevice device, {bool isLast = false}) {
+    final isActive =
+        _activePrinterMac?.toUpperCase() == device.mac.toUpperCase();
     return Container(
       margin: EdgeInsets.only(bottom: isLast ? 0 : 10),
       decoration: BoxDecoration(
@@ -864,32 +914,35 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.green.shade200),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.check_circle_rounded,
-                                    size: 11, color: Colors.green.shade700),
-                                const SizedBox(width: 3),
-                                Text(
-                                  S.printerRegistered,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.green.shade700,
-                                    fontWeight: FontWeight.w700,
+                          if (isActive) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(10),
+                                border:
+                                    Border.all(color: Colors.green.shade200),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.link_rounded,
+                                      size: 11, color: Colors.green.shade700),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    S.printerConnected,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.green.shade700,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ],
@@ -949,8 +1002,8 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
                       color: _primary.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child:
-                        const Icon(Icons.print_rounded, color: _primary, size: 30),
+                    child: const Icon(Icons.print_rounded,
+                        color: _primary, size: 30),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -1124,7 +1177,7 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
             ],
           ),
           const SizedBox(height: 12),
-          if (!_btEnabled)
+          if (!_btPermissionsGranted)
             _buildBluetoothWarningCard()
           else if (!_isScanning && discoveredList.isEmpty)
             _buildScanPromptCard()
@@ -1154,9 +1207,8 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
               color: Colors.orange.shade100,
               shape: BoxShape.circle,
             ),
-            child:
-                Icon(Icons.bluetooth_disabled_rounded,
-                    color: Colors.orange.shade700, size: 24),
+            child: Icon(Icons.bluetooth_disabled_rounded,
+                color: Colors.orange.shade700, size: 24),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -1192,7 +1244,8 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
                   borderRadius: BorderRadius.circular(10)),
             ),
             child: Text(S.openSettings,
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                style:
+                    const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
           ),
         ],
       ),
@@ -1346,8 +1399,8 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
                   foregroundColor: Colors.white,
                   disabledBackgroundColor: _primary.withValues(alpha: 0.5),
                   padding: const EdgeInsets.symmetric(horizontal: 14),
-                  textStyle:
-                      const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  textStyle: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w700),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),

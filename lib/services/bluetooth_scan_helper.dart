@@ -66,6 +66,15 @@ class BluetoothScanHelper {
     }
   }
 
+  static Future<bool> isBluetoothEnabled() async {
+    try {
+      return await _channel.invokeMethod<bool>('isBluetoothEnabled') ?? false;
+    } catch (e) {
+      debugPrint('[SDR-BT] isBluetoothEnabled error: $e');
+      return false;
+    }
+  }
+
   static Stream<BluetoothDeviceEvent> get events {
     _eventStream ??= _eventChannel
         .receiveBroadcastStream()
