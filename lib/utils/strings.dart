@@ -1074,6 +1074,16 @@ class S {
         en: 'Scan',
         ms: 'Imbas',
       );
+  static String get printerSuccessfullyPaired => withLang(
+        id: 'Printer berhasil dipairkan:',
+        en: 'Printer paired successfully:',
+        ms: 'Pencetak berjaya dipadankan:',
+      );
+  static String get printerRegistered => withLang(
+        id: 'Terdaftar',
+        en: 'Registered',
+        ms: 'Berdaftar',
+      );
 
   // Log screen
   static String get fullLog => withLang(

@@ -28,6 +28,8 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
   final Set<String> _pairingMacs = {};
   bool _isScanning = false;
   StreamSubscription<BluetoothDeviceEvent>? _eventSub;
+  Timer? _scanTimeoutTimer;
+  Timer? _pairPollingTimer;
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -55,6 +57,8 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
     WidgetsBinding.instance.removeObserver(this);
     _pulseController.dispose();
     _eventSub?.cancel();
+    _scanTimeoutTimer?.cancel();
+    _pairPollingTimer?.cancel();
     BluetoothScanHelper.stopScan();
     super.dispose();
   }
@@ -151,6 +155,7 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
 
   Future<void> _toggleScan() async {
     if (_isScanning) {
+      _scanTimeoutTimer?.cancel();
       await BluetoothScanHelper.stopScan();
       if (!mounted) return;
       setState(() => _isScanning = false);
@@ -166,7 +171,16 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
       final started = await BluetoothScanHelper.startScan();
       if (!started && mounted) {
         setState(() => _isScanning = false);
+        return;
       }
+      // Auto-stop scan after 15 seconds
+      _scanTimeoutTimer?.cancel();
+      _scanTimeoutTimer = Timer(const Duration(seconds: 15), () {
+        if (mounted && _isScanning) {
+          BluetoothScanHelper.stopScan();
+          if (mounted) setState(() => _isScanning = false);
+        }
+      });
     }
   }
 
@@ -220,7 +234,53 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
           margin: const EdgeInsets.all(16),
         ),
       );
+      return;
     }
+
+    // Poll paired devices until the new device appears (max 10 seconds).
+    // ACTION_BOND_STATE_CHANGED may not reach Flutter on some devices (e.g. Samsung),
+    // so we poll getPairedDevices() directly instead.
+    int attempts = 0;
+    _pairPollingTimer?.cancel();
+    _pairPollingTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      attempts++;
+      final paired = await BluetoothScanHelper.getPairedDevices();
+      final found = paired.any(
+        (p) => p.mac.toUpperCase() == device.mac.toUpperCase(),
+      );
+      if (found || attempts >= 10) {
+        timer.cancel();
+        setState(() => _pairingMacs.remove(device.mac));
+        await _refreshPaired();
+        if (!mounted) return;
+        final messenger = ScaffoldMessenger.of(context);
+        if (found) {
+          messenger.showSnackBar(
+            SnackBar(
+              content: Text('${S.printerSuccessfullyPaired} ${device.name}'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        } else {
+          messenger.showSnackBar(
+            SnackBar(
+              content: Text(S.pairFailed),
+              backgroundColor: _danger,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        }
+      }
+    });
   }
 
   Future<void> _unpair(ScannedDevice device) async {
@@ -820,7 +880,7 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
                                     size: 11, color: Colors.green.shade700),
                                 const SizedBox(width: 3),
                                 Text(
-                                  S.paired,
+                                  S.printerRegistered,
                                   style: TextStyle(
                                     fontSize: 10,
                                     color: Colors.green.shade700,
