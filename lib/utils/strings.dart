@@ -35,7 +35,7 @@ final langProvider = LangNotifier();
 
 // ─── LOCALIZATION STRINGS ──────────────────────────────────────────────────
 class S {
-  static String _langCode = 'id';
+  static String _langCode = 'en';
   static String get langCode => _langCode;
 
   // Internal callback for language change notifications

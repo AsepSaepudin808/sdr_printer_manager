@@ -1254,66 +1254,66 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
 
   Widget _buildScanPromptCard() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      width: double.infinity,
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFFEEF6FF),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: const Color(0xFFB3DCFF)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: _primary.withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  _primary.withValues(alpha: 0.08),
-                  _primary.withValues(alpha: 0.03),
-                ],
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: _primary.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
               ),
-              shape: BoxShape.circle,
+              child: Icon(Icons.bluetooth_searching_rounded,
+                  size: 44, color: _primary),
             ),
-            child: Icon(Icons.bluetooth_searching_rounded,
-                size: 44, color: _primary.withValues(alpha: 0.6)),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            S.readyToScan,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: Colors.grey.shade700,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            S.readyToScanDesc,
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-          ),
-          const SizedBox(height: 18),
-          ElevatedButton.icon(
-            onPressed: _toggleScan,
-            icon: const Icon(Icons.bluetooth_searching_rounded, size: 18),
-            label: Text(S.startScan),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+            const SizedBox(height: 16),
+            Text(
+              S.readyToScan,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1A3A5C),
               ),
-              elevation: 0,
             ),
-          ),
-        ],
+            const SizedBox(height: 6),
+            Text(
+              S.readyToScanDesc,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12, color: Color(0xFF4A6A8A)),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: _toggleScan,
+              icon: const Icon(Icons.bluetooth_searching_rounded, size: 18),
+              label: Text(S.startScan),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 13),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
