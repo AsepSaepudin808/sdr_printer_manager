@@ -68,7 +68,7 @@ class PrintServerService {
       final body = jsonEncode({
         'status': 'ok',
         'server': 'dPrinter Mart',
-        'version': '1.0.2',
+        'version': '1.0.3',
         'printer_connected': _btService?.isConnected ?? false,
       });
       return Response.ok(body, headers: const {
