@@ -60,18 +60,24 @@ class _MainShellState extends ConsumerState<MainShell> {
   static const _bg = AppColors.background;
 
   // ─── Convenience getters ───────────────────────────────────────────────────
-  AppState get _appState => ref.read(appStateProvider);
-  AppStateNotifier get _appNotifier => ref.read(appStateProvider.notifier);
+  ServerState get _serverState => ref.read(serverStateProvider);
+  PrinterConfig get _config => ref.read(printerConfigProvider);
+
+  ServerStateNotifier get _serverN => ref.read(serverStateProvider.notifier);
+  PrintStateNotifier get _printN => ref.read(printStateProvider.notifier);
+  PrinterConfigNotifier get _configN =>
+      ref.read(printerConfigProvider.notifier);
+  UiStateNotifier get _uiN => ref.read(uiStateProvider.notifier);
 
   SdrBluetoothService get _bt => ref.read(bluetoothServiceProvider);
   PrintServerService get _server => ref.read(printServerServiceProvider);
 
-  bool get _serverRunning => _appState.serverRunning;
-  int get _serverPort => _appState.serverPort;
-  PrinterDevice? get _printer => _appState.printer;
-  PaperSize get _paperSize => _appState.paperSize;
-  CashDrawerMode get _cashDrawerMode => _appState.cashDrawerMode;
-  bool get _sessionSummaryCashDrawer => _appState.sessionSummaryCashDrawer;
+  bool get _serverRunning => _serverState.running;
+  int get _serverPort => _serverState.port;
+  PrinterDevice? get _printer => _config.printer;
+  PaperSize get _paperSize => _config.paperSize;
+  CashDrawerMode get _cashDrawerMode => _config.cashDrawerMode;
+  bool get _sessionSummaryCashDrawer => _config.sessionSummaryCashDrawer;
 
   @override
   void initState() {
@@ -157,8 +163,8 @@ class _MainShellState extends ConsumerState<MainShell> {
       return;
     }
 
-    _appNotifier.setIsPrinting(true);
-    _appNotifier.setPrintStatus('🖨️ Memproses $name...');
+    _printN.setIsPrinting(true);
+    _printN.setStatus('🖨️ Memproses $name...');
     _addLog('🖨️ Menerima Print Job: $name');
 
     final connected = await _bt.checkConnection();
@@ -166,20 +172,20 @@ class _MainShellState extends ConsumerState<MainShell> {
       final a = _bt.lastAddress ?? _printer?.address;
       if (a != null && a.isNotEmpty) {
         _addLog(S.reconnecting);
-        _appNotifier.setPrintStatus(S.reconnecting);
+        _printN.setStatus(S.reconnecting);
         final reconOk = await _bt.connect(a);
         if (!reconOk) {
           _addLog(S.printerDisconnected);
-          _appNotifier.setIsPrinting(false);
-          _appNotifier.setPrintStatus(S.printerDisconnected);
+          _printN.setIsPrinting(false);
+          _printN.setStatus(S.printerDisconnected);
           return;
         }
         _addLog(S.printerConnected);
-        _appNotifier.setBtConnected(true);
+        _configN.setBtConnected(true);
       } else {
         _addLog(S.printerNotConnected);
-        _appNotifier.setIsPrinting(false);
-        _appNotifier.setPrintStatus(S.printerNotConnected);
+        _printN.setIsPrinting(false);
+        _printN.setStatus(S.printerNotConnected);
         return;
       }
     }
@@ -193,7 +199,7 @@ class _MainShellState extends ConsumerState<MainShell> {
 
       for (int i = 1; i <= totalPages; i++) {
         if (!mounted) return;
-        _appNotifier.setPrintStatus('🖨️ Mencetak halaman $i/$totalPages...');
+        _printN.setStatus('🖨️ Mencetak halaman $i/$totalPages...');
 
         final page = await document.getPage(i);
         final pageImage = await page.render(
@@ -222,10 +228,10 @@ class _MainShellState extends ConsumerState<MainShell> {
       }
 
       _addLog(S.printSuccess(name));
-      _appNotifier.setPrintStatus(S.printSuccess(name));
-      _appNotifier.incrementPrintCount();
+      _printN.setStatus(S.printSuccess(name));
+      ref.read(printCountProvider.notifier).increment();
       final p = await SharedPreferences.getInstance();
-      await p.setInt('print_count', _appState.printCount);
+      await p.setInt('print_count', ref.read(printCountProvider));
       _recordHistory('pdf', name, true, 0);
 
       try {
@@ -233,10 +239,10 @@ class _MainShellState extends ConsumerState<MainShell> {
       } catch (_) {}
     } catch (e) {
       _addLog('❌ Error mencetak $name: $e');
-      _appNotifier.setPrintStatus('❌ Error: $e');
+      _printN.setStatus('❌ Error: $e');
     } finally {
       await document?.close();
-      _appNotifier.setIsPrinting(false);
+      _printN.setIsPrinting(false);
     }
   }
 
@@ -253,9 +259,9 @@ class _MainShellState extends ConsumerState<MainShell> {
     final p = await SharedPreferences.getInstance();
     final port = p.getInt('server_port') ?? 8080;
     _portCtrl.text = port.toString();
-    _appNotifier.setServerPort(port);
-    _appNotifier.setAutoStart(p.getBool('auto_start') ?? false);
-    _appNotifier.setPrintCount(p.getInt('print_count') ?? 0);
+    _serverN.setPort(port);
+    _configN.setAutoStart(p.getBool('auto_start') ?? false);
+    ref.read(printCountProvider.notifier).set(p.getInt('print_count') ?? 0);
 
     final ps = p.getString('paper_size') ?? 'mm80';
     final paperSize = ps == 'mm58'
@@ -263,7 +269,7 @@ class _MainShellState extends ConsumerState<MainShell> {
         : ps == 'mm100'
             ? PaperSize.mm100
             : PaperSize.mm80;
-    _appNotifier.setPaperSize(paperSize);
+    _configN.setPaperSize(paperSize);
 
     final customChars = p.getInt('chars_per_line') ?? 0;
     EscPosHelper.setCustomCharsPerLine(customChars);
@@ -276,25 +282,25 @@ class _MainShellState extends ConsumerState<MainShell> {
         : savedCashDrawer == 'before'
             ? CashDrawerMode.openBeforePrint
             : CashDrawerMode.off;
-    _appNotifier.setCashDrawerMode(cashDrawerMode);
+    _configN.setCashDrawerMode(cashDrawerMode);
     EscPosHelper.setCashDrawerMode(cashDrawerMode);
 
     final sessionSummaryCashDrawer =
         p.getBool('session_summary_cash_drawer') ?? false;
-    _appNotifier.setSessionSummaryCashDrawer(sessionSummaryCashDrawer);
+    _configN.setSessionSummaryCashDrawer(sessionSummaryCashDrawer);
     EscPosHelper.setSessionSummaryCashDrawer(sessionSummaryCashDrawer);
 
     final printQris = p.getBool('print_qris') ?? true;
-    _appNotifier.setPrintQris(printQris);
+    _configN.setPrintQris(printQris);
     _server.setPrintQris(printQris);
 
     final addr = p.getString('printer_address');
     final name = p.getString('printer_name');
     if (addr != null && name != null) {
-      _appNotifier.setPrinter(PrinterDevice(address: addr, name: name));
+      _configN.setPrinter(PrinterDevice(address: addr, name: name));
     }
 
-    if (_appState.autoStart && _printer != null) {
+    if (_config.autoStart && _printer != null) {
       await Future.delayed(const Duration(milliseconds: 800));
       _startServer();
     }
@@ -305,14 +311,14 @@ class _MainShellState extends ConsumerState<MainShell> {
       ref.read(logsProvider.notifier).add(m);
     };
     _server.onPrintSuccess = () async {
-      _appNotifier.incrementPrintCount();
+      ref.read(printCountProvider.notifier).increment();
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('print_count', _appState.printCount);
+      await prefs.setInt('print_count', ref.read(printCountProvider));
     };
     _server.onPrintJob = (type, label, success, dataSize) {
       _recordHistory(type, label, success, dataSize);
     };
-    _server.onStatusChange = (r) => _appNotifier.setServerRunning(r);
+    _server.onStatusChange = (r) => _serverN.setRunning(r);
   }
 
   void _addLog(String m) {
@@ -324,43 +330,42 @@ class _MainShellState extends ConsumerState<MainShell> {
       _toast(S.selectPrinterToast, err: true);
       return;
     }
-    if (_serverRunning) {
+    if (_serverRunning || _serverState.connecting) {
       _toast(S.serverAlreadyRunning);
       return;
     }
 
-    // ✅ Start foreground service untuk menjaga app tetap aktif
     await ForegroundServiceHelper.start();
 
-    _appNotifier.setConnecting(true);
+    _serverN.setConnecting(true);
     final ok = await _bt.connect(_printer!.address);
-    _appNotifier.setConnecting(false);
+    _serverN.setConnecting(false);
     if (!ok) {
       _addLog(S.printerConnectFail);
       _toast(S.printerConnectFail, err: true);
       return;
     }
-    _appNotifier.setBtConnected(true);
+    _configN.setBtConnected(true);
     _addLog(S.printerConnected);
     _server.setCashDrawerMode(_cashDrawerMode);
     _server.setSessionSummaryCashDrawer(_sessionSummaryCashDrawer);
     try {
       await _server.start(
           port: _serverPort, bluetoothService: _bt, paperSize: _paperSize);
-      _appNotifier.setServerRunning(true);
+      _serverN.setRunning(true);
       _addLog(S.serverReady);
       _toast(S.printerReady);
     } catch (e) {
       _toast('${S.serverStartFailed}: $e', err: true);
-      _appNotifier.setServerRunning(false);
+      _serverN.setRunning(false);
     }
   }
 
   Future<void> _stopServer() async {
     await _server.stop();
     await _bt.disconnect();
-    _appNotifier.setServerRunning(false);
-    _appNotifier.setBtConnected(false);
+    _serverN.setRunning(false);
+    _configN.setBtConnected(false);
     _addLog(S.printerStopped);
     // ✅ Stop foreground service saat server dihentikan
     await ForegroundServiceHelper.stop();
@@ -382,7 +387,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     final r = await Navigator.push<PrinterDevice>(
         context, MaterialPageRoute(builder: (_) => const ScanScreen()));
     if (r != null) {
-      _appNotifier.setPrinter(r);
+      _configN.setPrinter(r);
       final p = await SharedPreferences.getInstance();
       await p.setString('printer_address', r.address);
       await p.setString('printer_name', r.name);
@@ -401,12 +406,12 @@ class _MainShellState extends ConsumerState<MainShell> {
         : ps == 'mm100'
             ? PaperSize.mm100
             : PaperSize.mm80;
-    _appNotifier.setPaperSize(newSize);
+    _configN.setPaperSize(newSize);
     _server.setPaperSize(newSize);
 
     await ref.read(historyNotifierProvider.notifier).load();
     final newCount = p.getInt('print_count') ?? 0;
-    _appNotifier.setPrintCount(newCount);
+    ref.read(printCountProvider.notifier).set(newCount);
     if (newCount == 0 && ref.read(historyNotifierProvider).isEmpty) {
       ref.read(logsProvider.notifier).clear();
     }
@@ -420,7 +425,7 @@ class _MainShellState extends ConsumerState<MainShell> {
       _server.setPaperSize(_paperSize);
       _server.setCashDrawerMode(_cashDrawerMode);
       _server.setSessionSummaryCashDrawer(_sessionSummaryCashDrawer);
-      _server.setPrintQris(_appState.printQris);
+      _server.setPrintQris(_config.printQris);
     }
   }
 
@@ -439,13 +444,13 @@ class _MainShellState extends ConsumerState<MainShell> {
     }
     final p = await SharedPreferences.getInstance();
     await p.setInt('server_port', v);
-    _appNotifier.setServerPort(v);
+    _serverN.setPort(v);
     _toast('${S.portSaved}: $v');
   }
 
   Future<void> _doTestPrint(Uint8List data, String label) async {
-    _appNotifier.setIsPrinting(true);
-    _appNotifier.setPrintStatus('');
+    _printN.setIsPrinting(true);
+    _printN.setStatus('');
     _addLog('🖨️ Test print: $label (${data.length} bytes)');
 
     final connected = await _bt.checkConnection();
@@ -453,20 +458,20 @@ class _MainShellState extends ConsumerState<MainShell> {
       final a = _bt.lastAddress;
       if (a != null && a.isNotEmpty) {
         _addLog(S.reconnecting);
-        _appNotifier.setPrintStatus(S.reconnecting);
+        _printN.setStatus(S.reconnecting);
         final reconOk = await _bt.connect(a);
         if (!reconOk) {
           _addLog(S.printerDisconnected);
-          _appNotifier.setIsPrinting(false);
-          _appNotifier.setPrintStatus(S.printerDisconnected);
+          _printN.setIsPrinting(false);
+          _printN.setStatus(S.printerDisconnected);
           return;
         }
         _addLog(S.printerConnected);
-        _appNotifier.setBtConnected(true);
+        _configN.setBtConnected(true);
       } else {
         _addLog(S.printerNotConnected);
-        _appNotifier.setIsPrinting(false);
-        _appNotifier.setPrintStatus(S.printerNotConnected);
+        _printN.setIsPrinting(false);
+        _printN.setStatus(S.printerNotConnected);
         return;
       }
     }
@@ -474,13 +479,13 @@ class _MainShellState extends ConsumerState<MainShell> {
     final ok = await _bt.sendRaw(data);
     if (ok) {
       _addLog(S.printSuccess(label));
-      _appNotifier.setIsPrinting(false);
-      _appNotifier.setPrintStatus(S.printSuccess(label));
+      _printN.setIsPrinting(false);
+      _printN.setStatus(S.printSuccess(label));
       _recordHistory('test', label, true, data.length);
     } else {
       _addLog(S.printFail);
-      _appNotifier.setIsPrinting(false);
-      _appNotifier.setPrintStatus(S.printFail);
+      _printN.setIsPrinting(false);
+      _printN.setStatus(S.printFail);
       _recordHistory('test', label, false, data.length);
     }
   }
@@ -553,7 +558,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                   Expanded(
                       child: _statItem(
                           S.totalPrintedLabel,
-                          '${_appState.printCount}',
+                          '${ref.read(printCountProvider)}',
                           Icons.receipt_long_rounded)),
                   Container(
                       width: 1,
@@ -630,8 +635,17 @@ class _MainShellState extends ConsumerState<MainShell> {
   // ─── BUILD ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    // Watch providers so UI rebuilds on state change
-    final appState = ref.watch(appStateProvider);
+    final tabIndex = ref.watch(uiStateProvider.select((s) => s.tabIndex));
+    final printer = ref.watch(printerConfigProvider.select((s) => s.printer));
+    final historyDateRange =
+        ref.watch(uiStateProvider.select((s) => s.historyDateRange));
+    final isPrinting =
+        ref.watch(printStateProvider.select((s) => s.isPrinting));
+    final printStatus = ref.watch(printStateProvider.select((s) => s.status));
+    final paperSize =
+        ref.watch(printerConfigProvider.select((s) => s.paperSize));
+    final autoStart =
+        ref.watch(printerConfigProvider.select((s) => s.autoStart));
     final logs = ref.watch(logsProvider);
 
     final titles = [S.home, S.freeText, S.statistics, S.printImage, S.printPdf];
@@ -682,8 +696,8 @@ class _MainShellState extends ConsumerState<MainShell> {
             );
           },
           child: Text(
-            titles[appState.tabIndex],
-            key: ValueKey(appState.tabIndex),
+            titles[tabIndex],
+            key: ValueKey(tabIndex),
             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
           ),
         ),
@@ -709,22 +723,22 @@ class _MainShellState extends ConsumerState<MainShell> {
           ),
         ],
       ),
-      drawer: _buildDrawer(appState, logs),
+      drawer: _buildDrawer(tabIndex, printer, logs),
       body: IndexedStack(
-        index: appState.tabIndex,
+        index: tabIndex,
         children: [
-          _buildHomeTab(appState),
+          _buildHomeTab(paperSize, isPrinting, printStatus, autoStart),
           TextTab(isKeyboardVisible: isKeyboardVisible),
-          _buildStatsTab(appState),
+          _buildStatsTab(historyDateRange),
           const ImageTab(),
           const PdfTab(),
         ],
       ),
-      bottomNavigationBar: isKeyboardVisible ? null : _buildBottomBar(appState),
+      bottomNavigationBar: isKeyboardVisible ? null : _buildBottomBar(tabIndex),
     );
   }
 
-  Widget _buildDrawer(AppState appState, List<String> logs) {
+  Widget _buildDrawer(int tabIndex, PrinterDevice? printer, List<String> logs) {
     return Drawer(
       elevation: 16,
       shape: const RoundedRectangleBorder(
@@ -792,8 +806,8 @@ class _MainShellState extends ConsumerState<MainShell> {
                 const SizedBox(height: 8),
                 _drawerItem(Icons.home_rounded, S.home, () {
                   Navigator.pop(context);
-                  _appNotifier.setTabIndex(0);
-                }, isSelected: appState.tabIndex == 0),
+                  _uiN.setTabIndex(0);
+                }, isSelected: tabIndex == 0),
                 _drawerItem(Icons.history_rounded, S.activityHistory, () {
                   Navigator.pop(context);
                   Navigator.push(context,
@@ -835,7 +849,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                       color: Colors.white70, size: 18),
                   const SizedBox(width: 8),
                   Text(
-                    appState.printer?.name ?? S.noPrinterSelected,
+                    printer?.name ?? S.noPrinterSelected,
                     style: const TextStyle(color: Colors.white70, fontSize: 12),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -906,41 +920,35 @@ class _MainShellState extends ConsumerState<MainShell> {
                 )
               : null,
           onTap: onTap,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         ),
       ),
     );
   }
 
-  Widget _buildBottomBar(AppState appState) {
-    // Dari docs curved_navigation_bar:
-    //   backgroundColor = warna body di belakang lengkungan (harus = Scaffold backgroundColor)
-    //   color           = warna bar itu sendiri
-    // SafeArea(top:false) = padding bawah otomatis = tinggi system navBar Android
-    // Hasilnya: navBar tidak tertimpa system navBar, background senada
+  Widget _buildBottomBar(int tabIndex) {
     return SafeArea(
       top: false,
       child: CurvedNavigationBar(
-        backgroundColor: _bg, // sama dengan Scaffold backgroundColor
+        backgroundColor: _bg,
         color: Colors.white,
         buttonBackgroundColor: _primary,
         height: 75,
         animationDuration: const Duration(milliseconds: 180),
         animationCurve: Curves.easeOut,
-        index: appState.tabIndex,
+        index: tabIndex,
         items: [
-          _buildNavItem(Icons.home_rounded, appState.tabIndex == 0, 'Home'),
-          _buildNavItem(
-              Icons.description_rounded, appState.tabIndex == 1, 'Text'),
-          _buildNavItem(
-              Icons.insights_rounded, appState.tabIndex == 2, 'Stats'),
-          _buildNavItem(Icons.image_rounded, appState.tabIndex == 3, 'Image'),
-          _buildNavItem(
-              Icons.picture_as_pdf_rounded, appState.tabIndex == 4, 'PDF'),
+          _buildNavItem(Icons.home_rounded, tabIndex == 0, 'Home'),
+          _buildNavItem(Icons.description_rounded, tabIndex == 1, 'Text'),
+          _buildNavItem(Icons.insights_rounded, tabIndex == 2, 'Stats'),
+          _buildNavItem(Icons.image_rounded, tabIndex == 3, 'Image'),
+          _buildNavItem(Icons.picture_as_pdf_rounded, tabIndex == 4, 'PDF'),
         ],
         onTap: (index) {
-          _appNotifier.setTabIndex(index);
+          _uiN.setTabIndex(index);
         },
       ),
     );
@@ -967,16 +975,16 @@ class _MainShellState extends ConsumerState<MainShell> {
     );
   }
 
-  Widget _buildStatsTab(AppState appState) {
+  Widget _buildStatsTab(DateTimeRange? historyDateRange) {
     final historyItems = ref.watch(historyNotifierProvider);
-    final historyNotifier = ref.read(historyNotifierProvider.notifier);
+    final stats = ref.watch(historyStatsProvider);
 
-    final totalSuccess = historyNotifier.successCount;
-    final totalFail = historyNotifier.failCount;
-    final todayCount = historyNotifier.todayCount;
-    final totalBytes = historyNotifier.totalBytes;
-    final byType = historyNotifier.countByType;
-    final byDate = historyNotifier.countByDate;
+    final totalSuccess = stats.totalSuccess;
+    final totalFail = stats.totalFail;
+    final todayCount = stats.todayCount;
+    final totalBytes = stats.totalBytes;
+    final byType = stats.countByType;
+    final byDate = stats.countByDate;
     final rate = (totalSuccess + totalFail) > 0
         ? (totalSuccess / (totalSuccess + totalFail) * 100).toStringAsFixed(0)
         : '—';
@@ -1019,7 +1027,6 @@ class _MainShellState extends ConsumerState<MainShell> {
       if (v > maxDay) maxDay = v;
     }
 
-    final historyDateRange = appState.historyDateRange;
     final filteredItems = historyDateRange != null
         ? historyItems.where((h) {
             final d = h.timestamp;
@@ -1249,7 +1256,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                     ),
                   );
                   if (picked != null) {
-                    _appNotifier.setHistoryDateRange(picked);
+                    _uiN.setHistoryDateRange(picked);
                   }
                 },
                 child: Container(
@@ -1290,7 +1297,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                     ),
                     if (historyDateRange != null)
                       GestureDetector(
-                        onTap: () => _appNotifier.setHistoryDateRange(null),
+                        onTap: () => _uiN.setHistoryDateRange(null),
                         child: Icon(Icons.close_rounded,
                             size: 16, color: Colors.grey.shade400),
                       ),
@@ -1451,26 +1458,25 @@ class _MainShellState extends ConsumerState<MainShell> {
   }
 
   // ─── HOME TAB ──────────────────────────────────────────────────────────────
-  Widget _buildHomeTab(AppState appState) {
+  Widget _buildHomeTab(PaperSize paperSize, bool isPrinting, String printStatus,
+      bool autoStart) {
     const double bottomPad = 16.0;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, bottomPad),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         StatusCard(
-          appState: appState,
           onCopyUrl: () => _toast(S.urlCopied),
         ),
         const SizedBox(height: 14),
         const BackgroundPermissionsCard(),
         const SizedBox(height: 14),
         PrinterCard(
-          appState: appState,
           onSelectPrinter: _goScan,
           onToggleServer: _serverRunning ? _stopServer : _startServer,
         ),
         const SizedBox(height: 14),
         StatsRow(
-          appState: appState,
+          paperSize: paperSize,
           onShowHistory: _showPrintHistory,
           onOpenSettings: _goPrinterSettings,
         ),
@@ -1481,13 +1487,11 @@ class _MainShellState extends ConsumerState<MainShell> {
         ),
         const SizedBox(height: 14),
         TestPrintCard(
-          isPrinting: appState.isPrinting,
-          paperSize: appState.paperSize,
           onTestPrint: (data, label) => _doTestPrint(data, label),
         ),
-        if (appState.printStatus.isNotEmpty) ...[
+        if (printStatus.isNotEmpty) ...[
           const SizedBox(height: 10),
-          _testStatusCard(appState)
+          _testStatusCard(printStatus)
         ],
         const SizedBox(height: 14),
         LogCard(
@@ -1499,9 +1503,8 @@ class _MainShellState extends ConsumerState<MainShell> {
         ),
         const SizedBox(height: 14),
         AutoStartCard(
-          autoStart: appState.autoStart,
           onChanged: (v) async {
-            _appNotifier.setAutoStart(v);
+            _configN.setAutoStart(v);
             final p = await SharedPreferences.getInstance();
             await p.setBool('auto_start', v);
           },
@@ -1524,8 +1527,8 @@ class _MainShellState extends ConsumerState<MainShell> {
         child: child,
       );
 
-  Widget _testStatusCard(AppState appState) {
-    final ok = appState.printStatus.startsWith('✅');
+  Widget _testStatusCard(String printStatus) {
+    final ok = printStatus.startsWith('✅');
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -1534,7 +1537,7 @@ class _MainShellState extends ConsumerState<MainShell> {
         border:
             Border.all(color: (ok ? _success : _danger).withValues(alpha: 0.3)),
       ),
-      child: Text(appState.printStatus,
+      child: Text(printStatus,
           style: TextStyle(
               color: ok ? _success : _danger,
               fontWeight: FontWeight.w600,

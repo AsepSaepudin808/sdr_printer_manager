@@ -14,7 +14,6 @@ import '../utils/strings.dart';
 import '../utils/colors.dart';
 
 class PdfTab extends ConsumerStatefulWidget {
-  // Tidak ada constructor params lagi — semua dibaca dari provider
   const PdfTab({super.key});
 
   @override
@@ -33,7 +32,6 @@ class _PdfTabState extends ConsumerState<PdfTab>
   bool _isPrinting = false;
   String _status = '';
 
-  // Override hanya untuk pilihan lokal di tab ini
   PaperSize? _overridePaperSize;
   double _contrast = 1.35;
   int _threshold = 160;
@@ -41,9 +39,8 @@ class _PdfTabState extends ConsumerState<PdfTab>
 
   late AnimationController _pulseController;
 
-  // Gunakan override jika user pilih manual, fallback ke provider
   PaperSize get _activePaperSize =>
-      _overridePaperSize ?? ref.read(appStateProvider).paperSize;
+      _overridePaperSize ?? ref.read(printerConfigProvider).paperSize;
 
   @override
   void initState() {
@@ -161,14 +158,14 @@ class _PdfTabState extends ConsumerState<PdfTab>
       }
 
       ref.read(historyNotifierProvider.notifier).add(PrintHistory(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        type: 'pdf',
-        label: _fileName ?? 'PDF Print',
-        timestamp: DateTime.now(),
-        success: true,
-        dataSize: _pdfBytes!.length,
-        source: 'manual',
-      ));
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            type: 'pdf',
+            label: _fileName ?? 'PDF Print',
+            timestamp: DateTime.now(),
+            success: true,
+            dataSize: _pdfBytes!.length,
+            source: 'manual',
+          ));
 
       setState(() {
         _isPrinting = false;
@@ -242,9 +239,8 @@ class _PdfTabState extends ConsumerState<PdfTab>
   }
 
   Widget _buildPaperSelector() {
-    // watch agar selector update saat paperSize berubah dari settings
     final globalPaperSize =
-        ref.watch(appStateProvider.select((s) => s.paperSize));
+        ref.watch(printerConfigProvider.select((s) => s.paperSize));
     final current = _overridePaperSize ?? globalPaperSize;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

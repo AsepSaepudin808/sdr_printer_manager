@@ -34,7 +34,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
 
   Future<void> _loadPrefs() async {
     final p = await SharedPreferences.getInstance();
-    final paperSize = ref.read(appStateProvider).paperSize;
+    final paperSize = ref.read(printerConfigProvider).paperSize;
     final savedChars = p.getInt('chars_per_line') ?? 0;
     setState(() {
       _charsCtrl.text = (savedChars > 0
@@ -66,8 +66,8 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
       return;
     }
 
-    final paperSize = ref.read(appStateProvider).paperSize;
-    final cashDrawerMode = ref.read(appStateProvider).cashDrawerMode;
+    final paperSize = ref.read(printerConfigProvider).paperSize;
+    final cashDrawerMode = ref.read(printerConfigProvider).cashDrawerMode;
     final originalChars = EscPosHelper.customCharsPerLineSetting;
     final originalFeed = EscPosHelper.extraFeedSetting;
     final originalCut = EscPosHelper.autoCutSetting;
@@ -133,9 +133,10 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
 
   Future<void> _save() async {
     final p = await SharedPreferences.getInstance();
-    final paperSize = ref.read(appStateProvider).paperSize;
-    final cashDrawerMode = ref.read(appStateProvider).cashDrawerMode;
-    final sessionSummaryCashDrawer = ref.read(appStateProvider).sessionSummaryCashDrawer;
+    final paperSize = ref.read(printerConfigProvider).paperSize;
+    final cashDrawerMode = ref.read(printerConfigProvider).cashDrawerMode;
+    final sessionSummaryCashDrawer =
+        ref.read(printerConfigProvider).sessionSummaryCashDrawer;
 
     final key = switch (paperSize) {
       PaperSize.mm58 => 'mm58',
@@ -172,7 +173,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
     EscPosHelper.setExtraFeed(_extraFeed);
 
     await p.setBool('print_qris', _printQris);
-    ref.read(appStateProvider.notifier).setPrintQris(_printQris);
+    ref.read(printerConfigProvider.notifier).setPrintQris(_printQris);
 
     if (mounted) {
       ScaffoldMessenger.of(context).clearSnackBars();
@@ -242,10 +243,12 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
     required String label,
     required IconData icon,
   }) {
-    final cashDrawerMode = ref.watch(appStateProvider).cashDrawerMode;
+    final cashDrawerMode =
+        ref.watch(printerConfigProvider.select((s) => s.cashDrawerMode));
     final isSelected = cashDrawerMode == mode;
     return InkWell(
-      onTap: () => ref.read(appStateProvider.notifier).setCashDrawerMode(mode),
+      onTap: () =>
+          ref.read(printerConfigProvider.notifier).setCashDrawerMode(mode),
       borderRadius: BorderRadius.circular(8),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -285,9 +288,11 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final paperSize = ref.watch(appStateProvider.select((s) => s.paperSize));
-    final cashDrawerMode = ref.watch(appStateProvider.select((s) => s.cashDrawerMode));
-    final sessionSummaryCashDrawer = ref.watch(appStateProvider.select((s) => s.sessionSummaryCashDrawer));
+    final paperSize = ref.watch(printerConfigProvider.select((s) => s.paperSize));
+    final cashDrawerMode =
+        ref.watch(printerConfigProvider.select((s) => s.cashDrawerMode));
+    final sessionSummaryCashDrawer =
+        ref.watch(printerConfigProvider.select((s) => s.sessionSummaryCashDrawer));
     final themeColor = Theme.of(context).colorScheme.primary;
 
     if (!_loaded) {
@@ -331,7 +336,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
               ],
               selected: {paperSize},
               onSelectionChanged: (v) {
-                ref.read(appStateProvider.notifier).setPaperSize(v.first);
+                ref.read(printerConfigProvider.notifier).setPaperSize(v.first);
                 _charsCtrl.text = EscPosHelper.defaultCharsPerLine(v.first).toString();
               },
               style: ButtonStyle(
@@ -426,7 +431,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
                     thumbColor: WidgetStateProperty.resolveWith((s) =>
                         s.contains(WidgetState.selected) ? Colors.white : Colors.grey),
                     onChanged: (v) {
-                      ref.read(appStateProvider.notifier).setCashDrawerMode(
+                      ref.read(printerConfigProvider.notifier).setCashDrawerMode(
                           v ? CashDrawerMode.openBeforePrint : CashDrawerMode.off);
                     },
                   ),
@@ -440,7 +445,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: InkWell(
-                      onTap: () => ref.read(appStateProvider.notifier)
+                      onTap: () => ref.read(printerConfigProvider.notifier)
                           .setSessionSummaryCashDrawer(!sessionSummaryCashDrawer),
                       borderRadius: BorderRadius.circular(8),
                       child: Row(children: [

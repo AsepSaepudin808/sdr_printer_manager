@@ -1,30 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/app_state_provider.dart';
 import '../../utils/escpos_helper.dart';
 import '../../utils/strings.dart';
 import '../../utils/colors.dart';
 
-/// Stats row widget - shows print count and printer settings
-class StatsRow extends StatelessWidget {
-  final AppState appState;
+class StatsRow extends ConsumerWidget {
+  final PaperSize paperSize;
   final VoidCallback? onShowHistory;
   final VoidCallback? onOpenSettings;
 
   const StatsRow({
     super.key,
-    required this.appState,
+    required this.paperSize,
     this.onShowHistory,
     this.onOpenSettings,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final paperLabel = switch (appState.paperSize) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final printCount = ref.watch(printCountProvider);
+    final paperLabel = switch (paperSize) {
       PaperSize.mm58 => '58mm',
       PaperSize.mm80 => '80mm',
       PaperSize.mm100 => '100mm'
     };
-    final chars = EscPosHelper.charsPerLine(appState.paperSize);
+    final chars = EscPosHelper.charsPerLine(paperSize);
 
     return Row(children: [
       Expanded(
@@ -46,7 +47,7 @@ class StatsRow extends StatelessWidget {
               ]),
               const SizedBox(height: 10),
               TweenAnimationBuilder<int>(
-                tween: IntTween(begin: 0, end: appState.printCount),
+                tween: IntTween(begin: 0, end: printCount),
                 duration: const Duration(milliseconds: 800),
                 curve: Curves.easeOutCubic,
                 builder: (context, value, child) {

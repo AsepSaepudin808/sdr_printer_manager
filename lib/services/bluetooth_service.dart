@@ -11,15 +11,12 @@ enum BluetoothConnectionState {
   error,
 }
 
-/// Bluetooth service dengan error handling dan retry mechanism
-/// Dioptimasi untuk stabilitas di semua device Android (Xiaomi, Samsung, dll)
 class SdrBluetoothService {
   BluetoothConnectionState _state = BluetoothConnectionState.disconnected;
   String? _lastAddress;
   String? _lastError;
   DateTime? _lastConnectedAt;
 
-  // Retry configuration - dioptimasi untuk stability
   static const int _maxRetryAttempts = 5;
   static const Duration _baseRetryDelay = Duration(milliseconds: 800);
   static const Duration _connectionTimeout = Duration(seconds: 15);
@@ -31,7 +28,6 @@ class SdrBluetoothService {
   String? get lastError => _lastError;
   DateTime? get lastConnectedAt => _lastConnectedAt;
 
-  /// Check if Bluetooth is enabled
   Future<bool> isBluetoothEnabled() async {
     try {
       return await PrintBluetoothThermal.bluetoothEnabled;
@@ -41,7 +37,6 @@ class SdrBluetoothService {
     }
   }
 
-  /// Get paired Bluetooth devices
   Future<List<BluetoothInfo>> getPairedDevices() async {
     try {
       final bool enabled = await PrintBluetoothThermal.bluetoothEnabled;
@@ -54,14 +49,14 @@ class SdrBluetoothService {
   }
 
   /// Connect to printer with robust retry mechanism
-  /// Menggunakan exponential backoff untuk retry yang lebih stabil
   Future<bool> connect(String address) async {
     _state = BluetoothConnectionState.connecting;
     _lastError = null;
 
     for (int attempt = 1; attempt <= _maxRetryAttempts; attempt++) {
       try {
-        debugPrint('[SDR-BT] Connect attempt $attempt/$_maxRetryAttempts to $address');
+        debugPrint(
+            '[SDR-BT] Connect attempt $attempt/$_maxRetryAttempts to $address');
 
         // Disconnect first if already connected
         if (_state == BluetoothConnectionState.connected) {
@@ -84,14 +79,16 @@ class SdrBluetoothService {
           _state = BluetoothConnectionState.connected;
           _lastAddress = address;
           _lastConnectedAt = DateTime.now();
-          debugPrint('[SDR-BT] Connected successfully to $address on attempt $attempt');
+          debugPrint(
+              '[SDR-BT] Connected successfully to $address on attempt $attempt');
           return true;
         }
 
         // Calculate delay with exponential backoff
         if (attempt < _maxRetryAttempts) {
           final delay = _baseRetryDelay * attempt;
-          debugPrint('[SDR-BT] Attempt $attempt failed, retrying in ${delay.inMilliseconds}ms...');
+          debugPrint(
+              '[SDR-BT] Attempt $attempt failed, retrying in ${delay.inMilliseconds}ms...');
           await Future.delayed(delay);
         }
       } catch (e) {
@@ -124,7 +121,9 @@ class SdrBluetoothService {
   Future<bool> checkConnection() async {
     try {
       final status = await PrintBluetoothThermal.connectionStatus;
-      _state = status ? BluetoothConnectionState.connected : BluetoothConnectionState.disconnected;
+      _state = status
+          ? BluetoothConnectionState.connected
+          : BluetoothConnectionState.disconnected;
       return status;
     } catch (e) {
       debugPrint('[SDR-BT] checkConnection error: $e');
@@ -135,7 +134,6 @@ class SdrBluetoothService {
 
   /// Send raw bytes to printer with auto-reconnect and retry
   Future<bool> sendRaw(Uint8List data) async {
-    // First check connection status
     await checkConnection();
 
     // Auto-reconnect if disconnected but we have a last address
@@ -156,13 +154,14 @@ class SdrBluetoothService {
     // Retry sending data if it fails
     for (int attempt = 1; attempt <= 3; attempt++) {
       try {
-        final List<int> bytes = data.toList();
-        debugPrint('[SDR-BT] Sending ${bytes.length} bytes (attempt $attempt/3)...');
+        debugPrint(
+            '[SDR-BT] Sending ${data.length} bytes (attempt $attempt/3)...');
 
         // Small delay before sending
-        await Future.delayed(const Duration(milliseconds: AppConstants.reconnectDelayMs));
+        await Future.delayed(
+            const Duration(milliseconds: AppConstants.reconnectDelayMs));
 
-        bool ok = await PrintBluetoothThermal.writeBytes(bytes).timeout(
+        bool ok = await PrintBluetoothThermal.writeBytes(data).timeout(
           _writeTimeout,
           onTimeout: () {
             debugPrint('[SDR-BT] writeBytes timeout on attempt $attempt');
@@ -171,7 +170,7 @@ class SdrBluetoothService {
         );
 
         if (ok) {
-          debugPrint('[SDR-BT] All ${bytes.length} bytes sent successfully');
+          debugPrint('[SDR-BT] All ${data.length} bytes sent successfully');
           return true;
         }
 

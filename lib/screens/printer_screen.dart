@@ -70,6 +70,12 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _refreshAll();
+    } else if (state == AppLifecycleState.paused) {
+      BluetoothScanHelper.stopScan();
+      _scanTimeoutTimer?.cancel();
+      if (_isScanning && mounted) {
+        setState(() => _isScanning = false);
+      }
     }
   }
 

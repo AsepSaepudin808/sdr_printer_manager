@@ -149,20 +149,21 @@ class MainActivity : FlutterActivity() {
                         }
                     }
                 }
-                // Auto-confirm PIN when the system requests pairing authentication
-                BluetoothDevice.ACTION_PAIRING_REQUEST -> {
-                    val device: BluetoothDevice? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
-                    } else {
-                        @Suppress("DEPRECATION")
-                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
-                    }
-                    if (device != null && device.address == pendingPairMac) {
-                        // Abort the system PIN dialog and set the PIN directly
-                        abortBroadcast()
-                        setPinOnDevice(device)
-                    }
-                }
+            }
+        }
+    }
+
+    private val pairingPinReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val device: BluetoothDevice? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+            }
+            if (device != null && device.address == pendingPairMac) {
+                abortBroadcast()
+                setPinOnDevice(device)
             }
         }
     }
@@ -189,7 +190,6 @@ class MainActivity : FlutterActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Register print job receiver
         val filter = IntentFilter("id.dretail.sdr_printer_manager.NEW_PRINT_JOB")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(printJobReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -197,18 +197,24 @@ class MainActivity : FlutterActivity() {
             @Suppress("UnspecifiedRegisterReceiverFlag")
             registerReceiver(printJobReceiver, filter)
         }
-        // Register Bluetooth discovery & PIN receivers ONCE — always listening
         val btFilter = IntentFilter().apply {
             addAction(BluetoothDevice.ACTION_FOUND)
             addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
             addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
-            addAction(BluetoothDevice.ACTION_PAIRING_REQUEST)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(bluetoothReceiver, btFilter, Context.RECEIVER_NOT_EXPORTED)
         } else {
             @Suppress("UnspecifiedRegisterReceiverFlag")
             registerReceiver(bluetoothReceiver, btFilter)
+        }
+
+        val pinFilter = IntentFilter(BluetoothDevice.ACTION_PAIRING_REQUEST)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(pairingPinReceiver, pinFilter, Context.RECEIVER_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            registerReceiver(pairingPinReceiver, pinFilter)
         }
     }
 
@@ -217,6 +223,7 @@ class MainActivity : FlutterActivity() {
         try { unregisterReceiver(printJobReceiver) } catch (_: Exception) {}
         try { stopDiscovery() } catch (_: Exception) {}
         try { unregisterReceiver(bluetoothReceiver) } catch (_: Exception) {}
+        try { unregisterReceiver(pairingPinReceiver) } catch (_: Exception) {}
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

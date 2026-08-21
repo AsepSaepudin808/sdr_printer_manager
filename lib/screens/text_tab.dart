@@ -12,7 +12,6 @@ import '../utils/colors.dart';
 import 'printer_settings_screen.dart';
 
 class TextTab extends ConsumerStatefulWidget {
-  // isKeyboardVisible tetap via constructor karena MainShell yang detect keyboard
   final bool isKeyboardVisible;
   const TextTab({super.key, this.isKeyboardVisible = false});
 
@@ -71,7 +70,7 @@ class _TextTabState extends ConsumerState<TextTab>
 
     setState(() => _isPrinting = true);
 
-    final paperSize = ref.read(appStateProvider).paperSize;
+    final paperSize = ref.read(printerConfigProvider).paperSize;
     final cpl = EscPosHelper.charsPerLine(paperSize);
     final printAlignMode = _alignMode == 3 ? 0 : _alignMode;
 
@@ -87,14 +86,14 @@ class _TextTabState extends ConsumerState<TextTab>
       setState(() => _isPrinting = false);
       if (success) {
         ref.read(historyNotifierProvider.notifier).add(PrintHistory(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          type: 'text',
-          label: 'Text Print',
-          timestamp: DateTime.now(),
-          success: true,
-          dataSize: data.length,
-          source: 'manual',
-        ));
+              id: DateTime.now().millisecondsSinceEpoch.toString(),
+              type: 'text',
+              label: 'Text Print',
+              timestamp: DateTime.now(),
+              success: true,
+              dataSize: data.length,
+              source: 'manual',
+            ));
         _showSnackBar(S.printSuccess('Text'));
       } else {
         _showSnackBar(S.printFail, isError: true);
@@ -164,7 +163,7 @@ class _TextTabState extends ConsumerState<TextTab>
   void _insertTestPattern() {
     _isTestPattern = true;
     // Baca paperSize saat ini dari provider
-    final paperSize = ref.read(appStateProvider).paperSize;
+    final paperSize = ref.read(printerConfigProvider).paperSize;
     final cpl = EscPosHelper.charsPerLine(paperSize);
     final now = DateTime.now();
     final date =
@@ -276,8 +275,8 @@ class _TextTabState extends ConsumerState<TextTab>
 
   @override
   Widget build(BuildContext context) {
-    // watch agar rebuild saat paperSize berubah dari settings
-    final paperSize = ref.watch(appStateProvider.select((s) => s.paperSize));
+    final paperSize =
+        ref.watch(printerConfigProvider.select((s) => s.paperSize));
     final charsPerLine = EscPosHelper.charsPerLine(paperSize);
     final lineWidth = _getFullLineWidth(charsPerLine);
     final paperContentWidth = lineWidth + 8.0;
@@ -289,8 +288,6 @@ class _TextTabState extends ConsumerState<TextTab>
             : _alignMode == 2
                 ? TextAlign.right
                 : TextAlign.justify;
-    // extendBody:false + SafeArea di navBar = Scaffold handle insets otomatis
-    // vp hanya untuk antisipasi notch/cutout kiri dan atas
     final vp = MediaQuery.viewPaddingOf(context);
 
     return Container(
@@ -366,12 +363,8 @@ class _TextTabState extends ConsumerState<TextTab>
               const SizedBox(width: 6),
               Container(width: 1.5, height: 22, color: Colors.grey.shade200),
               const SizedBox(width: 6),
-              _formatBtn(
-                  Icons.format_bold_rounded,
-                  _isBold,
-                  () => setState(() => _isBold = !_isBold),
-                  S.bold,
-                  themeColor),
+              _formatBtn(Icons.format_bold_rounded, _isBold,
+                  () => setState(() => _isBold = !_isBold), S.bold, themeColor),
               _formatBtn(
                   Icons.format_italic_rounded,
                   _isItalic,
@@ -450,7 +443,7 @@ class _TextTabState extends ConsumerState<TextTab>
                         borderRadius: BorderRadius.circular(10)),
                     child: const Icon(Icons.delete_sweep_rounded,
                         size: 20, color: Colors.red))),
-          ]),
+        ]),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

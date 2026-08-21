@@ -1,24 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/app_state_provider.dart';
 import '../../utils/strings.dart';
 import '../../utils/colors.dart';
 import '../../utils/escpos_helper.dart';
 
-/// Status card widget - shows server status and URL
-class StatusCard extends StatelessWidget {
-  final AppState appState;
+class StatusCard extends ConsumerWidget {
   final VoidCallback? onCopyUrl;
 
-  const StatusCard({
-    super.key,
-    required this.appState,
-    this.onCopyUrl,
-  });
+  const StatusCard({super.key, this.onCopyUrl});
 
   @override
-  Widget build(BuildContext context) {
-    final paperLabel = switch (appState.paperSize) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final paperSize = ref.watch(printerConfigProvider.select((s) => s.paperSize));
+    final serverRunning = ref.watch(serverStateProvider.select((s) => s.running));
+    final serverPort = ref.watch(serverStateProvider.select((s) => s.port));
+
+    final paperLabel = switch (paperSize) {
       PaperSize.mm58 => '58mm',
       PaperSize.mm80 => '80mm',
       PaperSize.mm100 => '100mm'
@@ -27,7 +26,7 @@ class StatusCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: appState.serverRunning
+          colors: serverRunning
               ? [const Color(0xFF034B2F), const Color(0xFF06874F)]
               : [AppColors.primary, AppColors.primary.withValues(alpha: 0.85)],
           begin: Alignment.topLeft,
@@ -36,7 +35,7 @@ class StatusCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: (appState.serverRunning ? AppColors.success : AppColors.primary)
+            color: (serverRunning ? AppColors.success : AppColors.primary)
                 .withValues(alpha: 0.35),
             blurRadius: 20,
             offset: const Offset(0, 8),
@@ -57,11 +56,11 @@ class StatusCard extends StatelessWidget {
                   width: 14,
                   height: 14,
                   decoration: BoxDecoration(
-                    color: appState.serverRunning
+                    color: serverRunning
                         ? AppColors.success
                         : Colors.grey.shade400,
                     shape: BoxShape.circle,
-                    boxShadow: appState.serverRunning
+                    boxShadow: serverRunning
                         ? [
                             BoxShadow(
                               color: AppColors.success.withValues(alpha: 0.6),
@@ -77,7 +76,7 @@ class StatusCard extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Text(
-            appState.serverRunning ? S.printerActive : S.printerInactive,
+            serverRunning ? S.printerActive : S.printerInactive,
             style: const TextStyle(
               color: Colors.white,
               fontSize: 16,
@@ -99,10 +98,10 @@ class StatusCard extends StatelessWidget {
           ),
         ]),
         const SizedBox(height: 16),
-        if (appState.serverRunning)
+        if (serverRunning)
           GestureDetector(
             onTap: () {
-              Clipboard.setData(ClipboardData(text: 'http://127.0.0.1:${appState.serverPort}'));
+              Clipboard.setData(ClipboardData(text: 'http://127.0.0.1:$serverPort'));
               onCopyUrl?.call();
             },
             child: Container(
@@ -117,7 +116,7 @@ class StatusCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'http://127.0.0.1:${appState.serverPort}',
+                        'http://127.0.0.1:$serverPort',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 14,

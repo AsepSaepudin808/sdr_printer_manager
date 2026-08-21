@@ -1,25 +1,21 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/app_state_provider.dart';
 import '../../utils/strings.dart';
 import '../../utils/colors.dart';
 import '../../utils/test_print_template.dart';
-import '../../utils/escpos_helper.dart';
 
-/// Test print card widget - for testing printer functionality
-class TestPrintCard extends StatelessWidget {
-  final bool isPrinting;
-  final PaperSize paperSize;
+class TestPrintCard extends ConsumerWidget {
   final void Function(Uint8List, String) onTestPrint;
 
-  const TestPrintCard({
-    super.key,
-    required this.isPrinting,
-    required this.paperSize,
-    required this.onTestPrint,
-  });
+  const TestPrintCard({super.key, required this.onTestPrint});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isPrinting = ref.watch(printStateProvider.select((s) => s.isPrinting));
+    final paperSize = ref.watch(printerConfigProvider.select((s) => s.paperSize));
+
     return _card(
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [

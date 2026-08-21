@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/crash_log_service.dart';
 import '../utils/strings.dart';
 import '../providers/history_provider.dart';
 import '../providers/app_state_provider.dart';
@@ -44,7 +46,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       MaterialPageRoute(builder: (_) => const ScanScreen()),
     );
     if (result != null && mounted) {
-      ref.read(appStateProvider.notifier).setPrinter(result);
+      ref.read(printerConfigProvider.notifier).setPrinter(result);
       final p = await SharedPreferences.getInstance();
       await p.setString('printer_address', result.address);
       await p.setString('printer_name', result.name);
@@ -137,7 +139,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await ref.read(historyNotifierProvider.notifier).clear();
     await p.setInt('print_count', 0);
     await p.remove('print_history_v1');
-    ref.read(appStateProvider.notifier).setPrintCount(0);
+    ref.read(printCountProvider.notifier).reset();
     ref.read(logsProvider.notifier).clear();
 
     String freedLabel;
@@ -179,6 +181,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         duration: const Duration(seconds: 3),
       ));
     }
+  }
+
+  Future<void> _sendLog() async {
+    final file = crashLogService.logFile;
+    if (file == null || !await file.exists()) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(S.isEn
+            ? 'No log file yet. Try again after a crash.'
+            : 'Belum ada log. Coba lagi setelah crash terjadi.'),
+        backgroundColor: Colors.grey.shade700,
+      ));
+      return;
+    }
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(file.path)],
+        subject: 'dPrinter Mart Crash Log V1.0.3',
+        text: S.isEn
+            ? 'Crash log from dPrinter Mart V1.0.3'
+            : 'Log crash dari dPrinter Mart V1.0.3',
+      ),
+    );
+  }
+
+  Future<void> _clearLog() async {
+    await crashLogService.clear();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(S.isEn ? 'Log cleared' : 'Log dihapus'),
+      backgroundColor: Colors.grey.shade700,
+    ));
   }
 
   Widget _buildSection(String label,
@@ -226,8 +260,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final appState = ref.watch(appStateProvider);
-    final printer = appState.printer;
+    final printer = ref.watch(printerConfigProvider.select((s) => s.printer));
     final themeColor = Theme.of(context).colorScheme.primary;
 
     if (!_loaded) {
@@ -434,6 +467,67 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
             ]),
+          ),
+          _buildSection(
+            S.isEn ? 'Send Crash Log' : 'Kirim Log Crash',
+            icon: Icons.bug_report_outlined,
+            iconColor: Colors.orange.shade700,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  S.isEn
+                      ? 'If the app crashes, the error is saved here. Send this file when contacting support.'
+                      : 'Jika aplikasi crash, error tersimpan di sini. Kirim file ini saat menghubungi support.',
+                  style: const TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${crashLogService.lineCount} ${S.isEn ? "entries" : "entri"}',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                ),
+                const SizedBox(height: 12),
+                Row(children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _sendLog,
+                      icon: const Icon(Icons.send_rounded, size: 18),
+                      label: Text(
+                        S.isEn ? 'Send Log' : 'Kirim Log',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange.shade700,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: _clearLog,
+                    icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                    label: Text(
+                      S.isEn ? 'Clear' : 'Hapus',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.grey.shade700,
+                      side: BorderSide(color: Colors.grey.shade400),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 12, horizontal: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ]),
+              ],
+            ),
           ),
           _buildSection(
             S.version,

@@ -60,8 +60,7 @@ class _ImageTabState extends ConsumerState<ImageTab>
     });
 
     try {
-      // Baca paperSize dari provider langsung
-      final paperSize = ref.read(appStateProvider).paperSize;
+      final paperSize = ref.read(printerConfigProvider).paperSize;
       final bytes = await _imageFile!.readAsBytes();
       final original = img.decodeImage(bytes);
       if (original == null) {
@@ -72,11 +71,11 @@ class _ImageTabState extends ConsumerState<ImageTab>
         return;
       }
 
-      final maxW = EscPosHelper.paperMaxWidth(paperSize);
-      final resized = img.copyResize(original, width: maxW);
-      final mono = img.grayscale(resized);
-
-      final escData = _imageToEscPos(mono, maxW);
+      final List<int> buf = [];
+      buf.addAll(EscPosHelper.init());
+      buf.addAll(EscPosHelper.imageEsc(original, paperSize));
+      buf.addAll(EscPosHelper.feed(2));
+      final escData = Uint8List.fromList(buf);
 
       final btService = ref.read(bluetoothServiceProvider);
       final ok = await btService.sendRaw(escData);
@@ -103,37 +102,6 @@ class _ImageTabState extends ConsumerState<ImageTab>
         _status = '❌ Error: $e';
       });
     }
-  }
-
-  Uint8List _imageToEscPos(img.Image image, int maxW) {
-    final w = image.width;
-    final h = image.height;
-    final widthBytes = (w + 7) ~/ 8;
-    final List<int> buf = [];
-    buf.addAll([0x1B, 0x40]);
-    buf.addAll([0x1B, 0x61, 0x01]);
-    for (int y = 0; y < h; y += 24) {
-      final bandH = (y + 24 > h) ? h - y : 24;
-      buf.addAll([0x1D, 0x76, 0x30, 0x00]);
-      buf.addAll([widthBytes & 0xFF, (widthBytes >> 8) & 0xFF]);
-      buf.addAll([bandH & 0xFF, (bandH >> 8) & 0xFF]);
-      for (int row = 0; row < bandH; row++) {
-        for (int col = 0; col < widthBytes; col++) {
-          int byte = 0;
-          for (int bit = 0; bit < 8; bit++) {
-            final px = col * 8 + bit;
-            if (px < w && (y + row) < h) {
-              final pixel = image.getPixel(px, y + row);
-              if (img.getLuminance(pixel) < 128) byte |= (0x80 >> bit);
-            }
-          }
-          buf.add(byte);
-        }
-      }
-    }
-    buf.addAll([0x0A, 0x0A, 0x0A]);
-    buf.addAll([0x1B, 0x61, 0x00]);
-    return Uint8List.fromList(buf);
   }
 
   Widget _buildImageButton(
@@ -195,7 +163,6 @@ class _ImageTabState extends ConsumerState<ImageTab>
 
   @override
   Widget build(BuildContext context) {
-    // extendBody:false + SafeArea di navBar = Scaffold handle insets otomatis
     final vp = MediaQuery.viewPaddingOf(context);
 
     return Container(

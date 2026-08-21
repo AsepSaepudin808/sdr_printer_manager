@@ -11,53 +11,6 @@ class HistoryNotifier extends Notifier<List<PrintHistory>> {
   List<PrintHistory> build() => [];
 
   int get totalCount => state.length;
-  int get successCount => state.where((e) => e.success).length;
-  int get failCount => state.where((e) => !e.success).length;
-
-  Map<String, int> get countByType {
-    final map = <String, int>{};
-    for (final item in state.where((e) => e.success)) {
-      map[item.type] = (map[item.type] ?? 0) + 1;
-    }
-    return map;
-  }
-
-  Map<String, int> get countByDate {
-    final map = <String, int>{};
-    final now = DateTime.now();
-    for (int i = 6; i >= 0; i--) {
-      final d = now.subtract(Duration(days: i));
-      final key = '${d.day}/${d.month}';
-      map[key] = 0;
-    }
-    for (final item in state.where((e) => e.success)) {
-      final diff = now.difference(item.timestamp).inDays;
-      if (diff < 7) {
-        final key = '${item.timestamp.day}/${item.timestamp.month}';
-        map[key] = (map[key] ?? 0) + 1;
-      }
-    }
-    return map;
-  }
-
-  int get totalBytes {
-    int sum = 0;
-    for (final item in state.where((e) => e.success)) {
-      sum += item.dataSize;
-    }
-    return sum;
-  }
-
-  int get todayCount {
-    final now = DateTime.now();
-    return state
-        .where((e) =>
-            e.success &&
-            e.timestamp.year == now.year &&
-            e.timestamp.month == now.month &&
-            e.timestamp.day == now.day)
-        .length;
-  }
 
   Future<void> load() async {
     final service = ref.read(printHistoryServiceProvider);
@@ -80,3 +33,72 @@ class HistoryNotifier extends Notifier<List<PrintHistory>> {
 
 final historyNotifierProvider =
     NotifierProvider<HistoryNotifier, List<PrintHistory>>(HistoryNotifier.new);
+
+class HistoryStats {
+  final int totalSuccess;
+  final int totalFail;
+  final int todayCount;
+  final int totalBytes;
+  final Map<String, int> countByType;
+  final Map<String, int> countByDate;
+  final double successRate;
+
+  const HistoryStats({
+    this.totalSuccess = 0,
+    this.totalFail = 0,
+    this.todayCount = 0,
+    this.totalBytes = 0,
+    this.countByType = const {},
+    this.countByDate = const {},
+    this.successRate = 0,
+  });
+
+  factory HistoryStats.from(List<PrintHistory> items) {
+    int success = 0;
+    int fail = 0;
+    int totalBytes = 0;
+    final byType = <String, int>{};
+    final now = DateTime.now();
+    final byDate = <String, int>{};
+    for (int i = 6; i >= 0; i--) {
+      final d = now.subtract(Duration(days: i));
+      byDate['${d.day}/${d.month}'] = 0;
+    }
+    int today = 0;
+
+    for (final item in items) {
+      if (item.success) {
+        success++;
+        totalBytes += item.dataSize;
+        byType[item.type] = (byType[item.type] ?? 0) + 1;
+        final diff = now.difference(item.timestamp).inDays;
+        if (diff < 7) {
+          final key = '${item.timestamp.day}/${item.timestamp.month}';
+          byDate[key] = (byDate[key] ?? 0) + 1;
+        }
+        if (item.timestamp.year == now.year &&
+            item.timestamp.month == now.month &&
+            item.timestamp.day == now.day) {
+          today++;
+        }
+      } else {
+        fail++;
+      }
+    }
+
+    final rate = (success + fail) > 0 ? success / (success + fail) * 100 : 0.0;
+    return HistoryStats(
+      totalSuccess: success,
+      totalFail: fail,
+      todayCount: today,
+      totalBytes: totalBytes,
+      countByType: byType,
+      countByDate: byDate,
+      successRate: rate,
+    );
+  }
+}
+
+final historyStatsProvider = Provider<HistoryStats>((ref) {
+  return HistoryStats.from(ref.watch(historyNotifierProvider));
+});

@@ -4,10 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/splash_screen.dart';
+import 'services/crash_log_service.dart';
 import 'utils/strings.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  setupCrashHandlers();
+  await crashLogService.init();
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     systemNavigationBarColor: Colors.white,
     systemNavigationBarDividerColor: Colors.transparent,

@@ -1,25 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/app_state_provider.dart';
 import '../../utils/strings.dart';
 import '../../utils/colors.dart';
 
-/// Printer card widget - shows selected printer and connection status
-class PrinterCard extends StatelessWidget {
-  final AppState appState;
+class PrinterCard extends ConsumerWidget {
   final VoidCallback? onSelectPrinter;
   final VoidCallback? onToggleServer;
 
   const PrinterCard({
     super.key,
-    required this.appState,
     this.onSelectPrinter,
     this.onToggleServer,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final hasPrinter = appState.printer != null;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final printer = ref.watch(printerConfigProvider.select((s) => s.printer));
+    final btConnected = ref.watch(printerConfigProvider.select((s) => s.btConnected));
+    final serverRunning = ref.watch(serverStateProvider.select((s) => s.running));
+    final connecting = ref.watch(serverStateProvider.select((s) => s.connecting));
+
+    final hasPrinter = printer != null;
 
     return _card(
       Row(children: [
@@ -44,7 +47,7 @@ class PrinterCard extends StatelessWidget {
             Row(children: [
               Expanded(
                 child: Text(
-                  hasPrinter ? appState.printer!.name : S.noPrinter,
+                  printer?.name ?? S.noPrinter,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -54,7 +57,7 @@ class PrinterCard extends StatelessWidget {
                   ),
                 ),
               ),
-              if (appState.btConnected)
+              if (btConnected)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
@@ -78,7 +81,7 @@ class PrinterCard extends StatelessWidget {
             ]),
             if (hasPrinter)
               GestureDetector(
-                onTap: () => _showPrinterDetails(context),
+                onTap: () => _showPrinterDetails(context, printer.address, printer.name),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
@@ -88,7 +91,7 @@ class PrinterCard extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('ID: ${appState.printer!.address}', maxLines: 1, overflow: TextOverflow.ellipsis,
+                      Text('ID: ${printer.address}', maxLines: 1, overflow: TextOverflow.ellipsis,
                         style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontFamily: 'monospace')),
                       const SizedBox(width: 4),
                       Icon(Icons.content_copy_rounded, size: 12, color: Colors.grey.shade500),
@@ -104,37 +107,37 @@ class PrinterCard extends StatelessWidget {
         const SizedBox(width: 12),
         Column(children: [
           GestureDetector(
-            onTap: appState.serverRunning ? null : onSelectPrinter,
+            onTap: serverRunning ? null : onSelectPrinter,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: (appState.serverRunning ? Colors.grey : AppColors.primary).withValues(alpha: 0.1),
+                color: (serverRunning ? Colors.grey : AppColors.primary).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: (appState.serverRunning ? Colors.grey : AppColors.primary).withValues(alpha: 0.3)),
+                border: Border.all(color: (serverRunning ? Colors.grey : AppColors.primary).withValues(alpha: 0.3)),
               ),
               child: Text(hasPrinter ? S.change : S.select,
-                style: TextStyle(color: appState.serverRunning ? Colors.grey : AppColors.primary, fontWeight: FontWeight.w700, fontSize: 12)),
+                style: TextStyle(color: serverRunning ? Colors.grey : AppColors.primary, fontWeight: FontWeight.w700, fontSize: 12)),
             ),
           ),
           const SizedBox(height: 8),
           GestureDetector(
-            onTap: appState.connecting ? null : onToggleServer,
+            onTap: connecting ? null : onToggleServer,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeOutCubic,
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
               decoration: BoxDecoration(
-                color: appState.connecting
+                color: connecting
                     ? Colors.grey.shade400
-                    : appState.serverRunning
+                    : serverRunning
                         ? AppColors.danger
                         : AppColors.success,
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: (appState.connecting
+                    color: (connecting
                         ? Colors.grey
-                        : appState.serverRunning
+                        : serverRunning
                             ? AppColors.danger
                             : AppColors.success).withValues(alpha: 0.35),
                     blurRadius: 12,
@@ -146,9 +149,9 @@ class PrinterCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    appState.connecting
+                    connecting
                         ? Icons.hourglass_top_rounded
-                        : appState.serverRunning
+                        : serverRunning
                             ? Icons.power_settings_new_rounded
                             : Icons.play_arrow_rounded,
                     size: 16,
@@ -156,9 +159,9 @@ class PrinterCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    appState.connecting
+                    connecting
                         ? '...'
-                        : appState.serverRunning
+                        : serverRunning
                             ? 'OFF'
                             : 'ON',
                     style: const TextStyle(
@@ -182,14 +185,12 @@ class PrinterCard extends StatelessWidget {
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 3))
-      ],
+      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 3))]
     ),
     child: child,
   );
 
-  void _showPrinterDetails(BuildContext context) {
+  void _showPrinterDetails(BuildContext context, String address, String name) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -217,7 +218,7 @@ class PrinterCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 14),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(appState.printer!.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                  Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 4),
                   Text('ID Printer', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                 ])),
@@ -229,7 +230,7 @@ class PrinterCard extends StatelessWidget {
                 child: Row(children: [
                   Icon(Icons.fingerprint_rounded, color: Colors.grey.shade500, size: 18),
                   const SizedBox(width: 8),
-                  Expanded(child: SelectableText(appState.printer!.address,
+                  Expanded(child: SelectableText(address,
                     style: const TextStyle(fontSize: 14, color: Colors.black87, fontFamily: 'monospace', letterSpacing: 1))),
                 ]),
               ),
@@ -238,7 +239,7 @@ class PrinterCard extends StatelessWidget {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () async {
-                    await Clipboard.setData(ClipboardData(text: appState.printer!.address));
+                    await Clipboard.setData(ClipboardData(text: address));
                     if (context.mounted) Navigator.pop(context);
                   },
                   icon: const Icon(Icons.copy_rounded, size: 18),

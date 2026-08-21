@@ -17,7 +17,6 @@ class PrintServerService {
   Function(String)? onLog;
   Function()? onPrintSuccess;
   Function(bool)? onStatusChange;
-  // PRINT JOB CALLBACK
   Function(String type, String label, bool success, int dataSize)? onPrintJob;
 
   PaperSize _paperSize = PaperSize.mm80;
@@ -104,7 +103,8 @@ class PrintServerService {
             });
       } else {
         onLog?.call('❌ Test print GAGAL — printer tidak terhubung');
-        onPrintJob?.call('test', 'Test Print ($action)', false, testData.length);
+        onPrintJob?.call(
+            'test', 'Test Print ($action)', false, testData.length);
         return Response.internalServerError(
             body: jsonEncode(
                 {'status': 'error', 'message': 'Printer tidak terhubung'}),
@@ -157,7 +157,8 @@ class PrintServerService {
           onLog?.call('❌ Gagal kirim QRIS ke printer');
           onPrintJob?.call('qris', 'QRIS Receipt', false, printData.length);
           return Response.internalServerError(
-            body: jsonEncode({'status': 'error', 'message': 'Printer not connected'}),
+            body: jsonEncode(
+                {'status': 'error', 'message': 'Printer not connected'}),
             headers: const {
               'Content-Type': 'application/json',
               'Access-Control-Allow-Origin': '*',
@@ -225,16 +226,18 @@ class PrintServerService {
             } else {
               summaryData = {};
             }
-            printData = EscPosHelper.buildSessionSummary(summaryData, _paperSize);
+            printData =
+                EscPosHelper.buildSessionSummary(summaryData, _paperSize);
             jobType = 'session_summary';
-            final sessionName = summaryData['session_name'] as String?
-                ?? summaryData['name'] as String?
-                ?? summaryData['session_id']?.toString()
-                ?? '';
+            final sessionName = summaryData['session_name'] as String? ??
+                summaryData['name'] as String? ??
+                summaryData['session_id']?.toString() ??
+                '';
             jobLabel = sessionName.isNotEmpty
                 ? 'Session Summary $sessionName'
                 : 'Session Summary Report';
-            onLog?.call('🖨️ Terima job Session Summary Report (${printData.length}B)');
+            onLog?.call(
+                '🖨️ Terima job Session Summary Report (${printData.length}B)');
           } else if (format == 'odoo_json') {
             Map<String, dynamic> orderData;
             if (dataField is Map<String, dynamic>) {
@@ -250,7 +253,8 @@ class PrintServerService {
                 ? orderData['name'] as String
                 : (orderData['order_ref'] as String?)?.isNotEmpty == true
                     ? orderData['order_ref'] as String
-                    : (orderData['pos_reference'] as String?)?.isNotEmpty == true
+                    : (orderData['pos_reference'] as String?)?.isNotEmpty ==
+                            true
                         ? orderData['pos_reference'] as String
                         : '';
 
@@ -258,14 +262,18 @@ class PrintServerService {
               printData = EscPosHelper.buildFromOdooData(orderData, _paperSize,
                   basic: true);
               jobType = 'receipt_basic';
-              jobLabel = orderName.isNotEmpty ? 'Basic Receipt\n$orderName' : 'Basic Receipt';
+              jobLabel = orderName.isNotEmpty
+                  ? 'Basic Receipt\n$orderName'
+                  : 'Basic Receipt';
               onLog?.call(
                   '🖨️ Terima job Basic Receipt (odoo_json, ${printData.length}B)');
             } else {
               printData = EscPosHelper.buildFromOdooData(orderData, _paperSize,
                   basic: false);
               jobType = 'receipt_full';
-              jobLabel = orderName.isNotEmpty ? 'Full Receipt\n$orderName' : 'Full Receipt';
+              jobLabel = orderName.isNotEmpty
+                  ? 'Full Receipt\n$orderName'
+                  : 'Full Receipt';
               onLog?.call(
                   '🖨️ Terima job Full Receipt (odoo_json, ${printData.length}B)');
             }
@@ -309,7 +317,8 @@ class PrintServerService {
         }
 
         // Check if this is a receipt print job (cash drawer trigger only for receipts)
-        final isReceiptJob = jobType == 'receipt_full' || jobType == 'receipt_basic';
+        final isReceiptJob =
+            jobType == 'receipt_full' || jobType == 'receipt_basic';
 
         // CASH DRAWER: Open before print (receipt only)
         if (isReceiptJob && _cashDrawerMode == CashDrawerMode.openBeforePrint) {
@@ -321,7 +330,8 @@ class PrintServerService {
         final ok = await _btService?.sendRaw(printData) ?? false;
         if (ok) {
           // CASH DRAWER: Open after print (receipt only)
-          if (isReceiptJob && _cashDrawerMode == CashDrawerMode.openAfterPrint) {
+          if (isReceiptJob &&
+              _cashDrawerMode == CashDrawerMode.openAfterPrint) {
             onLog?.call('🔓 Membuka cash drawer setelah cetak...');
             await Future.delayed(const Duration(milliseconds: 1000));
             await _btService?.sendRaw(EscPosHelper.openCashDrawer());
@@ -367,48 +377,22 @@ class PrintServerService {
       }
     });
 
-    final handler = const Pipeline()
-        .addMiddleware(_corsMiddleware())
-        .addHandler(router.call);
+    final handler = const Pipeline().addHandler(router.call);
 
     try {
       if (_server != null) {
         await _server?.close(force: true);
         _server = null;
       }
-      _server = await io.serve(handler, InternetAddress.anyIPv4, port, shared: true);
+      _server = await io.serve(handler, InternetAddress.loopbackIPv4, port,
+          shared: true);
       onStatusChange?.call(true);
-      onLog?.call('🚀 HTTP Server aktif di port $port');
+      onLog?.call('🚀 HTTP Server aktif di port $port (localhost only)');
     } catch (e) {
       onLog?.call('❌ Gagal memulai server: $e');
       onStatusChange?.call(false);
       rethrow;
     }
-  }
-
-  Middleware _corsMiddleware() {
-    return (Handler handler) {
-      return (Request request) async {
-        if (request.method == 'OPTIONS') {
-          return Response.ok('', headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers':
-                'Content-Type, X-Print-Format, X-Print-Source, Authorization',
-            'Access-Control-Allow-Private-Network': 'true',
-          });
-        }
-        final response = await handler(request);
-        return response.change(headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers':
-              'Content-Type, X-Print-Format, X-Print-Source, Authorization',
-          'Access-Control-Allow-Private-Network': 'true',
-          ...response.headers,
-        });
-      };
-    };
   }
 
   Future<void> stop() async {

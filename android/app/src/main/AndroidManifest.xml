@@ -50,8 +50,7 @@
         android:name="${applicationName}"
         android:label="dPrinter Mart"
         android:icon="@mipmap/ic_launcher"
-        android:enableOnBackInvokedCallback="true"
-        android:usesCleartextTraffic="true">
+        android:enableOnBackInvokedCallback="true">
 
         <activity
             android:name=".MainActivity"
