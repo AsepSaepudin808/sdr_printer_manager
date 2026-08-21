@@ -242,6 +242,7 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   @override
   void dispose() {
+    _printJobChannel.setMethodCallHandler(null);
     _portCtrl.dispose();
     _server.stop();
     _bt.disconnect();

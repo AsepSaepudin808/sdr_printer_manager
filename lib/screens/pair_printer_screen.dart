@@ -744,8 +744,7 @@ class _PairPrinterScreenState extends ConsumerState<PairPrinterScreen>
 // Bridge agar helper flutter_bloc/PrintBluetoothThermal dapat dicek status BT.
 Future<bool> printBluetoothThermalBluetoothEnabled() async {
   try {
-    // Pakai channel native langsung untuk konsistensi dengan bluetoothChannel.
-    return await BluetoothScanHelper.getPairedDevices().then((_) => true).catchError((_) => false);
+    return await BluetoothScanHelper.isBluetoothEnabled();
   } catch (_) {
     return false;
   }

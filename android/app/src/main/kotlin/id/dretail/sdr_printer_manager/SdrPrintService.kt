@@ -1,6 +1,8 @@
 package id.dretail.sdr_printer_manager
 
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.print.PrintAttributes
 import android.print.PrinterCapabilitiesInfo
@@ -75,21 +77,25 @@ class SdrPrintService : PrintService() {
 
             if (fileDescriptor != null) {
                 val tempFile = File(cacheDir, "print_job_${System.currentTimeMillis()}.pdf")
-                
+
                 FileInputStream(fileDescriptor.fileDescriptor).use { input ->
                     FileOutputStream(tempFile).use { output ->
                         input.copyTo(output)
                     }
                 }
                 fileDescriptor.close()
-                
+
                 val intent = Intent("id.dretail.sdr_printer_manager.NEW_PRINT_JOB").apply {
                     setPackage(packageName)
                     putExtra("PRINT_JOB_FILE_PATH", tempFile.absolutePath)
                     putExtra("PRINT_JOB_NAME", printJob.info.label)
                 }
                 sendBroadcast(intent)
-                
+
+                Handler(Looper.getMainLooper()).postDelayed({
+                    if (tempFile.exists()) tempFile.delete()
+                }, 60_000L)
+
                 printJob.complete()
             } else {
                 printJob.fail("No document data found")
