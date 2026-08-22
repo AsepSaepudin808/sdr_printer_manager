@@ -10,6 +10,7 @@ import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 
 import '../providers/app_state_provider.dart';
 import '../providers/bluetooth_provider.dart';
+import '../providers/escpos_formatter_provider.dart';
 import '../providers/server_provider.dart';
 import '../providers/history_provider.dart';
 import '../services/print_server_service.dart';
@@ -273,9 +274,13 @@ class _MainShellState extends ConsumerState<MainShell> {
     _configN.setPaperSize(paperSize);
 
     final customChars = p.getInt('chars_per_line') ?? 0;
-    EscPosHelper.setCustomCharsPerLine(customChars);
-    EscPosHelper.setExtraFeed(p.getInt('extra_feed') ?? 3);
-    EscPosHelper.setAutoCut(p.getBool('auto_cut') ?? false);
+    ref.read(printConfigProvider.notifier).setCustomCharsPerLine(customChars);
+    ref
+        .read(printConfigProvider.notifier)
+        .setExtraFeed(p.getInt('extra_feed') ?? 3);
+    ref
+        .read(printConfigProvider.notifier)
+        .setAutoCut(p.getBool('auto_cut') ?? false);
 
     final savedCashDrawer = p.getString('cash_drawer_mode') ?? 'off';
     final cashDrawerMode = savedCashDrawer == 'after'
@@ -284,12 +289,10 @@ class _MainShellState extends ConsumerState<MainShell> {
             ? CashDrawerMode.openBeforePrint
             : CashDrawerMode.off;
     _configN.setCashDrawerMode(cashDrawerMode);
-    EscPosHelper.setCashDrawerMode(cashDrawerMode);
 
     final sessionSummaryCashDrawer =
         p.getBool('session_summary_cash_drawer') ?? false;
     _configN.setSessionSummaryCashDrawer(sessionSummaryCashDrawer);
-    EscPosHelper.setSessionSummaryCashDrawer(sessionSummaryCashDrawer);
 
     final printQris = p.getBool('print_qris') ?? true;
     _configN.setPrintQris(printQris);
@@ -351,8 +354,12 @@ class _MainShellState extends ConsumerState<MainShell> {
     _server.setCashDrawerMode(_cashDrawerMode);
     _server.setSessionSummaryCashDrawer(_sessionSummaryCashDrawer);
     try {
+      final formatter = ref.read(escposFormatterProvider);
       await _server.start(
-          port: _serverPort, bluetoothService: _bt, paperSize: _paperSize);
+          port: _serverPort,
+          formatter: formatter,
+          bluetoothService: _bt,
+          paperSize: _paperSize);
       _serverN.setRunning(true);
       _addLog(S.serverReady);
       _toast(S.printerReady);
@@ -368,7 +375,6 @@ class _MainShellState extends ConsumerState<MainShell> {
     _serverN.setRunning(false);
     _configN.setBtConnected(false);
     _addLog(S.printerStopped);
-    // ✅ Stop foreground service saat server dihentikan
     await ForegroundServiceHelper.stop();
   }
 
@@ -505,9 +511,8 @@ class _MainShellState extends ConsumerState<MainShell> {
   }
 
   void _showPrintHistory() {
-    // Use watch inside builder via Consumer
     final logs = ref.read(logsProvider);
-    final w = EscPosHelper.charsPerLine(_paperSize);
+    final w = ref.read(escposFormatterProvider).charsPerLine(_paperSize);
     final paperLabel = switch (_paperSize) {
       PaperSize.mm58 => '58mm',
       PaperSize.mm80 => '80mm',

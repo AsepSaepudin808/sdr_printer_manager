@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/app_state_provider.dart';
+import '../../providers/escpos_formatter_provider.dart';
 import '../../utils/escpos_helper.dart';
 import '../../utils/strings.dart';
 import '../../utils/colors.dart';
@@ -25,7 +26,7 @@ class StatsRow extends ConsumerWidget {
       PaperSize.mm80 => '80mm',
       PaperSize.mm100 => '100mm'
     };
-    final chars = EscPosHelper.charsPerLine(paperSize);
+    final chars = ref.watch(escposFormatterProvider).charsPerLine(paperSize);
 
     return Row(children: [
       Expanded(

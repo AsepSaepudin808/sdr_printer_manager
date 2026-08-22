@@ -7,12 +7,15 @@ import 'package:shelf_router/shelf_router.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 
 import 'bluetooth_service.dart';
-import '../utils/escpos_helper.dart';
+import '../utils/escpos/escpos_commands.dart';
+import '../utils/escpos/escpos_config.dart';
+import '../utils/escpos/escpos_receipts.dart';
 import '../utils/test_print_template.dart';
 
 class PrintServerService {
   HttpServer? _server;
   SdrBluetoothService? _btService;
+  EscPosFormatter? _formatter;
 
   Function(String)? onLog;
   Function()? onPrintSuccess;
@@ -54,10 +57,12 @@ class PrintServerService {
 
   Future<void> start({
     required int port,
+    required EscPosFormatter formatter,
     required SdrBluetoothService bluetoothService,
     PaperSize paperSize = PaperSize.mm80,
   }) async {
     _btService = bluetoothService;
+    _formatter = formatter;
     _paperSize = paperSize;
 
     final router = Router();
@@ -83,11 +88,11 @@ class PrintServerService {
 
       Uint8List? testData;
       if (action == 'test_short') {
-        testData = TestPrintTemplate.buildTestShort(size);
+        testData = TestPrintTemplate.buildTestShort(size, _formatter!);
       } else if (action == 'test_long') {
-        testData = TestPrintTemplate.buildTestLong(size);
+        testData = TestPrintTemplate.buildTestLong(size, _formatter!);
       } else {
-        testData = TestPrintTemplate.buildTestShort(size);
+        testData = TestPrintTemplate.buildTestShort(size, _formatter!);
       }
 
       final ok = await _btService?.sendRaw(testData) ?? false;
@@ -139,7 +144,7 @@ class PrintServerService {
             ? json['data'] as Map<String, dynamic>
             : json;
 
-        final printData = EscPosHelper.buildQRISReceipt(qrisData, _paperSize);
+        final printData = _formatter!.buildQRISReceipt(qrisData, _paperSize);
 
         final ok = await _btService?.sendRaw(printData) ?? false;
         if (ok) {
@@ -227,7 +232,7 @@ class PrintServerService {
               summaryData = {};
             }
             printData =
-                EscPosHelper.buildSessionSummary(summaryData, _paperSize);
+                _formatter!.buildSessionSummary(summaryData, _paperSize);
             jobType = 'session_summary';
             final sessionName = summaryData['session_name'] as String? ??
                 summaryData['name'] as String? ??
@@ -259,8 +264,8 @@ class PrintServerService {
                         : '';
 
             if (receiptType == 'basic') {
-              printData = EscPosHelper.buildFromOdooData(orderData, _paperSize,
-                  basic: true);
+              printData = _formatter!
+                  .buildFromOdooData(orderData, _paperSize, basic: true);
               jobType = 'receipt_basic';
               jobLabel = orderName.isNotEmpty
                   ? 'Basic Receipt\n$orderName'
@@ -268,8 +273,8 @@ class PrintServerService {
               onLog?.call(
                   '🖨️ Terima job Basic Receipt (odoo_json, ${printData.length}B)');
             } else {
-              printData = EscPosHelper.buildFromOdooData(orderData, _paperSize,
-                  basic: false);
+              printData = _formatter!
+                  .buildFromOdooData(orderData, _paperSize, basic: false);
               jobType = 'receipt_full';
               jobLabel = orderName.isNotEmpty
                   ? 'Full Receipt\n$orderName'
@@ -280,7 +285,7 @@ class PrintServerService {
           } else if (format == 'text') {
             final textContent =
                 dataField is String ? dataField : dataField.toString();
-            printData = EscPosHelper.textToEscPos(textContent, _paperSize);
+            printData = _formatter!.textToEscPos(textContent, _paperSize);
             jobType = 'text';
             jobLabel = 'Cetak Teks';
             onLog?.call('Terima job (TEXT, ${printData.length}B)');
@@ -304,7 +309,7 @@ class PrintServerService {
           }
         } else if (contentType.contains('text/plain')) {
           final body = await req.readAsString();
-          printData = EscPosHelper.textToEscPos(body, _paperSize);
+          printData = _formatter!.textToEscPos(body, _paperSize);
           jobType = 'text';
           jobLabel = 'Cetak Teks';
           onLog?.call('Terima job (TEXT, ${printData.length}B)');
@@ -316,31 +321,27 @@ class PrintServerService {
           onLog?.call('Terima job (BINARY, ${printData.length}B)');
         }
 
-        // Check if this is a receipt print job (cash drawer trigger only for receipts)
         final isReceiptJob =
             jobType == 'receipt_full' || jobType == 'receipt_basic';
 
-        // CASH DRAWER: Open before print (receipt only)
         if (isReceiptJob && _cashDrawerMode == CashDrawerMode.openBeforePrint) {
           onLog?.call('🔓 Membuka cash drawer sebelum cetak...');
-          await _btService?.sendRaw(EscPosHelper.openCashDrawer());
+          await _btService?.sendRaw(EscPosCommands.openCashDrawer());
           await Future.delayed(const Duration(milliseconds: 1500));
         }
 
         final ok = await _btService?.sendRaw(printData) ?? false;
         if (ok) {
-          // CASH DRAWER: Open after print (receipt only)
           if (isReceiptJob &&
               _cashDrawerMode == CashDrawerMode.openAfterPrint) {
             onLog?.call('🔓 Membuka cash drawer setelah cetak...');
             await Future.delayed(const Duration(milliseconds: 1000));
-            await _btService?.sendRaw(EscPosHelper.openCashDrawer());
+            await _btService?.sendRaw(EscPosCommands.openCashDrawer());
           }
-          // CASH DRAWER: Open for session summary (if enabled)
           if (jobType == 'session_summary' && _sessionSummaryCashDrawer) {
             onLog?.call('🔓 Membuka cash drawer untuk Session Summary...');
             await Future.delayed(const Duration(milliseconds: 1000));
-            await _btService?.sendRaw(EscPosHelper.openCashDrawer());
+            await _btService?.sendRaw(EscPosCommands.openCashDrawer());
           }
           onLog?.call('✅ Print berhasil (${printData.length}B dikirim)');
           onPrintSuccess?.call();

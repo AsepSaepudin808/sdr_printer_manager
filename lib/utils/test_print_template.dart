@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
+import 'escpos/escpos_receipts.dart';
 import 'escpos_helper.dart';
 
 const _logoPath = 'assets/images/logo_print.png';
@@ -36,7 +37,8 @@ class TestPrintTemplate {
   // ===========================================================================
   // ========================= PRINT SHORT RECEIPT =============================
   // ===========================================================================
-  static Uint8List buildTestShort(PaperSize size) {
+  static Uint8List buildTestShort(
+      PaperSize size, EscPosFormatter formatter) {
     final List<int> b = [];
     final now = DateTime.now();
     final dateStr =
@@ -52,7 +54,7 @@ class TestPrintTemplate {
     // STORE NAME
     b.addAll(EscPosHelper.align(1));
     b.addAll(EscPosHelper.bold(true));
-    final halfW = EscPosHelper.charsPerLine(size) ~/ 2;
+    final halfW = formatter.charsPerLine(size) ~/ 2;
     if ('dRetail Mart'.length <= halfW) {
       b.addAll(EscPosHelper.doubleSize(true));
       b.addAll(EscPosHelper.txt('dRetail Mart'));
@@ -169,17 +171,18 @@ class TestPrintTemplate {
     b.addAll(EscPosHelper.bold(true));
     b.addAll(EscPosHelper.txt('CURRENT SETTINGS'));
     b.addAll(EscPosHelper.bold(false));
-    b.addAll(EscPosHelper.txt(_settingsInfo(size, 'SHORT')));
+    b.addAll(EscPosHelper.txt(_settingsInfo(size, formatter, 'SHORT')));
     b.addAll(EscPosHelper.align(0));
 
-    b.addAll(EscPosHelper.finalize());
+    b.addAll(formatter.finalize());
     return Uint8List.fromList(b);
   }
 
   // PRINT LONG RECEIPT
-  static Uint8List buildTestLong(PaperSize size) {
+  static Uint8List buildTestLong(
+      PaperSize size, EscPosFormatter formatter) {
     final List<int> b = [];
-    final w = EscPosHelper.charsPerLine(size);
+    final w = formatter.charsPerLine(size);
     final now = DateTime.now();
     final dateStr =
         '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
@@ -337,10 +340,10 @@ class TestPrintTemplate {
     b.addAll(EscPosHelper.bold(true));
     b.addAll(EscPosHelper.txt('CURRENT SETTINGS'));
     b.addAll(EscPosHelper.bold(false));
-    b.addAll(EscPosHelper.txt(_settingsInfo(size, 'FULL')));
+    b.addAll(EscPosHelper.txt(_settingsInfo(size, formatter, 'FULL')));
     b.addAll(EscPosHelper.align(0));
 
-    b.addAll(EscPosHelper.finalize());
+    b.addAll(formatter.finalize());
     return Uint8List.fromList(b);
   }
 
@@ -370,17 +373,19 @@ class TestPrintTemplate {
     return lines.isEmpty ? [''] : lines;
   }
 
-  static String _settingsInfo(PaperSize size, String type) {
+  static String _settingsInfo(
+      PaperSize size, EscPosFormatter formatter, String type) {
     final paperLabel = switch (size) {
       PaperSize.mm58 => '58mm',
       PaperSize.mm80 => '80mm',
       PaperSize.mm100 => '100mm',
     };
 
-    final customChars = EscPosHelper.customCharsPerLineSetting;
-    final extraFeed = EscPosHelper.extraFeedSetting;
-    final autoCut = EscPosHelper.autoCutSetting ? 'Ya' : 'Tidak';
-    final fontB = EscPosHelper.useFontBSetting ? 'Font-B' : 'Font-A';
+    final config = formatter.config;
+    final customChars = config.customCharsPerLine;
+    final extraFeed = config.extraFeed;
+    final autoCut = config.autoCut ? 'Ya' : 'Tidak';
+    final fontB = config.useFontB ? 'Font-B' : 'Font-A';
 
     final charsInfo = customChars > 0
         ? '$customChars (custom)'

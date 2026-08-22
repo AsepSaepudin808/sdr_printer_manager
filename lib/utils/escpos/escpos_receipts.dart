@@ -8,19 +8,15 @@ import 'escpos_config.dart';
 import 'escpos_image.dart';
 import 'escpos_text.dart';
 
-/// Instance-based formatter yang menghasilkan ESC/POS byte stream.
-/// Menerima [EscPosConfig] di constructor — tidak ada mutable global state.
 class EscPosFormatter {
   final EscPosConfig config;
 
   const EscPosFormatter(this.config);
 
-  /// Chars per line (override dari config atau default per PaperSize).
   int charsPerLine(PaperSize size) => config.customCharsPerLine > 0
       ? config.customCharsPerLine
       : EscPosCommands.defaultCharsPerLine(size);
 
-  /// Append extra-feed + auto-cut (sesuai config).
   List<int> finalize() {
     final List<int> b = [];
     if (config.extraFeed > 0) {
@@ -35,8 +31,6 @@ class EscPosFormatter {
   void _applyFontConfig(List<int> b) {
     b.addAll(EscPosCommands.setFontB(config.useFontB));
   }
-
-  // ── PUBLIC BUILDERS ───────────────────────────────────────────────────
 
   Uint8List buildFromOdooData(
     Map<String, dynamic> data,
@@ -437,8 +431,6 @@ class EscPosFormatter {
     b.addAll(finalize());
     return Uint8List.fromList(b);
   }
-
-  // ── PRIVATE RECEIPT BUILDERS ──────────────────────────────────────────
 
   Uint8List _buildFullReceipt(Map<String, dynamic> d, PaperSize size) {
     final List<int> b = [];

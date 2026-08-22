@@ -5,9 +5,7 @@ import 'package:image/image.dart' as img;
 import 'escpos_commands.dart';
 import 'escpos_config.dart';
 
-/// Image → ESC/POS raster conversion dengan Floyd-Steinberg dithering.
 class EscPosImage {
-  /// Resize + dither + emit raster bytes untuk paperSize.
   static Uint8List esc(img.Image src, PaperSize paperSize) {
     int maxW = EscPosCommands.paperMaxWidth(paperSize);
     img.Image resized = src;
@@ -97,8 +95,6 @@ class EscPosImage {
     return Uint8List.fromList(output);
   }
 
-  /// Crop whitespace border (quiet zone) di tepi gambar QR — biar
-  /// resize jadi square tidak kepotong pattern QR.
   static img.Image cropWhiteBorder(img.Image src) {
     const threshold = 240;
     int top = 0, bottom = src.height - 1, left = 0, right = src.width - 1;

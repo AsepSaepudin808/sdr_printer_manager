@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../providers/app_state_provider.dart';
+import '../providers/escpos_formatter_provider.dart';
 import '../providers/bluetooth_provider.dart';
 import '../providers/history_provider.dart';
 import '../models/print_history.dart';
@@ -47,10 +47,6 @@ class _TextTabState extends ConsumerState<TextTab>
   }
 
   Future<void> _loadLocalSettings() async {
-    final p = await SharedPreferences.getInstance();
-    EscPosHelper.setCustomCharsPerLine(p.getInt('chars_per_line') ?? 0);
-    EscPosHelper.setExtraFeed(p.getInt('extra_feed') ?? 3);
-    EscPosHelper.setAutoCut(p.getBool('auto_cut') ?? false);
     if (mounted) setState(() {});
   }
 
@@ -71,12 +67,13 @@ class _TextTabState extends ConsumerState<TextTab>
     setState(() => _isPrinting = true);
 
     final paperSize = ref.read(printerConfigProvider).paperSize;
-    final cpl = EscPosHelper.charsPerLine(paperSize);
+    final formatter = ref.read(escposFormatterProvider);
+    final cpl = formatter.charsPerLine(paperSize);
     final printAlignMode = _alignMode == 3 ? 0 : _alignMode;
 
     final wrappedText =
         _wrapText(_textCtrl.text, cpl, justify: _alignMode == 3);
-    final data = EscPosHelper.textToEscPos(wrappedText, paperSize,
+    final data = formatter.textToEscPos(wrappedText, paperSize,
         isBold: _isBold, alignMode: printAlignMode);
 
     final btService = ref.read(bluetoothServiceProvider);
@@ -162,9 +159,8 @@ class _TextTabState extends ConsumerState<TextTab>
 
   void _insertTestPattern() {
     _isTestPattern = true;
-    // Baca paperSize saat ini dari provider
     final paperSize = ref.read(printerConfigProvider).paperSize;
-    final cpl = EscPosHelper.charsPerLine(paperSize);
+    final cpl = ref.read(escposFormatterProvider).charsPerLine(paperSize);
     final now = DateTime.now();
     final date =
         '${now.day.toString().padLeft(2, '0')}-${now.month.toString().padLeft(2, '0')}-${now.year}';
@@ -277,7 +273,8 @@ class _TextTabState extends ConsumerState<TextTab>
   Widget build(BuildContext context) {
     final paperSize =
         ref.watch(printerConfigProvider.select((s) => s.paperSize));
-    final charsPerLine = EscPosHelper.charsPerLine(paperSize);
+    final charsPerLine =
+        ref.watch(escposFormatterProvider).charsPerLine(paperSize);
     final lineWidth = _getFullLineWidth(charsPerLine);
     final paperContentWidth = lineWidth + 8.0;
 

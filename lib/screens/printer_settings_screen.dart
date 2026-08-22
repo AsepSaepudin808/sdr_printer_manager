@@ -3,6 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import '../providers/app_state_provider.dart';
+import '../providers/escpos_formatter_provider.dart';
+import '../utils/escpos/escpos_commands.dart';
+import '../utils/escpos/escpos_config.dart';
+import '../utils/escpos/escpos_receipts.dart';
 import '../utils/escpos_helper.dart';
 import '../utils/strings.dart';
 import '../utils/test_print_template.dart';
@@ -67,27 +71,30 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
     }
 
     final paperSize = ref.read(printerConfigProvider).paperSize;
+    final baseFormatter = ref.read(escposFormatterProvider);
     final cashDrawerMode = ref.read(printerConfigProvider).cashDrawerMode;
-    final originalChars = EscPosHelper.customCharsPerLineSetting;
-    final originalFeed = EscPosHelper.extraFeedSetting;
-    final originalCut = EscPosHelper.autoCutSetting;
-    final originalCashDrawer = EscPosHelper.cashDrawerModeSetting;
 
     final chars = int.tryParse(_charsCtrl.text.trim()) ??
         EscPosHelper.defaultCharsPerLine(paperSize);
     final defaultChars = EscPosHelper.defaultCharsPerLine(paperSize);
-    EscPosHelper.setCustomCharsPerLine(chars != defaultChars ? chars : 0);
-    EscPosHelper.setExtraFeed(_extraFeed);
-    EscPosHelper.setAutoCut(_autoCut);
-    EscPosHelper.setCashDrawerMode(cashDrawerMode);
+    final testFormatter = EscPosFormatter(EscPosConfig(
+      customCharsPerLine: chars != defaultChars ? chars : 0,
+      extraFeed: _extraFeed,
+      autoCut: _autoCut,
+      useFontB: baseFormatter.config.useFontB,
+      cashDrawerMode: cashDrawerMode,
+      sessionSummaryCashDrawer:
+          baseFormatter.config.sessionSummaryCashDrawer,
+    ));
 
     try {
       final bytes = isFull
-          ? TestPrintTemplate.buildTestLong(paperSize)
-          : TestPrintTemplate.buildTestShort(paperSize);
+          ? TestPrintTemplate.buildTestLong(paperSize, testFormatter)
+          : TestPrintTemplate.buildTestShort(paperSize, testFormatter);
 
       if (cashDrawerMode == CashDrawerMode.openBeforePrint) {
-        await PrintBluetoothThermal.writeBytes(EscPosHelper.openCashDrawer());
+        await PrintBluetoothThermal.writeBytes(
+            EscPosCommands.openCashDrawer());
         await Future.delayed(const Duration(milliseconds: 1500));
       }
 
@@ -95,7 +102,8 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
 
       if (cashDrawerMode == CashDrawerMode.openAfterPrint) {
         await Future.delayed(const Duration(milliseconds: 1000));
-        await PrintBluetoothThermal.writeBytes(EscPosHelper.openCashDrawer());
+        await PrintBluetoothThermal.writeBytes(
+            EscPosCommands.openCashDrawer());
       }
 
       if (!mounted) return;
@@ -123,11 +131,6 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
       ));
-    } finally {
-      EscPosHelper.setCustomCharsPerLine(originalChars);
-      EscPosHelper.setExtraFeed(originalFeed);
-      EscPosHelper.setAutoCut(originalCut);
-      EscPosHelper.setCashDrawerMode(originalCashDrawer);
     }
   }
 
@@ -153,10 +156,11 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
     } else {
       await p.remove('chars_per_line');
     }
-    EscPosHelper.setCustomCharsPerLine(chars != defaultChars ? chars : 0);
+    final cc = ref.read(printConfigProvider.notifier);
+    cc.setCustomCharsPerLine(chars != defaultChars ? chars : 0);
 
     await p.setBool('auto_cut', _autoCut);
-    EscPosHelper.setAutoCut(_autoCut);
+    cc.setAutoCut(_autoCut);
 
     final cashDrawerKey = switch (cashDrawerMode) {
       CashDrawerMode.openAfterPrint => 'after',
@@ -164,13 +168,15 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
       CashDrawerMode.off => 'off',
     };
     await p.setString('cash_drawer_mode', cashDrawerKey);
-    EscPosHelper.setCashDrawerMode(cashDrawerMode);
+    ref.read(printerConfigProvider.notifier).setCashDrawerMode(cashDrawerMode);
 
     await p.setBool('session_summary_cash_drawer', sessionSummaryCashDrawer);
-    EscPosHelper.setSessionSummaryCashDrawer(sessionSummaryCashDrawer);
+    ref
+        .read(printerConfigProvider.notifier)
+        .setSessionSummaryCashDrawer(sessionSummaryCashDrawer);
 
     await p.setInt('extra_feed', _extraFeed);
-    EscPosHelper.setExtraFeed(_extraFeed);
+    cc.setExtraFeed(_extraFeed);
 
     await p.setBool('print_qris', _printQris);
     ref.read(printerConfigProvider.notifier).setPrintQris(_printQris);

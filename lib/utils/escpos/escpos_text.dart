@@ -3,12 +3,9 @@ import 'dart:typed_data';
 import 'escpos_commands.dart';
 import 'escpos_config.dart';
 
-/// Text & layout helpers for ESC/POS output. Stateless — semua method
-/// menerima parameter (tidak baca mutable state).
 class EscPosText {
   static const int lfCmd = 0x0A;
 
-  /// Emit raw text bytes (clip non-ASCII ke 0x3F, append LF).
   static Uint8List txt(String s) {
     final bytes = <int>[];
     for (int i = 0; i < s.length; i++) {
@@ -19,14 +16,11 @@ class EscPosText {
     return Uint8List.fromList(bytes);
   }
 
-  /// Emit horizontal divider char repeated to fill charsPerLine.
   static Uint8List divider(PaperSize size, {String char = '-'}) {
     final w = charsPerLineFor(size);
     return txt(char * w);
   }
 
-  /// Left+right row: `left` and `right` separated by spaces, padded to width.
-  /// If `boldRight`, the right side is wrapped in bold escape sequences.
   static Uint8List rowLR(String left, String right, PaperSize size,
       {bool boldRight = false}) {
     final w = charsPerLineFor(size);
@@ -62,7 +56,6 @@ class EscPosText {
     return txt('$left$padding$right');
   }
 
-  /// Build a `---- label ----` centered header line.
   static Uint8List sectionHeader(String label, PaperSize size) {
     final w = charsPerLineFor(size);
     final inner = ' $label ';
@@ -77,8 +70,6 @@ class EscPosText {
     return txt(line);
   }
 
-  /// Same as [sectionHeader] but returns String for callers that want to
-  /// compose other commands around it.
   static String sectionHeaderLine(String label, PaperSize size, String char) {
     final w = charsPerLineFor(size);
     final inner = label;
@@ -93,7 +84,6 @@ class EscPosText {
     return line;
   }
 
-  /// Indonesian-style currency formatting (e.g. "Rp10.000" or "10.000").
   static String rp(int amount,
       {String symbol = 'Rp', int decimals = 0, bool positionAfter = false}) {
     String prefix = symbol;
@@ -141,8 +131,6 @@ class EscPosText {
     return qty.toStringAsFixed(precision);
   }
 
-  /// Format ISO date string `yyyy-MM-ddTHH:mm:ss` (atau `dd/MM/yyyy`) jadi
-  /// `dd/MM/yyyy HH:mm`.
   static String formatDateShort(String raw) {
     try {
       if (raw.isEmpty) return '';
@@ -186,8 +174,6 @@ class EscPosText {
     return '\x1D\x21\x11$truncated\x1D\x21\x00';
   }
 
-  /// Plain ASCII word-wrap. Tidak bisa dipakai untuk teks mixed-script;
-  /// cukup untuk label produk/struk.
   static List<String> wordWrap(String text, int w) {
     final words = text.split(' ');
     final lines = <String>[];

@@ -1,8 +1,12 @@
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sdr_printer_manager/utils/escpos/escpos_config.dart';
+import 'package:sdr_printer_manager/utils/escpos/escpos_receipts.dart';
 import 'package:sdr_printer_manager/utils/escpos_helper.dart';
 
 void main() {
+  final formatter = EscPosFormatter(const EscPosConfig());
+
   group('EscPosHelper Commands', () {
     test('init() returns correct ESC/POS initialization bytes', () {
       final result = EscPosHelper.init();
@@ -86,57 +90,32 @@ void main() {
     });
 
     test('charsPerLine uses custom value when set', () {
-      EscPosHelper.setCustomCharsPerLine(40);
-      expect(EscPosHelper.charsPerLine(PaperSize.mm80), 40);
-      EscPosHelper.setCustomCharsPerLine(0); // Reset
+      final testFormatter = EscPosFormatter(
+          const EscPosConfig(customCharsPerLine: 40));
+      expect(testFormatter.charsPerLine(PaperSize.mm80), 40);
     });
 
     test('charsPerLine uses default when custom is 0', () {
-      EscPosHelper.setCustomCharsPerLine(0);
-      expect(EscPosHelper.charsPerLine(PaperSize.mm58), 32);
-      expect(EscPosHelper.charsPerLine(PaperSize.mm80), 48);
-      expect(EscPosHelper.charsPerLine(PaperSize.mm100), 64);
+      expect(formatter.charsPerLine(PaperSize.mm58), 32);
+      expect(formatter.charsPerLine(PaperSize.mm80), 48);
+      expect(formatter.charsPerLine(PaperSize.mm100), 64);
     });
   });
 
-  group('EscPosHelper Settings', () {
-    test('setExtraFeed updates _extraFeed', () {
-      EscPosHelper.setExtraFeed(5);
-      expect(EscPosHelper.extraFeedSetting, 5);
-      EscPosHelper.setExtraFeed(3); // Reset
-    });
-
-    test('setAutoCut updates _autoCut', () {
-      EscPosHelper.setAutoCut(true);
-      expect(EscPosHelper.autoCutSetting, true);
-      EscPosHelper.setAutoCut(false); // Reset
-    });
-
-    test('setCashDrawerMode updates _cashDrawerMode', () {
-      EscPosHelper.setCashDrawerMode(CashDrawerMode.openAfterPrint);
-      expect(EscPosHelper.cashDrawerModeSetting, CashDrawerMode.openAfterPrint);
-      EscPosHelper.setCashDrawerMode(CashDrawerMode.off); // Reset
-    });
-
+  group('EscPosFormatter finalize', () {
     test('finalize includes feed when extraFeed > 0', () {
-      EscPosHelper.setExtraFeed(5);
-      EscPosHelper.setAutoCut(false);
-      final result = EscPosHelper.finalize();
+      final f = EscPosFormatter(
+          const EscPosConfig(extraFeed: 5, autoCut: false));
+      final result = f.finalize();
       expect(result, isNotEmpty);
-      // Reset
-      EscPosHelper.setExtraFeed(3);
     });
 
     test('finalize includes cut when autoCut is true', () {
-      EscPosHelper.setExtraFeed(0);
-      EscPosHelper.setAutoCut(true);
-      final result = EscPosHelper.finalize();
+      final f = EscPosFormatter(
+          const EscPosConfig(extraFeed: 0, autoCut: true));
+      final result = f.finalize();
       expect(result, isNotEmpty);
-      // GS V A 0
       expect(result.length >= 4, true);
-      // Reset
-      EscPosHelper.setExtraFeed(3);
-      EscPosHelper.setAutoCut(false);
     });
   });
 
@@ -184,7 +163,7 @@ void main() {
         'company': <String, dynamic>{'name': 'Toko Test'},
       };
 
-      final result = EscPosHelper.buildFromOdooData(data, PaperSize.mm80);
+      final result = formatter.buildFromOdooData(data, PaperSize.mm80);
       expect(result, isA<Uint8List>());
       expect(result.isNotEmpty, true);
     });
@@ -200,7 +179,7 @@ void main() {
         'company': <String, dynamic>{'name': 'Toko Test'},
       };
 
-      final result = EscPosHelper.buildFromOdooData(data, PaperSize.mm80);
+      final result = formatter.buildFromOdooData(data, PaperSize.mm80);
       expect(result, isA<Uint8List>());
       expect(result.isNotEmpty, true);
     });
@@ -216,7 +195,7 @@ void main() {
         'company': <String, dynamic>{'name': 'Toko Test'},
       };
 
-      final result = EscPosHelper.buildFromOdooData(data, PaperSize.mm80);
+      final result = formatter.buildFromOdooData(data, PaperSize.mm80);
       expect(result, isA<Uint8List>());
       expect(result.isNotEmpty, true);
     });
@@ -232,7 +211,7 @@ void main() {
         'company': <String, dynamic>{'name': 'Toko Test'},
       };
 
-      final result = EscPosHelper.buildFromOdooData(data, PaperSize.mm80);
+      final result = formatter.buildFromOdooData(data, PaperSize.mm80);
       expect(result, isA<Uint8List>());
       expect(result.isNotEmpty, true);
     });
@@ -250,7 +229,7 @@ void main() {
         'company': <String, dynamic>{'name': 'Toko Test'},
       };
 
-      final result = EscPosHelper.buildFromOdooData(data, PaperSize.mm80, basic: true);
+      final result = formatter.buildFromOdooData(data, PaperSize.mm80, basic: true);
       expect(result, isA<Uint8List>());
       expect(result.isNotEmpty, true);
     });
@@ -268,7 +247,7 @@ void main() {
         'company': <String, dynamic>{'name': 'Toko Test'},
       };
 
-      final result = EscPosHelper.buildFromOdooData(data, PaperSize.mm80, basic: false);
+      final result = formatter.buildFromOdooData(data, PaperSize.mm80, basic: false);
       expect(result, isA<Uint8List>());
       expect(result.isNotEmpty, true);
     });
@@ -288,7 +267,7 @@ void main() {
         },
       };
 
-      final result = EscPosHelper.buildSessionSummary(data, PaperSize.mm80);
+      final result = formatter.buildSessionSummary(data, PaperSize.mm80);
       expect(result, isA<Uint8List>());
       expect(result.isNotEmpty, true);
     });
@@ -333,7 +312,7 @@ void main() {
         },
       };
 
-      final result = EscPosHelper.buildSessionSummary(data, PaperSize.mm80);
+      final result = formatter.buildSessionSummary(data, PaperSize.mm80);
       expect(result, isA<Uint8List>());
       expect(result.isNotEmpty, true);
     });
@@ -370,19 +349,19 @@ void main() {
         },
       };
 
-      final result = EscPosHelper.buildSessionSummary(data, PaperSize.mm58);
+      final result = formatter.buildSessionSummary(data, PaperSize.mm58);
       expect(result, isA<Uint8List>());
       expect(result.isNotEmpty, true);
     });
 
     test('textToEscPos converts text to bytes', () {
-      final result = EscPosHelper.textToEscPos('Hello World', PaperSize.mm80);
+      final result = formatter.textToEscPos('Hello World', PaperSize.mm80);
       expect(result, isA<Uint8List>());
       expect(result.isNotEmpty, true);
     });
 
     test('textToEscPos with bold formatting', () {
-      final result = EscPosHelper.textToEscPos('Bold Text', PaperSize.mm80, isBold: true);
+      final result = formatter.textToEscPos('Bold Text', PaperSize.mm80, isBold: true);
       expect(result, isA<Uint8List>());
       expect(result.isNotEmpty, true);
     });
@@ -470,7 +449,7 @@ void main() {
         },
       };
 
-      final result = EscPosHelper.buildFromOdooData(data, PaperSize.mm80);
+      final result = formatter.buildFromOdooData(data, PaperSize.mm80);
       expect(result, isA<Uint8List>());
       expect(result.isNotEmpty, true);
     });
@@ -503,7 +482,7 @@ void main() {
         },
       };
 
-      final result = EscPosHelper.buildFromOdooData(data, PaperSize.mm80);
+      final result = formatter.buildFromOdooData(data, PaperSize.mm80);
       expect(result, isA<Uint8List>());
       expect(result.isNotEmpty, true);
     });

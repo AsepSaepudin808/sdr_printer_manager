@@ -152,3 +152,46 @@ class UiStateNotifier extends Notifier<UiState> {
 
 final uiStateProvider =
     NotifierProvider<UiStateNotifier, UiState>(UiStateNotifier.new);
+
+// PRINT CONFIG — technical print settings (chars/line, extra feed, auto cut, font B).
+class PrintConfig {
+  final int customCharsPerLine;
+  final int extraFeed;
+  final bool autoCut;
+  final bool useFontB;
+
+  const PrintConfig({
+    this.customCharsPerLine = 0,
+    this.extraFeed = 3,
+    this.autoCut = false,
+    this.useFontB = false,
+  });
+
+  PrintConfig copyWith({
+    int? customCharsPerLine,
+    int? extraFeed,
+    bool? autoCut,
+    bool? useFontB,
+  }) =>
+      PrintConfig(
+        customCharsPerLine: customCharsPerLine ?? this.customCharsPerLine,
+        extraFeed: extraFeed ?? this.extraFeed,
+        autoCut: autoCut ?? this.autoCut,
+        useFontB: useFontB ?? this.useFontB,
+      );
+}
+
+class PrintConfigNotifier extends Notifier<PrintConfig> {
+  @override
+  PrintConfig build() => const PrintConfig();
+
+  void setCustomCharsPerLine(int v) =>
+      state = state.copyWith(customCharsPerLine: v);
+  void setExtraFeed(int v) => state = state.copyWith(extraFeed: v);
+  void setAutoCut(bool v) => state = state.copyWith(autoCut: v);
+  void setUseFontB(bool v) => state = state.copyWith(useFontB: v);
+  void replace(PrintConfig next) => state = next;
+}
+
+final printConfigProvider =
+    NotifierProvider<PrintConfigNotifier, PrintConfig>(PrintConfigNotifier.new);

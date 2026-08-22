@@ -5,62 +5,12 @@ import 'package:image/image.dart' as img;
 import 'escpos/escpos_commands.dart';
 import 'escpos/escpos_config.dart';
 import 'escpos/escpos_image.dart';
-import 'escpos/escpos_receipts.dart';
 import 'escpos/escpos_text.dart';
 
-/// Re-export enums agar import lama `import '../utils/escpos_helper.dart'
-/// show PaperSize, CashDrawerMode` tetap jalan.
 export 'escpos/escpos_config.dart' show PaperSize, CashDrawerMode;
 
-/// Backward-compat facade. JANGAN pakai langsung di kode baru —
-/// pakai class di sub-folder `escpos/` ([EscPosCommands], [EscPosText],
-/// [EscPosImage], [EscPosFormatter]) yang stateless / instance-based.
-///
-/// File ini tetap ada untuk kompatibilitas 226 call site lama
-/// (`EscPosHelper.methodName()`). State mutable yang dipakai di sini
-/// dikonversi ke [EscPosConfig] lewat [formatter].
 class EscPosHelper {
-  static EscPosConfig _config = const EscPosConfig();
-
-  // ─── CONFIG SETTERS (backward compat) ───────────────────────────────
-
-  static void setCustomCharsPerLine(int v) =>
-      _config = _config.copyWith(customCharsPerLine: v);
-  static void setExtraFeed(int v) =>
-      _config = _config.copyWith(extraFeed: v);
-  static void setAutoCut(bool v) => _config = _config.copyWith(autoCut: v);
-  static void setUseFontB(bool v) =>
-      _config = _config.copyWith(useFontB: v);
-  static void setCashDrawerMode(CashDrawerMode mode) =>
-      _config = _config.copyWith(cashDrawerMode: mode);
-  static void setSessionSummaryCashDrawer(bool v) =>
-      _config = _config.copyWith(sessionSummaryCashDrawer: v);
-
-  // ─── CONFIG GETTERS (backward compat) ───────────────────────────────
-
-  static int get customCharsPerLineSetting => _config.customCharsPerLine;
-  static int get extraFeedSetting => _config.extraFeed;
-  static bool get autoCutSetting => _config.autoCut;
-  static bool get useFontBSetting => _config.useFontB;
-  static CashDrawerMode get cashDrawerModeSetting =>
-      _config.cashDrawerMode;
-  static bool get sessionSummaryCashDrawerSetting =>
-      _config.sessionSummaryCashDrawer;
-
-  // ─── STATELESS COMMANDS (delegate) ──────────────────────────────────
-
-  static Uint8List openCashDrawer() => EscPosCommands.openCashDrawer();
-
-  static int defaultCharsPerLine(PaperSize size) =>
-      EscPosCommands.defaultCharsPerLine(size);
-
-  static int paperMaxWidth(PaperSize size) =>
-      EscPosCommands.paperMaxWidth(size);
-
-  static int charsPerLine(PaperSize size) =>
-      formatter.charsPerLine(size);
-
-  static List<int> finalize() => formatter.finalize();
+  // ─── STATELESS COMMANDS ─────────────────────────────────────────────
 
   static Uint8List init() => EscPosCommands.init();
   static Uint8List cut() => EscPosCommands.cut();
@@ -69,13 +19,19 @@ class EscPosHelper {
   static Uint8List feed(int n) => EscPosCommands.feed(n);
   static Uint8List setFontB(bool on) => EscPosCommands.setFontB(on);
   static Uint8List doubleSize(bool on) => EscPosCommands.doubleSize(on);
-  static Uint8List doubleHeight(bool on) =>
-      EscPosCommands.doubleHeight(on);
+  static Uint8List doubleHeight(bool on) => EscPosCommands.doubleHeight(on);
+  static Uint8List openCashDrawer() => EscPosCommands.openCashDrawer();
+
+  // ─── STATELESS HELPERS ──────────────────────────────────────────────
+
+  static int defaultCharsPerLine(PaperSize size) =>
+      EscPosCommands.defaultCharsPerLine(size);
+
+  static int paperMaxWidth(PaperSize size) =>
+      EscPosCommands.paperMaxWidth(size);
 
   static Uint8List imageEsc(img.Image src, PaperSize size) =>
       EscPosImage.esc(src, size);
-
-  // ─── TEXT HELPERS (delegate) ────────────────────────────────────────
 
   static Uint8List txt(String s) => EscPosText.txt(s);
   static Uint8List divider(PaperSize size, {String char = '-'}) =>
@@ -99,19 +55,22 @@ class EscPosHelper {
   static String fixLenR(String s, int width) => EscPosText.fixLenR(s, width);
   static String formatQty(double qty, [int precision = 2]) =>
       EscPosText.formatQty(qty, precision);
-  static String formatDateShort(String raw) =>
-      EscPosText.formatDateShort(raw);
+  static String formatDateShort(String raw) => EscPosText.formatDateShort(raw);
   static List<String> wordWrap(String text, int w) =>
       EscPosText.wordWrap(text, w);
 
-  // ─── RECEIPT BUILDERS (delegate ke formatter instance) ─────────────
+  // ─── STATEFUL COMMANDS ─────────────────────────────────────────────
+  static int charsPerLine(PaperSize size) =>
+      throw _stateRemoved('charsPerLine');
+
+  static List<int> finalize() => throw _stateRemoved('finalize');
 
   static Uint8List buildFromOdooData(
     Map<String, dynamic> data,
     PaperSize size, {
     bool basic = false,
   }) =>
-      formatter.buildFromOdooData(data, size, basic: basic);
+      throw _stateRemoved('buildFromOdooData');
 
   static Uint8List textToEscPos(
     String text,
@@ -119,19 +78,39 @@ class EscPosHelper {
     bool isBold = false,
     int alignMode = 0,
   }) =>
-      formatter.textToEscPos(text, size,
-          isBold: isBold, alignMode: alignMode);
+      throw _stateRemoved('textToEscPos');
 
   static Uint8List buildSessionSummary(
           Map<String, dynamic> data, PaperSize size) =>
-      formatter.buildSessionSummary(data, size);
+      throw _stateRemoved('buildSessionSummary');
 
   static Uint8List buildQRISReceipt(
           Map<String, dynamic> data, PaperSize size) =>
-      formatter.buildQRISReceipt(data, size);
+      throw _stateRemoved('buildQRISReceipt');
 
-  // ─── INSTANCE AKSES (untuk kode baru) ────────────────────────────────
+  // ─── STATEFUL CONFIG ──────────────────────────────────────────────
+  static void setCustomCharsPerLine(int v) =>
+      throw _stateRemoved('setCustomCharsPerLine');
+  static void setExtraFeed(int v) => throw _stateRemoved('setExtraFeed');
+  static void setAutoCut(bool v) => throw _stateRemoved('setAutoCut');
+  static void setUseFontB(bool v) => throw _stateRemoved('setUseFontB');
+  static void setCashDrawerMode(CashDrawerMode mode) =>
+      throw _stateRemoved('setCashDrawerMode');
+  static void setSessionSummaryCashDrawer(bool v) =>
+      throw _stateRemoved('setSessionSummaryCashDrawer');
 
-  static EscPosFormatter get formatter => EscPosFormatter(_config);
-  static EscPosConfig get config => _config;
+  static int get customCharsPerLineSetting =>
+      throw _stateRemoved('customCharsPerLineSetting');
+  static int get extraFeedSetting => throw _stateRemoved('extraFeedSetting');
+  static bool get autoCutSetting => throw _stateRemoved('autoCutSetting');
+  static bool get useFontBSetting => throw _stateRemoved('useFontBSetting');
+  static CashDrawerMode get cashDrawerModeSetting =>
+      throw _stateRemoved('cashDrawerModeSetting');
+  static bool get sessionSummaryCashDrawerSetting =>
+      throw _stateRemoved('sessionSummaryCashDrawerSetting');
+
+  static StateError _stateRemoved(String name) => StateError(
+      'EscPosHelper.$name() dihapus — mutable global state sudah dihapus. '
+      'Gunakan EscPosFormatter dari escposFormatterProvider, atau '
+      'printConfigProvider/printerConfigProvider untuk update config.');
 }

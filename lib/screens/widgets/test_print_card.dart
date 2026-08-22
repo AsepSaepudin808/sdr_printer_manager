@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/app_state_provider.dart';
+import '../../providers/escpos_formatter_provider.dart';
 import '../../utils/strings.dart';
 import '../../utils/colors.dart';
 import '../../utils/test_print_template.dart';
@@ -15,6 +16,7 @@ class TestPrintCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isPrinting = ref.watch(printStateProvider.select((s) => s.isPrinting));
     final paperSize = ref.watch(printerConfigProvider.select((s) => s.paperSize));
+    final formatter = ref.watch(escposFormatterProvider);
 
     return _card(
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -38,7 +40,7 @@ class TestPrintCard extends ConsumerWidget {
               Icons.receipt_rounded,
               AppColors.primary,
               isPrinting ? null : () => onTestPrint(
-                TestPrintTemplate.buildTestShort(paperSize),
+                TestPrintTemplate.buildTestShort(paperSize, formatter),
                 S.shortReceiptPrint,
               ),
             ),
@@ -50,7 +52,7 @@ class TestPrintCard extends ConsumerWidget {
               Icons.receipt_long_rounded,
               const Color(0xFF7B2FBE),
               isPrinting ? null : () => onTestPrint(
-                TestPrintTemplate.buildTestLong(paperSize),
+                TestPrintTemplate.buildTestLong(paperSize, formatter),
                 S.fullReceiptPrint,
               ),
             ),
