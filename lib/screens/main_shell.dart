@@ -161,13 +161,13 @@ class _MainShellState extends ConsumerState<MainShell> {
   Future<void> _processPdfJob(String path, String name) async {
     final file = File(path);
     if (!await file.exists()) {
-      _addLog('❌ File PDF tidak ditemukan: $path');
+      _addLog(S.pdfNotFound(path));
       return;
     }
 
     _printN.setIsPrinting(true);
-    _printN.setStatus('🖨️ Memproses $name...');
-    _addLog('🖨️ Menerima Print Job: $name');
+    _printN.setStatus(S.processingJob(name));
+    _addLog(S.receivingJob(name));
 
     final connected = await _bt.checkConnection();
     if (!connected) {
@@ -201,7 +201,7 @@ class _MainShellState extends ConsumerState<MainShell> {
 
       for (int i = 1; i <= totalPages; i++) {
         if (!mounted) return;
-        _printN.setStatus('🖨️ Mencetak halaman $i/$totalPages...');
+        _printN.setStatus(S.printingPage(i, totalPages));
 
         final page = await document.getPage(i);
         final pageImage = await page.render(
@@ -212,10 +212,10 @@ class _MainShellState extends ConsumerState<MainShell> {
         );
         await page.close();
 
-        if (pageImage == null) throw Exception('Gagal render halaman $i');
+        if (pageImage == null) throw Exception(S.renderFail(i));
 
         final decoded = img.decodeImage(pageImage.bytes);
-        if (decoded == null) throw Exception('Gagal decode image halaman $i');
+        if (decoded == null) throw Exception(S.decodeFail(i));
 
         final processed = _enhanceForThermal(decoded);
 
@@ -226,7 +226,7 @@ class _MainShellState extends ConsumerState<MainShell> {
         buf.addAll(EscPosHelper.feed(2));
 
         final ok = await _bt.sendRaw(Uint8List.fromList(buf));
-        if (!ok) throw Exception('Printer gagal menerima data di halaman $i');
+        if (!ok) throw Exception(S.printerDataFail(i));
       }
 
       _addLog(S.printSuccess(name));
@@ -240,7 +240,7 @@ class _MainShellState extends ConsumerState<MainShell> {
         await file.delete();
       } catch (_) {}
     } catch (e) {
-      _addLog('❌ Error mencetak $name: $e');
+      _addLog(S.printingError(name, e.toString()));
       _printN.setStatus('❌ Error: $e');
     } finally {
       await document?.close();
@@ -653,6 +653,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     final autoStart =
         ref.watch(printerConfigProvider.select((s) => s.autoStart));
     final logs = ref.watch(logsProvider);
+    ref.watch(langProvider);
 
     final titles = [S.home, S.freeText, S.statistics, S.printImage, S.printPdf];
     final isKeyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
@@ -1604,15 +1605,15 @@ class _MainShellState extends ConsumerState<MainShell> {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Print Bridge for PoS',
+              Text(
+                S.aboutSubtitle,
                 style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
               const SizedBox(height: 20),
               const Divider(),
               const SizedBox(height: 12),
-              const Text(
-                'Aplikasi pengelola koneksi printer Bluetooth thermal untuk PoS dRetail Mart.',
+              Text(
+                S.aboutDescription,
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 13, color: Colors.grey),
               ),
@@ -1657,8 +1658,8 @@ class _MainShellState extends ConsumerState<MainShell> {
                 children: [
                   const Icon(Icons.description_rounded, color: _primary),
                   const SizedBox(width: 8),
-                  const Text(
-                    'Lisensi',
+                  Text(
+                    S.license,
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                   const Spacer(),

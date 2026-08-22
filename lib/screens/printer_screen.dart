@@ -442,6 +442,7 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(langProvider);
     return Scaffold(
       backgroundColor: _bg,
       body: CustomScrollView(
@@ -494,12 +495,12 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
                             color: Colors.white, size: 28),
                       ),
                       const SizedBox(width: 14),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Printer',
+                              S.printer,
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 22,
@@ -507,7 +508,7 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
                               ),
                             ),
                             Text(
-                              'Kelola & daftarkan printer Bluetooth',
+                              S.printerManageSubtitle,
                               style: TextStyle(
                                 color: Colors.white70,
                                 fontSize: 12,
@@ -570,10 +571,6 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
   }
 
   Widget _buildBluetoothStatusBanner() {
-    // Three states:
-    // 1. Hardware off  → red/orange, prompt to turn on BT
-    // 2. Hardware on, permissions missing → orange, prompt to grant
-    // 3. All ready      → green, show active printer info
     final allReady =
         _btHardwareEnabled && _btPermissionsGranted && _locationEnabled;
     final btOff = !_btHardwareEnabled;
@@ -588,7 +585,7 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
       bgEnd = Colors.red.shade600;
       icon = Icons.bluetooth_disabled_rounded;
       title = S.bluetoothInactive;
-      subtitle = 'Aktifkan Bluetooth untuk memindai printer.';
+      subtitle = S.bluetoothScanHint;
     } else if (!allReady) {
       bgStart = Colors.orange.shade700;
       bgEnd = Colors.orange.shade600;
@@ -601,8 +598,8 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen>
       icon = Icons.bluetooth_rounded;
       title = S.bluetoothActive;
       subtitle = _activePrinterMac != null
-          ? 'Printer aktif terhubung'
-          : 'Pilih printer untuk digunakan';
+          ? S.printerActiveConnected
+          : S.selectPrinterToUse;
     }
 
     return Container(

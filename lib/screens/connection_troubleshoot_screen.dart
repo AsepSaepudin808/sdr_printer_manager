@@ -47,24 +47,19 @@ class _ConnectionTroubleshootScreenState
   }
 
   List<_DiagStep> _buildSteps() {
-    final isEn = S.isEn;
     return [
       _DiagStep(
-        title: isEn ? 'Bluetooth is ON' : 'Bluetooth Aktif',
-        description: isEn
-            ? 'Hardware Bluetooth must be enabled.'
-            : 'Bluetooth hardware harus dinyalakan.',
+        title: S.troubleshootBluetoothOnTitle,
+        description: S.troubleshootBluetoothOnDesc,
         icon: Icons.bluetooth_rounded,
-        actionLabel: isEn ? 'Open Settings' : 'Buka Settings',
+        actionLabel: S.troubleshootBluetoothOnAction,
         onAction: () => BluetoothSettingsHelper.openBluetoothSettings(),
       ),
       _DiagStep(
-        title: isEn ? 'Permissions granted' : 'Permission diberikan',
-        description: isEn
-            ? 'Bluetooth Connect + Location must be allowed.'
-            : 'Bluetooth Connect + Lokasi harus diizinkan.',
+        title: S.troubleshootPermissionsTitle,
+        description: S.troubleshootPermissionsDesc,
         icon: Icons.lock_outline_rounded,
-        actionLabel: isEn ? 'Grant' : 'Izinkan',
+        actionLabel: S.troubleshootPermissionsAction,
         onAction: () async {
           await Permission.bluetoothConnect.request();
           await Permission.locationWhenInUse.request();
@@ -72,21 +67,17 @@ class _ConnectionTroubleshootScreenState
         },
       ),
       _DiagStep(
-        title: isEn ? 'Printer paired' : 'Printer sudah paired',
-        description: isEn
-            ? 'Your printer must be paired in Android Bluetooth settings.'
-            : 'Printer harus sudah di-pair di Bluetooth Settings Android.',
+        title: S.troubleshootPrinterPairedTitle,
+        description: S.troubleshootPrinterPairedDesc,
         icon: Icons.print_rounded,
-        actionLabel: isEn ? 'Scan' : 'Pindai',
+        actionLabel: S.troubleshootPrinterPairedAction,
         onAction: () => _runCheck(2),
       ),
       _DiagStep(
-        title: isEn ? 'Connection test' : 'Tes koneksi',
-        description: isEn
-            ? 'Try to reach the selected printer.'
-            : 'Coba hubungi printer yang dipilih.',
+        title: S.troubleshootConnectionTitle,
+        description: S.troubleshootConnectionDesc,
         icon: Icons.wifi_rounded,
-        actionLabel: isEn ? 'Retry' : 'Coba lagi',
+        actionLabel: S.troubleshootConnectionAction,
         onAction: () => _runCheck(3),
       ),
     ];
@@ -140,9 +131,7 @@ class _ConnectionTroubleshootScreenState
     final allOk = _steps.every((s) => s.status == _StepStatus.ok);
     if (allOk) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(S.isEn
-            ? 'All checks passed. Connection looks healthy.'
-            : 'Semua cek berhasil. Koneksi terlihat sehat.'),
+        content: Text(S.troubleshootAllPassed),
         backgroundColor: const Color(0xFF06C270),
       ));
     }
@@ -150,10 +139,11 @@ class _ConnectionTroubleshootScreenState
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(langProvider);
+    _steps = _buildSteps();
     return Scaffold(
       appBar: AppBar(
-        title: Text(S.isEn ? 'Connection Troubleshoot' : 'Troubleshoot Koneksi',
-            style: const TextStyle(fontWeight: FontWeight.w800)),
+        title: Text(S.troubleshootTitle, style: const TextStyle(fontWeight: FontWeight.w800)),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -171,9 +161,7 @@ class _ConnectionTroubleshootScreenState
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  S.isEn
-                      ? 'Diagnose printer connection step-by-step. Run all checks at once or tap each card to retry.'
-                      : 'Diagnosa koneksi printer langkah demi langkah. Jalankan semua cek sekaligus atau tap kartu untuk coba lagi.',
+                  S.troubleshootIntro,
                   style: const TextStyle(fontSize: 13),
                 ),
               ),
@@ -194,7 +182,7 @@ class _ConnectionTroubleshootScreenState
                           strokeWidth: 2, color: Colors.white))
                   : const Icon(Icons.play_arrow_rounded, size: 20),
               label: Text(
-                S.isEn ? 'Run All Checks' : 'Jalankan Semua Cek',
+                S.runAllChecks,
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               style: ElevatedButton.styleFrom(

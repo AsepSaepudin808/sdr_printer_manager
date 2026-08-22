@@ -33,7 +33,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _loadPrefs() async {
     final p = await SharedPreferences.getInstance();
     setState(() {
-      _languageCode = p.getString('language_code') ?? 'id';
+      _languageCode = p.getString('language_code') ?? 'en';
       _directPrint = p.getBool('direct_print_on') ?? true;
       _androidPrintService = p.getBool('android_print_service') ?? false;
       _loaded = true;
@@ -81,7 +81,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: const Text('Gagal membuka pengaturan cetak Android'),
+          content: Text(S.androidPrintSettingsFail),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
           shape:
@@ -164,7 +164,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               children: [
                 Text(S.resetSuccess,
                     style: const TextStyle(fontWeight: FontWeight.w700)),
-                Text('${S.isEn ? 'Freed' : 'Memori dibebaskan'}: $freedLabel',
+                Text('${S.memoryFreed}: $freedLabel',
                     style: const TextStyle(fontSize: 12)),
               ],
             ),
@@ -188,9 +188,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (file == null || !await file.exists()) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(S.isEn
-            ? 'No log file yet. Try again after a crash.'
-            : 'Belum ada log. Coba lagi setelah crash terjadi.'),
+        content: Text(S.noLogYet),
         backgroundColor: Colors.grey.shade700,
       ));
       return;
@@ -198,10 +196,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await SharePlus.instance.share(
       ShareParams(
         files: [XFile(file.path)],
-        subject: 'dPrinter Mart Crash Log V1.0.3',
-        text: S.isEn
-            ? 'Crash log from dPrinter Mart V1.0.3'
-            : 'Log crash dari dPrinter Mart V1.0.3',
+        subject: S.crashLogSubject,
+        text: S.crashLogSubject,
       ),
     );
   }
@@ -210,7 +206,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await crashLogService.clear();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(S.isEn ? 'Log cleared' : 'Log dihapus'),
+      content: Text(S.logCleared),
       backgroundColor: Colors.grey.shade700,
     ));
   }
@@ -262,6 +258,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final printer = ref.watch(printerConfigProvider.select((s) => s.printer));
     final themeColor = Theme.of(context).colorScheme.primary;
+    ref.watch(langProvider);
 
     if (!_loaded) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -469,21 +466,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ]),
           ),
           _buildSection(
-            S.isEn ? 'Send Crash Log' : 'Kirim Log Crash',
+            S.sendCrashLog,
             icon: Icons.bug_report_outlined,
             iconColor: Colors.orange.shade700,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  S.isEn
-                      ? 'If the app crashes, the error is saved here. Send this file when contacting support.'
-                      : 'Jika aplikasi crash, error tersimpan di sini. Kirim file ini saat menghubungi support.',
+                  S.sendCrashLogDesc,
                   style: const TextStyle(fontSize: 13),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${crashLogService.lineCount} ${S.isEn ? "entries" : "entri"}',
+                  '${crashLogService.lineCount} ${S.crashLogEntryCount}',
                   style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                 ),
                 const SizedBox(height: 12),
@@ -493,7 +488,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       onPressed: _sendLog,
                       icon: const Icon(Icons.send_rounded, size: 18),
                       label: Text(
-                        S.isEn ? 'Send Log' : 'Kirim Log',
+                        S.sendLog,
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       style: ElevatedButton.styleFrom(
@@ -512,7 +507,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     onPressed: _clearLog,
                     icon: const Icon(Icons.delete_outline_rounded, size: 18),
                     label: Text(
-                      S.isEn ? 'Clear' : 'Hapus',
+                      S.clear,
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                     style: OutlinedButton.styleFrom(

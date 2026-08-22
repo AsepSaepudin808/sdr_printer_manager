@@ -60,7 +60,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
         content: Row(children: [
           const Icon(Icons.error_outline_rounded, color: Colors.white),
           const SizedBox(width: 10),
-          Text(S.isEn ? 'Printer is not connected!' : 'Printer belum terhubung!'),
+          Text(S.printerNotConnectedMsg),
         ]),
         backgroundColor: Colors.red,
         behavior: SnackBarBehavior.floating,
@@ -111,7 +111,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
         content: Row(children: [
           const Icon(Icons.check_circle_rounded, color: Colors.white),
           const SizedBox(width: 10),
-          Text(S.isEn ? 'Test print sent' : 'Test print berhasil dikirim'),
+          Text(S.testPrintSent),
         ]),
         backgroundColor: const Color(0xFF06C270),
         behavior: SnackBarBehavior.floating,
@@ -307,13 +307,14 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
       );
     }
     final defaultChars = EscPosHelper.defaultCharsPerLine(paperSize);
+    ref.watch(langProvider);
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FC),
       appBar: AppBar(
         backgroundColor: themeColor,
         foregroundColor: Colors.white,
         title: Text(
-          S.isEn ? 'Printer Settings' : 'Pengaturan Printer',
+          S.printerSettingsTitle,
           style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
         ),
         elevation: 0,
@@ -380,16 +381,14 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    S.isEn ? 'chars' : 'kar',
+                    S.charsShort,
                     style: const TextStyle(
                         fontSize: 14, fontWeight: FontWeight.w600),
                   ),
                 ]),
                 const SizedBox(height: 8),
                 Text(
-                  S.isEn
-                      ? 'Default for ${paperSize.name}: $defaultChars chars'
-                      : 'Default untuk ${paperSize.name}: $defaultChars kar',
+                  S.charsPerLineInfo(paperSize.name, defaultChars),
                   style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                 ),
               ],
@@ -576,7 +575,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
           ),
 
           _buildSection(
-            S.isEn ? 'Test Print' : 'Cetak Percobaan',
+            S.testPrintTrialSection,
             icon: Icons.print_rounded,
             iconColor: const Color(0xFF06C270),
             child: Row(children: [
@@ -584,7 +583,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
                 child: ElevatedButton.icon(
                   onPressed: () => _testPrint(false),
                   icon: const Icon(Icons.receipt_long_rounded, size: 18),
-                  label: Text(S.isEn ? 'Short' : 'Pendek'),
+                  label: Text(S.shortLabel),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.amber.shade700,
                     foregroundColor: Colors.white,
@@ -601,7 +600,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
                 child: ElevatedButton.icon(
                   onPressed: () => _testPrint(true),
                   icon: const Icon(Icons.receipt_rounded, size: 18),
-                  label: Text(S.isEn ? 'Full' : 'Lengkap'),
+                  label: Text(S.fullLabel),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF06C270),
                     foregroundColor: Colors.white,

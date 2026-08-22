@@ -34,13 +34,19 @@ class _OnboardingPermissionsSheetState extends State<OnboardingPermissionsSheet>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    langNotifierInstance.addListener(_onLangChange);
     _checkAll();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    langNotifierInstance.removeListener(_onLangChange);
     super.dispose();
+  }
+
+  void _onLangChange() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -264,7 +270,7 @@ class _OnboardingPermissionsSheetState extends State<OnboardingPermissionsSheet>
             Text(
               _allDone
                   ? S.permissionGranted
-                  : 'Berikan izin berikut agar aplikasi berfungsi optimal.',
+                  : S.permissionSheetIntro,
               style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
               textAlign: TextAlign.center,
             ),
@@ -274,9 +280,9 @@ class _OnboardingPermissionsSheetState extends State<OnboardingPermissionsSheet>
               color: const Color(0xFF2196F3),
               title: S.permissionBluetooth,
               subtitle: _bluetoothPermanent || _bluetoothScanPermanent
-                  ? 'Ditolak permanen — ketuk untuk buka Pengaturan Aplikasi'
+                  ? S.permissionDeniedPerm
                   : (_bluetoothGranted && !_bluetoothScanGranted)
-                      ? 'Tap sekali lagi untuk memberikan izin Bluetooth Scan'
+                      ? S.bluetoothScanRetryHint
                       : S.permissionBluetoothDesc,
               granted: _bluetoothGranted && _bluetoothScanGranted,
               isPermanent: _bluetoothPermanent || _bluetoothScanPermanent,
@@ -290,7 +296,7 @@ class _OnboardingPermissionsSheetState extends State<OnboardingPermissionsSheet>
               color: const Color(0xFF4CAF50),
               title: S.permissionLocation,
               subtitle: _locationPermanent
-                  ? 'Ditolak permanen — ketuk untuk buka Pengaturan Aplikasi'
+                  ? S.permissionDeniedPerm
                   : S.permissionLocationDesc,
               granted: _locationGranted,
               isPermanent: _locationPermanent,
@@ -302,7 +308,7 @@ class _OnboardingPermissionsSheetState extends State<OnboardingPermissionsSheet>
               color: const Color(0xFFFF9800),
               title: S.permissionNotification,
               subtitle: _notificationPermanent
-                  ? 'Ditolak permanen — ketuk untuk buka Pengaturan Aplikasi'
+                  ? S.permissionDeniedPerm
                   : S.permissionNotificationDesc,
               granted: _notificationGranted,
               isPermanent: _notificationPermanent,
@@ -312,8 +318,8 @@ class _OnboardingPermissionsSheetState extends State<OnboardingPermissionsSheet>
             _permTile(
               icon: Icons.battery_charging_full_rounded,
               color: const Color(0xFF00BCD4),
-              title: 'Optimasi Baterai',
-              subtitle: 'Agar server cetak tetap aktif saat layar mati',
+              title: S.batteryOptimizationTitle,
+              subtitle: S.batteryOptimizationDesc,
               granted: _batteryGranted,
               isPermanent: false,
               onTap: _requestBattery,
@@ -324,7 +330,7 @@ class _OnboardingPermissionsSheetState extends State<OnboardingPermissionsSheet>
               color: const Color(0xFF9C27B0),
               title: S.backgroundPermissionTitle,
               subtitle: _autoStartAcknowledged
-                  ? 'Sudah diarahkan ke pengaturan — pastikan diaktifkan'
+                  ? S.autoStartDirected
                   : S.backgroundPermissionDesc,
               granted: _autoStartAcknowledged,
               isPermanent: false,

@@ -132,7 +132,7 @@ class _PdfTabState extends ConsumerState<PdfTab>
 
       for (int i = 1; i <= totalPages; i++) {
         if (!mounted) return;
-        setState(() => _status = '🖨️ Mencetak halaman $i/$totalPages...');
+        setState(() => _status = S.printingPage(i, totalPages));
 
         final page = await document.getPage(i);
         final pageImage = await page.render(
@@ -142,9 +142,9 @@ class _PdfTabState extends ConsumerState<PdfTab>
             backgroundColor: '#FFFFFF');
         await page.close();
 
-        if (pageImage == null) throw Exception('Gagal render halaman $i');
+        if (pageImage == null) throw Exception(S.renderFail(i));
         final decoded = img.decodeImage(pageImage.bytes);
-        if (decoded == null) throw Exception('Gagal decode image halaman $i');
+        if (decoded == null) throw Exception(S.decodeFail(i));
 
         final processed = _enhanceForThermal(decoded);
         final List<int> buf = [];
@@ -154,7 +154,7 @@ class _PdfTabState extends ConsumerState<PdfTab>
         buf.addAll(EscPosHelper.feed(2));
 
         final ok = await btService.sendRaw(Uint8List.fromList(buf));
-        if (!ok) throw Exception('Printer gagal menerima data di halaman $i');
+        if (!ok) throw Exception(S.printerDataFail(i));
       }
 
       ref.read(historyNotifierProvider.notifier).add(PrintHistory(
@@ -263,7 +263,7 @@ class _PdfTabState extends ConsumerState<PdfTab>
             child: const Icon(Icons.straighten_rounded,
                 size: 18, color: _primary)),
         const SizedBox(width: 12),
-        const Text('Kertas:', style: TextStyle(fontWeight: FontWeight.w600)),
+        Text(S.paperLabel, style: const TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(width: 10),
         Expanded(
             child: DropdownButton<PaperSize>(
@@ -330,7 +330,7 @@ class _PdfTabState extends ConsumerState<PdfTab>
                       Icon(Icons.picture_as_pdf_rounded,
                           size: 56, color: Colors.red.shade300),
                       const SizedBox(height: 8),
-                      Text('Preview tidak tersedia',
+                      Text(S.previewUnavailable,
                           style: TextStyle(color: Colors.grey.shade500)),
                     ])))),
       const SizedBox(height: 10),
@@ -355,7 +355,7 @@ class _PdfTabState extends ConsumerState<PdfTab>
                 decoration: BoxDecoration(
                     color: _primary.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8)),
-                child: Text('$_pageCount halaman',
+                child: Text(S.pages(_pageCount),
                     style: const TextStyle(
                         fontSize: 11,
                         color: _primary,
@@ -387,7 +387,7 @@ class _PdfTabState extends ConsumerState<PdfTab>
               child: const Icon(Icons.tune_rounded,
                   size: 16, color: Color(0xFF7B2FBE))),
           const SizedBox(width: 10),
-          const Text('Kualitas Cetak',
+          Text(S.printQuality,
               style: TextStyle(fontWeight: FontWeight.w700)),
           const Spacer(),
           Container(
@@ -458,6 +458,7 @@ class _PdfTabState extends ConsumerState<PdfTab>
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(langProvider);
     // extendBody:false + SafeArea di navBar = Scaffold handle insets otomatis
     final vp = MediaQuery.viewPaddingOf(context);
 

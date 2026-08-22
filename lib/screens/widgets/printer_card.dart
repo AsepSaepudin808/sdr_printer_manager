@@ -17,6 +17,7 @@ class PrinterCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(langProvider);
     final printer = ref.watch(printerConfigProvider.select((s) => s.printer));
     final btConnected = ref.watch(printerConfigProvider.select((s) => s.btConnected));
     final serverRunning = ref.watch(serverStateProvider.select((s) => s.running));
@@ -220,7 +221,7 @@ class PrinterCard extends ConsumerWidget {
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 4),
-                  Text('ID Printer', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                  Text(S.printerId, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                 ])),
               ]),
               const SizedBox(height: 16),
@@ -243,7 +244,7 @@ class PrinterCard extends ConsumerWidget {
                     if (context.mounted) Navigator.pop(context);
                   },
                   icon: const Icon(Icons.copy_rounded, size: 18),
-                  label: Text(S.isEn ? 'Copy ID' : 'Salin ID'),
+                  label: Text(S.copyId),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,

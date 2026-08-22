@@ -27,13 +27,19 @@ class _BackgroundPermissionsCardState extends State<BackgroundPermissionsCard>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    langNotifierInstance.addListener(_onLangChange);
     _check();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    langNotifierInstance.removeListener(_onLangChange);
     super.dispose();
+  }
+
+  void _onLangChange() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -123,7 +129,7 @@ class _BackgroundPermissionsCardState extends State<BackgroundPermissionsCard>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '$missingCount izin belum diberikan',
+                S.missingPermissions(missingCount),
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
@@ -150,8 +156,8 @@ class _BackgroundPermissionsCardState extends State<BackgroundPermissionsCard>
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
-          child: const Text(
-            'Izinkan',
+          child: Text(
+            S.allow,
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
           ),
         ),
@@ -168,13 +174,13 @@ class _BackgroundPermissionsCardState extends State<BackgroundPermissionsCard>
       missing.add('Bluetooth Scan');
     }
     if (!_locationGranted) {
-      missing.add('Lokasi');
+      missing.add(S.permissionLocation);
     }
     if (!_notificationGranted) {
-      missing.add('Notifikasi');
+      missing.add(S.permissionNotification);
     }
     if (!_batteryGranted) {
-      missing.add('Optimasi Baterai');
+      missing.add(S.batteryOptimizationTitle);
     }
     if (!_autoStartAcknowledged) {
       missing.add(S.backgroundPermissionTitle);

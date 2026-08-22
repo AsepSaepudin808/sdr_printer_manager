@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // LANGUAGE MODEL
@@ -27,8 +28,11 @@ class LangNotifier extends ChangeNotifier {
   }
 }
 
-/// Provider for reactive language state
-final langProvider = LangNotifier();
+/// Singleton LangNotifier instance
+final langNotifierInstance = LangNotifier();
+
+/// Riverpod provider — watch this in widgets to rebuild on language change
+final langProvider = Provider<LangNotifier>((ref) => langNotifierInstance);
 
 /// Hook to use langProvider in widgets without Provider scope
 /// Usage: LangNotifier.instance.addListener(...) or use langProvider directly with ref.watch()
@@ -69,7 +73,7 @@ class S {
       return;
     }
 
-    _langCode = 'id';
+    _langCode = 'en';
   }
 
   static Future<void> setLang(String input) async {
@@ -80,7 +84,7 @@ class S {
     // keep legacy key for compatibility with old app state
     await p.setString('language', _codeToLegacy(code));
     // Trigger reactive rebuild
-    langProvider.notifyListeners();
+    langNotifierInstance.notifyListeners();
   }
 
   static String _normalizeLang(String input) {
@@ -1264,9 +1268,270 @@ class S {
         en: 'Done',
         ms: 'Selesai',
       );
-  static String get permissionDenied => withLang(
-        id: 'Izin belum diberikan',
-        en: 'Permission not granted',
-        ms: 'Kebenaran belum diberikan',
+  // Connection Troubleshoot
+  static String get troubleshootBluetoothOnTitle => withLang(
+        id: 'Bluetooth Aktif',
+        en: 'Bluetooth is ON',
+      );
+  static String get troubleshootBluetoothOnDesc => withLang(
+        id: 'Bluetooth hardware harus dinyalakan.',
+        en: 'Hardware Bluetooth must be enabled.',
+      );
+  static String get troubleshootBluetoothOnAction => withLang(
+        id: 'Buka Settings',
+        en: 'Open Settings',
+      );
+  static String get troubleshootPermissionsTitle => withLang(
+        id: 'Permission diberikan',
+        en: 'Permissions granted',
+      );
+  static String get troubleshootPermissionsDesc => withLang(
+        id: 'Bluetooth Connect + Lokasi harus diizinkan.',
+        en: 'Bluetooth Connect + Location must be allowed.',
+      );
+  static String get troubleshootPermissionsAction => withLang(
+        id: 'Izinkan',
+        en: 'Grant',
+      );
+  static String get troubleshootPrinterPairedTitle => withLang(
+        id: 'Printer sudah paired',
+        en: 'Printer paired',
+      );
+  static String get troubleshootPrinterPairedDesc => withLang(
+        id: 'Printer harus sudah di-pair di Bluetooth Settings Android.',
+        en: 'Your printer must be paired in Android Bluetooth settings.',
+      );
+  static String get troubleshootPrinterPairedAction => withLang(
+        id: 'Pindai',
+        en: 'Scan',
+      );
+  static String get troubleshootConnectionTitle => withLang(
+        id: 'Tes koneksi',
+        en: 'Connection test',
+      );
+  static String get troubleshootConnectionDesc => withLang(
+        id: 'Coba hubungi printer yang dipilih.',
+        en: 'Try to reach the selected printer.',
+      );
+  static String get troubleshootConnectionAction => withLang(
+        id: 'Coba lagi',
+        en: 'Retry',
+      );
+  static String get troubleshootAllPassed => withLang(
+        id: 'Semua cek berhasil. Koneksi terlihat sehat.',
+        en: 'All checks passed. Connection looks healthy.',
+      );
+  static String get troubleshootTitle => withLang(
+        id: 'Troubleshoot Koneksi',
+        en: 'Connection Troubleshoot',
+      );
+  static String get troubleshootIntro => withLang(
+        id: 'Diagnosa koneksi printer langkah demi langkah. Jalankan semua cek sekaligus atau tap kartu untuk coba lagi.',
+        en: 'Diagnose printer connection step-by-step. Run all checks at once or tap each card to retry.',
+      );
+  static String get runAllChecks => withLang(
+        id: 'Jalankan Semua Cek',
+        en: 'Run All Checks',
+      );
+
+  // Settings
+  static String get sendCrashLog => withLang(
+        id: 'Kirim Log Crash',
+        en: 'Send Crash Log',
+      );
+  static String get sendCrashLogDesc => withLang(
+        id: 'Jika aplikasi crash, error tersimpan di sini. Kirim file ini saat menghubungi support.',
+        en: 'If the app crashes, the error is saved here. Send this file when contacting support.',
+      );
+  static String get crashLogEntryCount => withLang(
+        id: 'entri',
+        en: 'entries',
+      );
+  static String get sendLog => withLang(
+        id: 'Kirim Log',
+        en: 'Send Log',
+      );
+  static String get clear => withLang(
+        id: 'Hapus',
+        en: 'Clear',
+      );
+  static String get androidPrintSettingsFail => withLang(
+        id: 'Gagal membuka pengaturan cetak Android',
+        en: 'Failed to open Android print settings',
+      );
+  static String get memoryFreed => withLang(
+        id: 'Memori dibebaskan',
+        en: 'Freed',
+      );
+  static String get noLogYet => withLang(
+        id: 'Belum ada log. Coba lagi setelah crash terjadi.',
+        en: 'No log yet. Try again after a crash occurs.',
+      );
+  static String get crashLogSubject => withLang(
+        id: 'Log crash dari dPrinter Mart V1.0.3',
+        en: 'Crash log from dPrinter Mart V1.0.3',
+      );
+  static String get logCleared => withLang(
+        id: 'Log dihapus',
+        en: 'Log cleared',
+      );
+
+  // Printer Settings
+  static String get printerSettingsTitle => withLang(
+        id: 'Pengaturan Printer',
+        en: 'Printer Settings',
+      );
+  static String get printerSettings => printerSettingsTitle;
+  static String get printerNotConnectedMsg => withLang(
+        id: 'Printer belum terhubung!',
+        en: 'Printer is not connected!',
+      );
+  static String get charsShort => withLang(
+        id: 'kar',
+        en: 'chars',
+      );
+  static String charsPerLineInfo(String paperSizeName, int defaultChars) =>
+      withLang(
+        id: 'Default untuk $paperSizeName: $defaultChars kar',
+        en: 'Default for $paperSizeName: $defaultChars chars',
+      );
+  static String get testPrintSent => withLang(
+        id: 'Test print berhasil dikirim',
+        en: 'Test print sent',
+      );
+  static String get testPrintTrialSection => withLang(
+        id: 'Cetak Percobaan',
+        en: 'Test Print',
+      );
+  static String get shortLabel => withLang(
+        id: 'Pendek',
+        en: 'Short',
+      );
+  static String get fullLabel => withLang(
+        id: 'Lengkap',
+        en: 'Full',
+      );
+
+  // Printer Screen
+  static String get printerManageSubtitle => withLang(
+        id: 'Kelola & daftarkan printer Bluetooth',
+        en: 'Manage & register Bluetooth printers',
+      );
+  static String get bluetoothScanHint => withLang(
+        id: 'Aktifkan Bluetooth untuk memindai printer.',
+        en: 'Turn on Bluetooth to scan for printers.',
+      );
+  static String get printerActiveConnected => withLang(
+        id: 'Printer aktif terhubung',
+        en: 'Printer active and connected',
+      );
+  static String get selectPrinterToUse => withLang(
+        id: 'Pilih printer untuk digunakan',
+        en: 'Select a printer to use',
+      );
+
+  // Main Shell PDF Job
+  static String pdfNotFound(String path) => withLang(
+        id: '❌ File PDF tidak ditemukan: $path',
+        en: '❌ PDF file not found: $path',
+      );
+  static String processingJob(String name) => withLang(
+        id: '🖨️ Memproses $name...',
+        en: '🖨️ Processing $name...',
+      );
+  static String receivingJob(String name) => withLang(
+        id: '🖨️ Menerima Print Job: $name',
+        en: '🖨️ Receiving Print Job: $name',
+      );
+  static String printingPage(int i, int total) => withLang(
+        id: '🖨️ Mencetak halaman $i/$total...',
+        en: '🖨️ Printing page $i of $total...',
+      );
+  static String renderFail(int i) => withLang(
+        id: '❌ Gagal render halaman $i',
+        en: '❌ Failed to render page $i',
+      );
+  static String decodeFail(int i) => withLang(
+        id: '❌ Gagal decode image halaman $i',
+        en: '❌ Failed to decode image on page $i',
+      );
+  static String printerDataFail(int i) => withLang(
+        id: '❌ Printer gagal menerima data di halaman $i',
+        en: '❌ Printer failed to receive data on page $i',
+      );
+  static String printingError(String name, String e) => withLang(
+        id: '❌ Error mencetak $name: $e',
+        en: '❌ Error printing $name: $e',
+      );
+
+  // PDF Tab
+  static String get paperLabel => withLang(
+        id: 'Kertas',
+        en: 'Paper',
+      );
+  static String get previewUnavailable => withLang(
+        id: 'Preview tidak tersedia',
+        en: 'Preview not available',
+      );
+  static String get printQuality => withLang(
+        id: 'Kualitas Cetak',
+        en: 'Print Quality',
+      );
+  static String pages(int count) => withLang(
+        id: '$count halaman',
+        en: '$count pages',
+      );
+
+  // Widgets
+  static String get printerId => withLang(
+        id: 'ID Printer',
+        en: 'Printer ID',
+      );
+  static String get copyId => withLang(
+        id: 'Salin ID',
+        en: 'Copy ID',
+      );
+  static String get allow => withLang(
+        id: 'Izinkan',
+        en: 'Allow',
+      );
+  static String missingPermissions(int count) => withLang(
+        id: '$count izin belum diberikan',
+        en: '$count permissions not granted',
+      );
+
+  static String get permissionDeniedPerm => withLang(
+        id: 'Ditolak permanen — ketuk untuk buka Pengaturan Aplikasi',
+        en: 'Permanently denied — tap to open App Settings',
+      );
+  static String get bluetoothScanRetryHint => withLang(
+        id: 'Tap sekali lagi untuk memberikan izin Bluetooth Scan',
+        en: 'Tap again to grant Bluetooth Scan permission',
+      );
+  static String get autoStartDirected => withLang(
+        id: 'Sudah diarahkan ke pengaturan — pastikan diaktifkan',
+        en: 'Directed to settings — make sure to enable it',
+      );
+  static String get batteryOptimizationTitle => withLang(
+        id: 'Optimasi Baterai',
+        en: 'Battery Optimization',
+      );
+  static String get batteryOptimizationDesc => withLang(
+        id: 'Agar server cetak tetap aktif saat layar mati',
+        en: 'To keep the print server active when the screen is off',
+      );
+  static String get permissionSheetIntro => withLang(
+        id: 'Berikan izin berikut agar aplikasi berfungsi optimal.',
+        en: 'Grant the following permissions for the app to work properly.',
+      );
+
+  // About Dialog
+  static String get aboutSubtitle => withLang(
+        id: 'Print Bridge for PoS',
+        en: 'Print Bridge for PoS',
+      );
+  static String get aboutDescription => withLang(
+        id: 'Aplikasi pengelola koneksi printer Bluetooth thermal untuk PoS dRetail Mart.',
+        en: 'Bluetooth thermal printer connection manager for dRetail Mart PoS.',
       );
 }

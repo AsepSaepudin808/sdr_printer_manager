@@ -20,6 +20,7 @@ class StatsRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(langProvider);
     final printCount = ref.watch(printCountProvider);
     final paperLabel = switch (paperSize) {
       PaperSize.mm58 => '58mm',
@@ -81,7 +82,7 @@ class StatsRow extends ConsumerWidget {
               ]),
               const SizedBox(height: 10),
               Text('$paperLabel · ${chars}kar', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF7B2FBE))),
-              Text(S.isEn ? 'Printer Settings' : 'Pengaturan Printer', style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
+              Text(S.printerSettings, style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
             ]),
           ),
         ),

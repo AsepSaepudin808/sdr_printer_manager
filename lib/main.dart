@@ -31,7 +31,6 @@ void main() async {
   );
 }
 
-/// Wrapper that rebuilds children when language changes
 class InheritedLangWrapper extends StatelessWidget {
   final Widget child;
   const InheritedLangWrapper({super.key, required this.child});
@@ -39,7 +38,7 @@ class InheritedLangWrapper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: langProvider,
+      listenable: langNotifierInstance,
       builder: (context, child) => child!,
       child: child,
     );
