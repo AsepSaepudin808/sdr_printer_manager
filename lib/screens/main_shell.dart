@@ -27,6 +27,7 @@ import 'printer_screen.dart';
 import 'log_screen.dart';
 import 'settings_screen.dart';
 import 'printer_settings_screen.dart';
+import 'connection_troubleshoot_screen.dart';
 import 'text_tab.dart';
 import 'image_tab.dart';
 import 'pdf_tab.dart';
@@ -828,6 +829,15 @@ class _MainShellState extends ConsumerState<MainShell> {
                 _drawerItem(Icons.print_outlined, S.printerSize, () async {
                   Navigator.pop(context);
                   await _goPrinterSettings();
+                }),
+                _drawerItem(Icons.health_and_safety_outlined, 'Troubleshoot',
+                    () async {
+                  Navigator.pop(context);
+                  await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) =>
+                              const ConnectionTroubleshootScreen()));
                 }),
                 _drawerItem(Icons.info_outline_rounded, S.aboutApp, () {
                   Navigator.pop(context);
