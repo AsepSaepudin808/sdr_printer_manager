@@ -69,8 +69,7 @@ class EscPosFormatter {
     return Uint8List.fromList(b);
   }
 
-  Uint8List buildSessionSummary(
-      Map<String, dynamic> data, PaperSize size) {
+  Uint8List buildSessionSummary(Map<String, dynamic> data, PaperSize size) {
     final List<int> b = [];
     b.addAll(EscPosCommands.init());
     _applyFontConfig(b);
@@ -83,6 +82,12 @@ class EscPosFormatter {
     final decimals = currency['decimal_places'] as int? ?? 0;
     final positionAfter =
         (currency['position'] as String? ?? 'before') == 'after';
+    final thousandsSep = (data['thousands_sep'] as String?) ??
+        (currency['thousands_sep'] as String?) ??
+        '.';
+    final decimalPoint = (data['decimal_point'] as String?) ??
+        (currency['decimal_point'] as String?) ??
+        ',';
     final w = charsPerLine(size);
 
     b.addAll(EscPosCommands.align(1));
@@ -105,8 +110,10 @@ class EscPosFormatter {
     b.addAll(EscPosText.rowLR('Opening :', startAt, size));
     b.addAll(EscPosText.rowLR('Closing :', stopAt, size));
 
-    _buildSessionProductSection(
-        b, data, size, symbol, decimals, positionAfter);
+    b.addAll(EscPosText.divider(size, char: '-'));
+
+    _buildSessionProductSection(b, data, size, symbol, decimals, positionAfter,
+        thousandsSep, decimalPoint);
 
     b.addAll(EscPosCommands.align(1));
     b.addAll(EscPosCommands.bold(true));
@@ -126,48 +133,60 @@ class EscPosFormatter {
 
     b.addAll(EscPosText.rowLR(
         'Gross Sales',
-        EscPosText.rp(grossSales.round(),
+        EscPosText.formatMoney(grossSales,
             symbol: symbol,
             decimals: decimals,
-            positionAfter: positionAfter),
+            positionAfter: positionAfter,
+            thousandsSep: thousandsSep,
+            decimalPoint: decimalPoint),
         size));
     b.addAll(EscPosText.rowLR(
         'Discounts',
-        EscPosText.rp(-totalDiscount.round(),
+        EscPosText.formatMoney(-totalDiscount,
             symbol: symbol,
             decimals: decimals,
-            positionAfter: positionAfter),
+            positionAfter: positionAfter,
+            thousandsSep: thousandsSep,
+            decimalPoint: decimalPoint),
         size));
     b.addAll(EscPosText.rowLR(
         'Returns/Refunds',
-        EscPosText.rp(-refundUntaxed.round(),
+        EscPosText.formatMoney(-refundUntaxed,
             symbol: symbol,
             decimals: decimals,
-            positionAfter: positionAfter),
+            positionAfter: positionAfter,
+            thousandsSep: thousandsSep,
+            decimalPoint: decimalPoint),
         size));
     b.addAll(EscPosText.txt('.' * w));
     b.addAll(EscPosText.rowLR(
         'Net Sales',
-        EscPosText.rp(netSalesBeforeTax.round(),
+        EscPosText.formatMoney(netSalesBeforeTax,
             symbol: symbol,
             decimals: decimals,
-            positionAfter: positionAfter),
+            positionAfter: positionAfter,
+            thousandsSep: thousandsSep,
+            decimalPoint: decimalPoint),
         size));
     b.addAll(EscPosText.rowLR(
         'Tax',
-        EscPosText.rp(totalTaxes.round(),
+        EscPosText.formatMoney(totalTaxes,
             symbol: symbol,
             decimals: decimals,
-            positionAfter: positionAfter),
+            positionAfter: positionAfter,
+            thousandsSep: thousandsSep,
+            decimalPoint: decimalPoint),
         size));
     b.addAll(EscPosText.txt('.' * w));
     b.addAll(EscPosCommands.bold(true));
     b.addAll(EscPosText.rowLR(
         'Total Sales',
-        EscPosText.rp(totalSales.round(),
+        EscPosText.formatMoney(totalSales,
             symbol: symbol,
             decimals: decimals,
-            positionAfter: positionAfter),
+            positionAfter: positionAfter,
+            thousandsSep: thousandsSep,
+            decimalPoint: decimalPoint),
         size));
     b.addAll(EscPosCommands.bold(false));
 
@@ -183,10 +202,12 @@ class EscPosFormatter {
     final refundAmount = (data['refund_amount'] ?? 0).toDouble();
     b.addAll(EscPosText.rowLR(
         'Total Refund Amount',
-        EscPosText.rp(refundAmount.round(),
+        EscPosText.formatMoney(refundAmount,
             symbol: symbol,
             decimals: decimals,
-            positionAfter: positionAfter),
+            positionAfter: positionAfter,
+            thousandsSep: thousandsSep,
+            decimalPoint: decimalPoint),
         size));
 
     b.addAll(EscPosCommands.align(1));
@@ -205,10 +226,12 @@ class EscPosFormatter {
       final payAmt = (p['amount'] ?? 0).toDouble();
       b.addAll(EscPosText.rowLR(
           payName,
-          EscPosText.rp(payAmt.round(),
+          EscPosText.formatMoney(payAmt,
               symbol: symbol,
               decimals: decimals,
-              positionAfter: positionAfter),
+              positionAfter: positionAfter,
+              thousandsSep: thousandsSep,
+              decimalPoint: decimalPoint),
           size));
     }
     final totalPayment = (data['total_payment_amount'] ?? 0).toDouble();
@@ -216,10 +239,12 @@ class EscPosFormatter {
     b.addAll(EscPosCommands.bold(true));
     b.addAll(EscPosText.rowLR(
         'Total Payment',
-        EscPosText.rp(totalPayment.round(),
+        EscPosText.formatMoney(totalPayment,
             symbol: symbol,
             decimals: decimals,
-            positionAfter: positionAfter),
+            positionAfter: positionAfter,
+            thousandsSep: thousandsSep,
+            decimalPoint: decimalPoint),
         size));
     b.addAll(EscPosCommands.bold(false));
 
@@ -240,44 +265,54 @@ class EscPosFormatter {
 
     b.addAll(EscPosText.rowLR(
         'Opening Cash',
-        EscPosText.rp(startingCash.round(),
+        EscPosText.formatMoney(startingCash,
             symbol: symbol,
             decimals: decimals,
-            positionAfter: positionAfter),
+            positionAfter: positionAfter,
+            thousandsSep: thousandsSep,
+            decimalPoint: decimalPoint),
         size));
     b.addAll(EscPosText.rowLR(
         '(+) Cash Sales',
-        EscPosText.rp(cashSales.round(),
+        EscPosText.formatMoney(cashSales,
             symbol: symbol,
             decimals: decimals,
-            positionAfter: positionAfter),
+            positionAfter: positionAfter,
+            thousandsSep: thousandsSep,
+            decimalPoint: decimalPoint),
         size));
     if (cashIn > 0) {
       b.addAll(EscPosText.rowLR(
           '(+) Cash In',
-          EscPosText.rp(cashIn.round(),
+          EscPosText.formatMoney(cashIn,
               symbol: symbol,
               decimals: decimals,
-              positionAfter: positionAfter),
+              positionAfter: positionAfter,
+              thousandsSep: thousandsSep,
+              decimalPoint: decimalPoint),
           size));
     }
     if (cashOut > 0) {
       b.addAll(EscPosText.rowLR(
           '(-) Cash Out',
-          EscPosText.rp(-cashOut.round(),
+          EscPosText.formatMoney(-cashOut,
               symbol: symbol,
               decimals: decimals,
-              positionAfter: positionAfter),
+              positionAfter: positionAfter,
+              thousandsSep: thousandsSep,
+              decimalPoint: decimalPoint),
           size));
     }
     b.addAll(EscPosText.txt('.' * w));
     b.addAll(EscPosCommands.bold(true));
     b.addAll(EscPosText.rowLR(
         'Total',
-        EscPosText.rp(expectedCash.round(),
+        EscPosText.formatMoney(expectedCash,
             symbol: symbol,
             decimals: decimals,
-            positionAfter: positionAfter),
+            positionAfter: positionAfter,
+            thousandsSep: thousandsSep,
+            decimalPoint: decimalPoint),
         size));
     b.addAll(EscPosCommands.bold(false));
 
@@ -295,8 +330,10 @@ class EscPosFormatter {
     final refundTransactions = data['refund_transactions'] ?? 0;
     final totalQtySold = data['total_qty_sold'] ?? 0;
 
-    b.addAll(EscPosText.rowLR('Total Transactions', '$totalTransactions', size));
-    b.addAll(EscPosText.rowLR('Sales Transactions', '$salesTransactions', size));
+    b.addAll(
+        EscPosText.rowLR('Total Transactions', '$totalTransactions', size));
+    b.addAll(
+        EscPosText.rowLR('Sales Transactions', '$salesTransactions', size));
     b.addAll(EscPosText.rowLR('Returns/Refunds', '$refundTransactions', size));
     b.addAll(EscPosText.rowLR('Items Sold', '$totalQtySold', size));
 
@@ -308,24 +345,30 @@ class EscPosFormatter {
     b.addAll(EscPosCommands.bold(true));
     b.addAll(EscPosText.rowLR(
         'Expected Balance :',
-        EscPosText.rp(expectedCash.round(),
+        EscPosText.formatMoney(expectedCash,
             symbol: symbol,
             decimals: decimals,
-            positionAfter: positionAfter),
+            positionAfter: positionAfter,
+            thousandsSep: thousandsSep,
+            decimalPoint: decimalPoint),
         size));
     b.addAll(EscPosText.rowLR(
         'Closing Balance :',
-        EscPosText.rp(countedCash.round(),
+        EscPosText.formatMoney(countedCash,
             symbol: symbol,
             decimals: decimals,
-            positionAfter: positionAfter),
+            positionAfter: positionAfter,
+            thousandsSep: thousandsSep,
+            decimalPoint: decimalPoint),
         size));
     b.addAll(EscPosText.rowLR(
         'Difference :',
-        EscPosText.rp(differenceCash.round(),
+        EscPosText.formatMoney(differenceCash,
             symbol: symbol,
             decimals: decimals,
-            positionAfter: positionAfter),
+            positionAfter: positionAfter,
+            thousandsSep: thousandsSep,
+            decimalPoint: decimalPoint),
         size));
     b.addAll(EscPosCommands.bold(false));
 
@@ -333,10 +376,12 @@ class EscPosFormatter {
       b.addAll(EscPosText.txt('.' * w));
       b.addAll(EscPosText.rowLR(
           '* Credit(piutang) :',
-          EscPosText.rp(totalCreditAmount.round(),
+          EscPosText.formatMoney(totalCreditAmount,
               symbol: symbol,
               decimals: decimals,
-              positionAfter: positionAfter),
+              positionAfter: positionAfter,
+              thousandsSep: thousandsSep,
+              decimalPoint: decimalPoint),
           size));
     }
 
@@ -356,8 +401,7 @@ class EscPosFormatter {
     return Uint8List.fromList(b);
   }
 
-  Uint8List buildQRISReceipt(
-      Map<String, dynamic> data, PaperSize size) {
+  Uint8List buildQRISReceipt(Map<String, dynamic> data, PaperSize size) {
     final List<int> b = [];
     b.addAll(EscPosCommands.init());
     _applyFontConfig(b);
@@ -373,8 +417,7 @@ class EscPosFormatter {
     final orderId =
         data['order_id'] as String? ?? data['pac_order_id'] as String? ?? '-';
     final qrImageBase64 = data['qr_image_base64'] as String? ?? '';
-    final dateStr =
-        data['date_str'] as String? ?? _currentDateTime();
+    final dateStr = data['date_str'] as String? ?? _currentDateTime();
 
     b.addAll(EscPosCommands.align(1));
     if (storeName.isNotEmpty) {
@@ -571,8 +614,8 @@ class EscPosFormatter {
       final globalDiscStr = EscPosText.rp(-globalDiscountLineAmt.round(),
           symbol: symbol, decimals: decimals);
       b.addAll(EscPosCommands.bold(true));
-      b.addAll(EscPosText.rowLR('Discount', globalDiscStr, size,
-          boldRight: true));
+      b.addAll(
+          EscPosText.rowLR('Discount', globalDiscStr, size, boldRight: true));
       b.addAll(EscPosCommands.bold(false));
     }
 
@@ -587,8 +630,7 @@ class EscPosFormatter {
     b.addAll(EscPosText.divider(size, char: '='));
     b.addAll(EscPosText.rowLR(
         'Total Belanja',
-        EscPosText.rp(subtotalVal.round(),
-            symbol: symbol, decimals: decimals),
+        EscPosText.rp(subtotalVal.round(), symbol: symbol, decimals: decimals),
         size));
     if (allDiscount > 0) {
       b.addAll(EscPosText.rowLR(
@@ -602,13 +644,11 @@ class EscPosFormatter {
     if (taxVal > 0) {
       b.addAll(EscPosText.rowLR(
           'DPP',
-          EscPosText.rp(dppVal.round(),
-              symbol: symbol, decimals: decimals),
+          EscPosText.rp(dppVal.round(), symbol: symbol, decimals: decimals),
           size));
       b.addAll(EscPosText.rowLR(
           'PPN 11%',
-          EscPosText.rp(taxVal.round(),
-              symbol: symbol, decimals: decimals),
+          EscPosText.rp(taxVal.round(), symbol: symbol, decimals: decimals),
           size));
     }
 
@@ -617,8 +657,7 @@ class EscPosFormatter {
     b.addAll(EscPosCommands.bold(true));
     b.addAll(EscPosText.rowLR(
         'TOTAL BAYAR',
-        EscPosText.rp(totalVal.round(),
-            symbol: symbol, decimals: decimals),
+        EscPosText.rp(totalVal.round(), symbol: symbol, decimals: decimals),
         size));
     b.addAll(EscPosCommands.bold(false));
     b.addAll(EscPosCommands.doubleHeight(false));
@@ -630,23 +669,20 @@ class EscPosFormatter {
       final payAmt = (p['amount'] ?? 0).toDouble();
       b.addAll(EscPosText.rowLR(
           payName,
-          EscPosText.rp(payAmt.round(),
-              symbol: symbol, decimals: decimals),
+          EscPosText.rp(payAmt.round(), symbol: symbol, decimals: decimals),
           size));
     }
     if (payments.isEmpty && paidVal > 0) {
       b.addAll(EscPosText.rowLR(
           'Cash',
-          EscPosText.rp(paidVal.round(),
-              symbol: symbol, decimals: decimals),
+          EscPosText.rp(paidVal.round(), symbol: symbol, decimals: decimals),
           size));
     }
 
     b.addAll(EscPosCommands.bold(true));
     b.addAll(EscPosText.rowLR(
         'CHANGE',
-        EscPosText.rp(changeVal.round(),
-            symbol: symbol, decimals: decimals),
+        EscPosText.rp(changeVal.round(), symbol: symbol, decimals: decimals),
         size));
     b.addAll(EscPosCommands.bold(false));
 
@@ -775,8 +811,7 @@ class EscPosFormatter {
       final qtyStr = '${EscPosText.formatQty(qty)} $uomLabel';
 
       b.addAll(EscPosCommands.bold(true));
-      final nameLines =
-          EscPosText.wordWrap(name, w - qtyStr.length - 1);
+      final nameLines = EscPosText.wordWrap(name, w - qtyStr.length - 1);
       for (int i = 0; i < nameLines.length; i++) {
         if (i == 0) {
           b.addAll(EscPosText.rowLR(nameLines[i], qtyStr, size));
@@ -823,8 +858,10 @@ class EscPosFormatter {
     Map<String, dynamic> d,
     PaperSize size,
     String symbol,
-    int decimals,
+    int currencyDecimals,
     bool positionAfter,
+    String thousandsSep,
+    String decimalPoint,
   ) {
     final hasProductGroups = d['has_product_groups'] == true;
     final productGroups = d['product_groups'] as List<dynamic>? ?? [];
@@ -833,6 +870,9 @@ class EscPosFormatter {
     if (!hasProducts) return;
 
     final qtyPrecision = d['qty_precision'] as int? ?? 2;
+    final w = EscPosText.charsPerLineFor(size);
+
+    final sectionWidth = size == PaperSize.mm58 ? 42 : 64;
 
     b.addAll(EscPosCommands.align(1));
     b.addAll(EscPosCommands.bold(true));
@@ -843,6 +883,8 @@ class EscPosFormatter {
     }
     b.addAll(EscPosCommands.bold(false));
     b.addAll(EscPosCommands.align(0));
+    b.addAll(EscPosCommands.selectFontB());
+    b.addAll(EscPosCommands.setSize(0x01));
 
     if (hasProductGroups) {
       for (final group in productGroups) {
@@ -852,72 +894,130 @@ class EscPosFormatter {
         final categoryTax = (g['category_tax'] ?? 0).toDouble();
         final categorySubtotal = (g['category_subtotal'] ?? 0).toDouble();
 
+        b.addAll(EscPosText.divider(size, char: '-', width: sectionWidth));
         b.addAll(EscPosCommands.bold(true));
         b.addAll(EscPosText.txt(categoryName.isEmpty ? '-' : categoryName));
         b.addAll(EscPosCommands.bold(false));
 
+        b.addAll(EscPosText.divider(size, char: '-', width: sectionWidth));
+        b.addAll(EscPosText.txt(_productHeaderLine(size, w)));
+        b.addAll(EscPosText.divider(size, char: '-', width: sectionWidth));
+
         for (final item in items) {
-          _printSessionProductRow(b, item as Map<String, dynamic>, size,
-              symbol, decimals, positionAfter, qtyPrecision);
+          _printProductRow(b, item as Map<String, dynamic>, size, w,
+              qtyPrecision, thousandsSep, decimalPoint);
         }
 
-        b.addAll(EscPosText.divider(size, char: '.'));
+        b.addAll(EscPosText.divider(size, char: '.', width: sectionWidth));
         b.addAll(EscPosText.rowLR(
             'Total Tax',
-            EscPosText.rp(categoryTax.round(),
+            EscPosText.formatMoney(categoryTax,
                 symbol: symbol,
-                decimals: decimals,
-                positionAfter: positionAfter),
-            size));
+                decimals: currencyDecimals,
+                positionAfter: positionAfter,
+                thousandsSep: thousandsSep,
+                decimalPoint: decimalPoint),
+            size,
+            width: sectionWidth));
         b.addAll(EscPosCommands.bold(true));
         b.addAll(EscPosText.rowLR(
             'Subtotal ${categoryName.isEmpty ? '-' : categoryName}',
-            EscPosText.rp(categorySubtotal.round(),
+            EscPosText.formatMoney(categorySubtotal,
                 symbol: symbol,
-                decimals: decimals,
-                positionAfter: positionAfter),
-            size));
+                decimals: currencyDecimals,
+                positionAfter: positionAfter,
+                thousandsSep: thousandsSep,
+                decimalPoint: decimalPoint),
+            size,
+            width: sectionWidth));
         b.addAll(EscPosCommands.bold(false));
       }
     } else {
       final productLinesTax = (d['product_lines_tax'] ?? 0).toDouble();
+
+      b.addAll(EscPosText.divider(size, char: '-', width: sectionWidth));
+      b.addAll(EscPosText.txt(_productHeaderLine(size, w)));
+      b.addAll(EscPosText.divider(size, char: '-', width: sectionWidth));
+
       for (final item in productLines) {
-        _printSessionProductRow(b, item as Map<String, dynamic>, size,
-            symbol, decimals, positionAfter, qtyPrecision);
+        _printProductRow(b, item as Map<String, dynamic>, size, w, qtyPrecision,
+            thousandsSep, decimalPoint);
       }
-      b.addAll(EscPosText.divider(size, char: '.'));
+
+      b.addAll(EscPosText.divider(size, char: '.', width: sectionWidth));
       b.addAll(EscPosText.rowLR(
           'Total Tax',
-          EscPosText.rp(productLinesTax.round(),
+          EscPosText.formatMoney(productLinesTax,
               symbol: symbol,
-              decimals: decimals,
-              positionAfter: positionAfter),
-          size));
+              decimals: currencyDecimals,
+              positionAfter: positionAfter,
+              thousandsSep: thousandsSep,
+              decimalPoint: decimalPoint),
+          size,
+          width: sectionWidth));
     }
+
+    b.addAll(EscPosCommands.setSize(0x00));
+    b.addAll(EscPosCommands.selectFontA());
 
     final grandTotal = (d['grand_total'] ?? 0).toDouble();
     b.addAll(EscPosText.divider(size, char: '='));
     b.addAll(EscPosCommands.bold(true));
     b.addAll(EscPosText.rowLR(
         'GRAND TOTAL',
-        EscPosText.rp(grandTotal.round(),
+        EscPosText.formatMoney(grandTotal,
             symbol: symbol,
-            decimals: decimals,
-            positionAfter: positionAfter),
+            decimals: currencyDecimals,
+            positionAfter: positionAfter,
+            thousandsSep: thousandsSep,
+            decimalPoint: decimalPoint),
         size,
         boldRight: true));
     b.addAll(EscPosCommands.bold(false));
-    b.addAll(EscPosText.divider(size, char: '='));
   }
 
-  void _printSessionProductRow(
+  String _productHeaderLine(PaperSize size, int w) {
+    final int colProd, colPrice, colQty, colTotal;
+    if (size == PaperSize.mm58) {
+      colProd = 16;
+      colPrice = 10;
+      colQty = 6;
+      colTotal = 10;
+    } else {
+      colProd = 24;
+      colPrice = 16;
+      colQty = 8;
+      colTotal = 16;
+    }
+    String padC(String s, int len) {
+      if (s.length >= len) return s.substring(0, len);
+      final totalPad = len - s.length;
+      final left = totalPad ~/ 2;
+      final right = totalPad - left;
+      return ' ' * left + s + ' ' * right;
+    }
+
+    String padL(String s, int len) => s.length >= len
+        ? s.substring(s.length - len)
+        : ' ' * (len - s.length) + s;
+
+    final prodHeader = 'PRODUCT'.length > colProd
+        ? 'PRODUCT'.substring(0, colProd)
+        : 'PRODUCT'.padRight(colProd);
+    return '$prodHeader'
+        '${padC('PRICE', colPrice)}'
+        '${padC('QTY', colQty)}'
+        '${padL('TOTAL', colTotal)}';
+  }
+
+  void _printProductRow(
     List<int> b,
     Map<String, dynamic> item,
     PaperSize size,
-    String symbol,
-    int decimals,
-    bool positionAfter,
+    int w,
     int qtyPrecision,
+    String thousandsSep,
+    String decimalPoint,
   ) {
     final productName = (item['product_name'] as String? ?? '-').trim();
     final priceUnit = (item['price_unit'] ?? 0).toDouble();
@@ -928,22 +1028,77 @@ class EscPosFormatter {
     final qtyNet = qtySold - qtyRefunded;
     final amountNet = amountSold - amountRefunded;
 
-    final w = charsPerLine(size);
-    b.addAll(EscPosCommands.bold(true));
-    final nameLines =
-        EscPosText.wordWrap('• ${productName.isEmpty ? '-' : productName}', w);
-    for (final line in nameLines) {
-      b.addAll(EscPosText.txt(line));
+    final int colProd, colPrice, colQty, colTotal;
+    if (size == PaperSize.mm58) {
+      colProd = 16;
+      colPrice = 10;
+      colQty = 6;
+      colTotal = 10;
+    } else {
+      colProd = 24;
+      colPrice = 16;
+      colQty = 8;
+      colTotal = 16;
     }
-    b.addAll(EscPosCommands.bold(false));
 
-    final qtyStr = EscPosText.formatQty(qtyNet, qtyPrecision);
-    final priceStr = EscPosText.rp(priceUnit.round(),
-        symbol: symbol, decimals: decimals, positionAfter: positionAfter);
-    final totalStr = EscPosText.rp(amountNet.round(),
-        symbol: symbol, decimals: decimals, positionAfter: positionAfter);
-    b.addAll(EscPosText.rowLR('$qtyStr x $priceStr', totalStr, size,
-        boldRight: true));
+    final priceStr = _formatProductListAmount(priceUnit.round(),
+        thousandsSep: thousandsSep, decimalPoint: decimalPoint);
+    final totalStr = _formatProductListAmount(amountNet.round(),
+        thousandsSep: thousandsSep, decimalPoint: decimalPoint);
+    final qtyStr = qtyNet.toStringAsFixed(qtyPrecision);
+
+    String padC(String s, int len) {
+      if (s.length >= len) return s.substring(0, len);
+      final totalPad = len - s.length;
+      final left = totalPad ~/ 2;
+      final right = totalPad - left;
+      return ' ' * left + s + ' ' * right;
+    }
+
+    String padL(String s, int len) => s.length >= len
+        ? s.substring(s.length - len)
+        : ' ' * (len - s.length) + s;
+
+    final nameLines = nameLinesSafe(productName, colProd - 2);
+    final firstLineRaw = nameLines.first;
+    final firstLine = firstLineRaw.length > (colProd - 2)
+        ? firstLineRaw.substring(0, colProd - 2)
+        : firstLineRaw.padRight(colProd - 2);
+    final financialBlock = padC(priceStr, colPrice) +
+        padC(qtyStr, colQty) +
+        padL(totalStr, colTotal);
+
+    b.addAll(EscPosText.txt('* $firstLine$financialBlock'));
+
+    for (int i = 1; i < nameLines.length; i++) {
+      final cont = nameLines[i].length > colProd
+          ? nameLines[i].substring(0, colProd)
+          : nameLines[i].padRight(colProd);
+      b.addAll(EscPosText.txt('  $cont'));
+    }
+  }
+
+  List<String> nameLinesSafe(String text, int col) {
+    if (col <= 0 || text.isEmpty) return [text];
+    return EscPosText.wordWrapWordBoundary(text, col);
+  }
+
+  static String _formatProductListAmount(num amount,
+      {required String thousandsSep, required String decimalPoint}) {
+    return _formatThousandsOnly(amount.round(), thousandsSep);
+  }
+
+  static String _formatThousandsOnly(int value, String thousandsSep) {
+    final s = value.abs().toString();
+    final buf = StringBuffer();
+    int count = 0;
+    for (int i = s.length - 1; i >= 0; i--) {
+      if (count > 0 && count % 3 == 0) buf.write(thousandsSep);
+      buf.write(s[i]);
+      count++;
+    }
+    final out = buf.toString().split('').reversed.join();
+    return value < 0 ? '-$out' : out;
   }
 
   String _currentDateTime() {

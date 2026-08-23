@@ -265,7 +265,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     _configN.setAutoStart(p.getBool('auto_start') ?? false);
     ref.read(printCountProvider.notifier).set(p.getInt('print_count') ?? 0);
 
-    final ps = p.getString('paper_size') ?? 'mm80';
+    final ps = p.getString('paper_size') ?? 'mm58';
     final paperSize = ps == 'mm58'
         ? PaperSize.mm58
         : ps == 'mm100'
@@ -407,7 +407,7 @@ class _MainShellState extends ConsumerState<MainShell> {
         context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
     await S.load();
     final p = await SharedPreferences.getInstance();
-    final ps = p.getString('paper_size') ?? 'mm80';
+    final ps = p.getString('paper_size') ?? 'mm58';
     final newSize = ps == 'mm58'
         ? PaperSize.mm58
         : ps == 'mm100'

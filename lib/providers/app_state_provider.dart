@@ -82,7 +82,7 @@ class PrinterConfig {
   const PrinterConfig({
     this.printer,
     this.btConnected = false,
-    this.paperSize = PaperSize.mm80,
+    this.paperSize = PaperSize.mm58,
     this.cashDrawerMode = CashDrawerMode.off,
     this.sessionSummaryCashDrawer = false,
     this.printQris = true,

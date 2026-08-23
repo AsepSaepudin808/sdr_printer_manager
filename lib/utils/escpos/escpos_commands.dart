@@ -15,6 +15,10 @@ class EscPosCommands {
   static Uint8List feed(int n) => Uint8List.fromList([escCmd, 0x64, n]);
   static Uint8List setFontB(bool on) =>
       Uint8List.fromList([escCmd, 0x21, on ? 1 : 0]);
+  static Uint8List setSize(int n) =>
+      Uint8List.fromList([escCmd, 0x21, n & 0xFF]);
+  static Uint8List selectFontA() => Uint8List.fromList([escCmd, 0x4D, 0x00]);
+  static Uint8List selectFontB() => Uint8List.fromList([escCmd, 0x4D, 0x01]);
   static Uint8List doubleSize(bool on) =>
       Uint8List.fromList([0x1D, 0x21, on ? 0x11 : 0x00]);
   static Uint8List doubleHeight(bool on) =>

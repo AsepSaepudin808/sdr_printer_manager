@@ -16,14 +16,14 @@ class EscPosText {
     return Uint8List.fromList(bytes);
   }
 
-  static Uint8List divider(PaperSize size, {String char = '-'}) {
-    final w = charsPerLineFor(size);
+  static Uint8List divider(PaperSize size, {String char = '-', int? width}) {
+    final w = width ?? charsPerLineFor(size);
     return txt(char * w);
   }
 
   static Uint8List rowLR(String left, String right, PaperSize size,
-      {bool boldRight = false}) {
-    final w = charsPerLineFor(size);
+      {bool boldRight = false, int? width}) {
+    final w = width ?? charsPerLineFor(size);
     if (right.length >= w) {
       return txt(right.substring(0, w));
     }
@@ -94,7 +94,8 @@ class EscPosText {
       final whole = (value ~/ divisor);
       final frac = (value % divisor).toString().padLeft(decimals, '0');
       final wholeStr = _formatWithDot(whole);
-      final result = '$wholeStr$frac';
+      // Match Odoo: '.' thousands separator, ',' decimal separator (id_ID locale).
+      final result = '$wholeStr,$frac';
       if (positionAfter) {
         suffix = ' $symbol';
         return amount < 0 ? '-$result$suffix' : '$result$suffix';
@@ -195,6 +196,28 @@ class EscPosText {
     return lines.isEmpty ? [''] : lines;
   }
 
+  static List<String> wordWrapWordBoundary(String text, int w) {
+    if (w <= 0) return [text];
+    final lines = <String>[];
+    int pos = 0;
+    while (pos < text.length) {
+      if (pos + w >= text.length) {
+        lines.add(text.substring(pos));
+        break;
+      }
+      int breakAt = pos + w;
+      int sp = text.lastIndexOf(' ', breakAt);
+      if (sp > pos) {
+        lines.add(text.substring(pos, sp));
+        pos = sp + 1;
+      } else {
+        lines.add(text.substring(pos, breakAt));
+        pos = breakAt;
+      }
+    }
+    return lines.isEmpty ? [''] : lines;
+  }
+
   static int _pow10(int exp) {
     int result = 1;
     for (int i = 0; i < exp; i++) {
@@ -209,6 +232,48 @@ class EscPosText {
     int count = 0;
     for (int i = s.length - 1; i >= 0; i--) {
       if (count > 0 && count % 3 == 0) buf.write('.');
+      buf.write(s[i]);
+      count++;
+    }
+    return buf.toString().split('').reversed.join();
+  }
+
+  static String formatMoney(
+    num amount, {
+    String symbol = 'Rp',
+    int decimals = 0,
+    bool positionAfter = false,
+    String thousandsSep = '.',
+    String decimalPoint = ',',
+  }) {
+    final absAmount = amount.abs();
+    final divisor = decimals > 0 ? _pow10(decimals) : 1;
+    final valueScaled = (absAmount * divisor).round();
+    final neg = amount < 0;
+    String prefix = '';
+    String suffix = '';
+    if (positionAfter) {
+      suffix = ' $symbol';
+    } else {
+      prefix = symbol;
+    }
+    if (decimals <= 0) {
+      final out = _formatWithCustomThousands(valueScaled, thousandsSep);
+      return neg ? '-$prefix$out$suffix' : '$prefix$out$suffix';
+    }
+    final whole = valueScaled ~/ divisor;
+    final frac = (valueScaled % divisor).toString().padLeft(decimals, '0');
+    final out =
+        '${_formatWithCustomThousands(whole, thousandsSep)}$decimalPoint$frac';
+    return neg ? '-$prefix$out$suffix' : '$prefix$out$suffix';
+  }
+
+  static String _formatWithCustomThousands(int value, String thousandsSep) {
+    final s = value.toString();
+    final buf = StringBuffer();
+    int count = 0;
+    for (int i = s.length - 1; i >= 0; i--) {
+      if (count > 0 && count % 3 == 0) buf.write(thousandsSep);
       buf.write(s[i]);
       count++;
     }

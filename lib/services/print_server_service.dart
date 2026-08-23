@@ -22,7 +22,7 @@ class PrintServerService {
   Function(bool)? onStatusChange;
   Function(String type, String label, bool success, int dataSize)? onPrintJob;
 
-  PaperSize _paperSize = PaperSize.mm80;
+  PaperSize _paperSize = PaperSize.mm58;
   CashDrawerMode _cashDrawerMode = CashDrawerMode.off;
   bool _sessionSummaryCashDrawer = false;
   bool _printQris = true;
@@ -59,7 +59,7 @@ class PrintServerService {
     required int port,
     required EscPosFormatter formatter,
     required SdrBluetoothService bluetoothService,
-    PaperSize paperSize = PaperSize.mm80,
+    PaperSize paperSize = PaperSize.mm58,
   }) async {
     _btService = bluetoothService;
     _formatter = formatter;
