@@ -409,7 +409,11 @@ class EscPosFormatter {
     b.addAll(EscPosCommands.init());
     _applyFontConfig(b);
 
+    final merchantName = (data['merchant_name'] as String? ?? '').trim();
     final storeName = (data['store_name'] as String? ?? '').trim();
+    final displayName = merchantName.isNotEmpty
+        ? merchantName
+        : (storeName.isNotEmpty ? storeName : 'PAC QRIS');
     final formattedAmount = (data['formatted_amount'] as String? ?? '')
         .replaceAll(' ', ' ')
         .replaceAll(RegExp(r'[^ -~]'), '');
@@ -423,11 +427,10 @@ class EscPosFormatter {
     final dateStr = data['date_str'] as String? ?? _currentDateTime();
 
     b.addAll(EscPosCommands.align(1));
-    if (storeName.isNotEmpty) {
-      b.addAll(EscPosCommands.bold(true));
-      b.addAll(EscPosText.txt(storeName.toUpperCase()));
-      b.addAll(EscPosCommands.bold(false));
-    }
+    b.addAll(EscPosCommands.bold(true));
+    b.addAll(EscPosText.txt(displayName.toUpperCase()));
+    b.addAll(EscPosCommands.bold(false));
+    b.addAll(EscPosCommands.feed(1));
     b.addAll(EscPosText.txt('Scan QRIS to pay'));
     b.addAll(EscPosText.divider(size));
 
@@ -466,7 +469,9 @@ class EscPosFormatter {
     b.addAll(EscPosCommands.align(0));
     b.addAll(EscPosText.divider(size));
 
-    b.addAll(EscPosText.rowLR('Order   :', orderId, size));
+    const idLabel = 'Order ID :';
+    b.addAll(EscPosText.txt(idLabel));
+    b.addAll(EscPosText.txt(orderId));
     b.addAll(EscPosText.rowLR('Tanggal :', dateStr, size));
     b.addAll(EscPosText.divider(size));
 
