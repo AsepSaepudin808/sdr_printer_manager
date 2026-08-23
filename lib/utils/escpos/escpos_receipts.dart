@@ -190,25 +190,28 @@ class EscPosFormatter {
         size));
     b.addAll(EscPosCommands.bold(false));
 
-    b.addAll(EscPosCommands.align(1));
-    b.addAll(EscPosCommands.bold(true));
-    b.addAll(EscPosText.txt(EscPosText.sectionHeaderLine('', size, '-')));
-    b.addAll(EscPosText.txt(
-        EscPosText.sectionHeaderLine('RETURNS/REFUNDS', size, '-')));
-    b.addAll(EscPosText.txt(EscPosText.sectionHeaderLine('', size, '-')));
-    b.addAll(EscPosCommands.bold(false));
-    b.addAll(EscPosCommands.align(0));
-
     final refundAmount = (data['refund_amount'] ?? 0).toDouble();
-    b.addAll(EscPosText.rowLR(
-        'Total Refund Amount',
-        EscPosText.formatMoney(refundAmount,
-            symbol: symbol,
-            decimals: decimals,
-            positionAfter: positionAfter,
-            thousandsSep: thousandsSep,
-            decimalPoint: decimalPoint),
-        size));
+
+    if (refundAmount > 0) {
+      b.addAll(EscPosCommands.align(1));
+      b.addAll(EscPosCommands.bold(true));
+      b.addAll(EscPosText.txt(EscPosText.sectionHeaderLine('', size, '-')));
+      b.addAll(EscPosText.txt(
+          EscPosText.sectionHeaderLine('RETURNS/REFUNDS', size, '-')));
+      b.addAll(EscPosText.txt(EscPosText.sectionHeaderLine('', size, '-')));
+      b.addAll(EscPosCommands.bold(false));
+      b.addAll(EscPosCommands.align(0));
+
+      b.addAll(EscPosText.rowLR(
+          'Total Refund Amount',
+          EscPosText.formatMoney(refundAmount,
+              symbol: symbol,
+              decimals: decimals,
+              positionAfter: positionAfter,
+              thousandsSep: thousandsSep,
+              decimalPoint: decimalPoint),
+          size));
+    }
 
     b.addAll(EscPosCommands.align(1));
     b.addAll(EscPosCommands.bold(true));
