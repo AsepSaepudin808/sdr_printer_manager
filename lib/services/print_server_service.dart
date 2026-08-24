@@ -203,6 +203,16 @@ class PrintServerService {
       });
     });
 
+    router.options('/print-qris', (Request req) {
+      return Response.ok('', headers: const {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers':
+            'Content-Type, X-Print-Format, X-Print-Source',
+        'Access-Control-Allow-Private-Network': 'true',
+      });
+    });
+
     // PRINT ENDPOINT
     router.post('/print', (Request req) async {
       onLog?.call('📥 Request masuk dari Odoo!');

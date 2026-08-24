@@ -23,6 +23,13 @@ class EscPosCommands {
       Uint8List.fromList([0x1D, 0x21, on ? 0x11 : 0x00]);
   static Uint8List doubleHeight(bool on) =>
       Uint8List.fromList([0x1D, 0x21, on ? 0x01 : 0x00]);
+
+  static Uint8List setCharSize(int n) =>
+      Uint8List.fromList([0x1D, 0x21, n & 0xFF]);
+
+  static Uint8List setSmallFont() => Uint8List.fromList([escCmd, 0x21, 0x01]);
+  static Uint8List setNormalFont() => Uint8List.fromList([escCmd, 0x21, 0x00]);
+
   static Uint8List openCashDrawer() =>
       Uint8List.fromList([escCmd, 0x70, 0x00, 0x19, 0xFA]);
 

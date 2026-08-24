@@ -45,7 +45,8 @@ class QrisReceiptBuilder {
     final orderId =
         data['order_id'] as String? ?? data['pac_order_id'] as String? ?? '-';
     final qrImageBase64 = data['qr_image_base64'] as String? ?? '';
-    final dateStr = data['date_str'] as String? ?? EscPosReceiptHelpers.currentDateTime();
+    final dateStr =
+        data['date_str'] as String? ?? EscPosReceiptHelpers.currentDateTime();
 
     b.addAll(EscPosCommands.align(1));
     b.addAll(EscPosCommands.bold(true));
@@ -69,9 +70,21 @@ class QrisReceiptBuilder {
     b.addAll(EscPosCommands.align(0));
     b.addAll(EscPosText.divider(size));
 
-    b.addAll(EscPosText.txt('Order ID :'));
-    b.addAll(EscPosText.txt(orderId));
-    b.addAll(EscPosText.rowLR('Tanggal :', dateStr, size));
+    final w = EscPosCommands.defaultCharsPerLine(size);
+    const idLabel = 'ID :';
+    final idLine = idLabel.length + orderId.length;
+    final idFits = idLine <= w;
+    if (idFits) {
+      final idPadding = ' ' * (w - idLabel.length - orderId.length);
+      b.addAll(EscPosText.txt('$idLabel$idPadding$orderId'));
+    } else {
+      final idFirst = orderId.substring(0, 22);
+      final idRest = orderId.substring(22);
+      b.addAll(EscPosText.txt('$idLabel$idFirst'));
+      b.addAll(EscPosText.txt(idRest));
+    }
+    final datePadding = ' ' * (w - 'Date :'.length - dateStr.length);
+    b.addAll(EscPosText.txt('Date :$datePadding$dateStr'));
     b.addAll(EscPosText.divider(size));
 
     b.addAll(EscPosCommands.align(1));
