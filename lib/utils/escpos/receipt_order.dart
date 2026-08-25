@@ -1,8 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
-
 import 'package:image/image.dart' as img;
-
 import 'escpos_commands.dart';
 import 'escpos_config.dart';
 import 'escpos_helpers.dart';
@@ -253,7 +251,7 @@ class OrderReceiptBuilder {
 
     b.addAll(EscPosText.divider(size, char: '='));
     _renderFooter(b, receiptFooter);
-    _renderPoweredBy(b);
+    b.addAll(EscPosReceiptHelpers.finalize(config));
     return Uint8List.fromList(b);
   }
 
@@ -349,12 +347,12 @@ class OrderReceiptBuilder {
     b.addAll(EscPosText.divider(size, char: '='));
 
     _renderFooter(b, receiptFooter);
-    _renderPoweredBy(b);
+    b.addAll(EscPosReceiptHelpers.finalize(config));
     return Uint8List.fromList(b);
   }
 
   // ──── Shared private helpers ─────────────────────────────────────────────
-  // Logo, receipt footer, "Powered by dRetail" trailer.
+  // Logo + receipt_footer
 
   void _renderLogo(List<int> b, String logoBase64, PaperSize size) {
     if (logoBase64.isEmpty) return;
@@ -381,16 +379,5 @@ class OrderReceiptBuilder {
     }
     b.addAll(EscPosCommands.bold(false));
     b.addAll(EscPosCommands.align(0));
-  }
-
-  void _renderPoweredBy(List<int> b) {
-    b.addAll(EscPosCommands.feed(1));
-    b.addAll(EscPosCommands.align(1));
-    b.addAll(EscPosCommands.bold(true));
-    b.addAll(EscPosText.txt('Powered by dRetail'));
-    b.addAll(EscPosCommands.bold(false));
-    b.addAll(EscPosText.txt(EscPosReceiptHelpers.currentDateTimeShort()));
-    b.addAll(EscPosCommands.align(0));
-    b.addAll(EscPosReceiptHelpers.finalize(config));
   }
 }

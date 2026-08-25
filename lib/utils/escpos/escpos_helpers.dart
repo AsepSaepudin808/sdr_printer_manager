@@ -22,21 +22,12 @@ class EscPosReceiptHelpers {
   }
 
   // ──── Date / time formatters ─────────────────────────────────────────────
-  // Format dd/MM/yyyy HH:mm dan dd/MM/yy HH:mm untuk receipt footer.
+  // Format dd/MM/yyyy HH:mm untuk receipt footer.
   static String currentDateTime() {
     final now = DateTime.now();
     return '${now.day.toString().padLeft(2, '0')}/'
         '${now.month.toString().padLeft(2, '0')}/'
         '${now.year} '
-        '${now.hour.toString().padLeft(2, '0')}:'
-        '${now.minute.toString().padLeft(2, '0')}';
-  }
-
-  static String currentDateTimeShort() {
-    final now = DateTime.now();
-    return '${now.day.toString().padLeft(2, '0')}/'
-        '${now.month.toString().padLeft(2, '0')}/'
-        '${now.year.toString().substring(2)} '
         '${now.hour.toString().padLeft(2, '0')}:'
         '${now.minute.toString().padLeft(2, '0')}';
   }
