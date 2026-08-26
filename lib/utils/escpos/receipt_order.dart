@@ -87,9 +87,15 @@ class OrderReceiptBuilder {
         .replaceFirst(RegExp(r'^Order\s*', caseSensitive: false), '');
     final dateFormatted =
         dateRaw.isNotEmpty ? EscPosText.formatDateShort(dateRaw) : '';
-    b.addAll(EscPosText.rowLR('Ref         :', orderNumberClean, size));
-    b.addAll(EscPosText.rowLR('Tanggal     :', dateFormatted, size));
-    b.addAll(EscPosText.rowLR('Kasir       :', cashier, size));
+    final datePart = dateFormatted.contains(' ')
+        ? dateFormatted.split(' ')[0]
+        : dateFormatted;
+    final timePart =
+        dateFormatted.contains(' ') ? dateFormatted.split(' ')[1] : '';
+    b.addAll(EscPosText.rowLR('Receipt Number:', orderNumberClean, size));
+    b.addAll(EscPosText.rowLR('Date          :', datePart, size));
+    b.addAll(EscPosText.rowLR('Time          :', timePart, size));
+    b.addAll(EscPosText.rowLR('Cashier       :', cashier, size));
     b.addAll(EscPosText.divider(size, char: '='));
 
     final currency = company['currency'] as Map<String, dynamic>? ??
@@ -108,7 +114,7 @@ class OrderReceiptBuilder {
     b.addAll(EscPosCommands.bold(true));
     b.addAll(EscPosText.sectionHeader('DETAIL ITEM', size));
     b.addAll(EscPosCommands.bold(false));
-
+    b.addAll(EscPosCommands.setFontB(true));
     final lines = d['orderlines'] as List<dynamic>? ?? [];
     double globalDiscountLineAmt = 0;
 
@@ -135,30 +141,38 @@ class OrderReceiptBuilder {
       final customerNote = m['customer_note'] as String? ?? '';
 
       b.addAll(EscPosCommands.align(0));
-      b.addAll(EscPosCommands.bold(true));
       final nameLines = EscPosText.wordWrap(name, w);
       for (final nl in nameLines) {
         b.addAll(EscPosText.txt(nl));
       }
-      b.addAll(EscPosCommands.bold(false));
 
-      final uom = (m['uom'] as String? ?? '').trim();
-      final uomLabel = uom.isNotEmpty ? uom : 'Pcs';
       final qtyStr =
-          '${EscPosText.formatQty(qty)} $uomLabel x ${EscPosText.rp(unitPrice.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint)}';
-      final totalStr =
-          EscPosText.rp(subtotal.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint);
+          '${EscPosText.formatQty(qty)} x ${EscPosText.rp(unitPrice.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint)}';
+      final totalStr = EscPosText.rp(subtotal.round(),
+          symbol: symbol,
+          decimals: decimals,
+          positionAfter: positionAfter,
+          thousandsSep: thousandsSep,
+          decimalPoint: decimalPoint);
       b.addAll(EscPosText.rowLR(qtyStr, totalStr, size, boldRight: true));
 
       if (discountType == '%' && discountPct > 0 && discountAmt > 0) {
         final discLabel = '  Disc(${EscPosText.formatQty(discountPct)}%)';
         final discStr = EscPosText.rp(-discountAmt.round(),
-            symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint);
+            symbol: symbol,
+            decimals: decimals,
+            positionAfter: positionAfter,
+            thousandsSep: thousandsSep,
+            decimalPoint: decimalPoint);
         b.addAll(EscPosText.rowLR(discLabel, discStr, size));
       } else if (discountType == 'Rp' && discountAmt > 0) {
         const discLabel = '  Disc(Rp)';
         final discStr = EscPosText.rp(-discountAmt.round(),
-            symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint);
+            symbol: symbol,
+            decimals: decimals,
+            positionAfter: positionAfter,
+            thousandsSep: thousandsSep,
+            decimalPoint: decimalPoint);
         b.addAll(EscPosText.rowLR(discLabel, discStr, size));
       }
 
@@ -169,12 +183,18 @@ class OrderReceiptBuilder {
 
     if (globalDiscountLineAmt > 0) {
       final globalDiscStr = EscPosText.rp(-globalDiscountLineAmt.round(),
-          symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint);
+          symbol: symbol,
+          decimals: decimals,
+          positionAfter: positionAfter,
+          thousandsSep: thousandsSep,
+          decimalPoint: decimalPoint);
       b.addAll(EscPosCommands.bold(true));
       b.addAll(
           EscPosText.rowLR('Discount', globalDiscStr, size, boldRight: true));
       b.addAll(EscPosCommands.bold(false));
     }
+
+    b.addAll(EscPosCommands.setFontB(false));
 
     final subtotalVal = (d['total_without_tax'] ?? 0).toDouble();
     final taxVal = (d['total_tax'] ?? 0).toDouble();
@@ -187,13 +207,22 @@ class OrderReceiptBuilder {
     b.addAll(EscPosText.divider(size, char: '='));
     b.addAll(EscPosText.rowLR(
         'Total Belanja',
-        EscPosText.rp(subtotalVal.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint),
+        EscPosText.rp(subtotalVal.round(),
+            symbol: symbol,
+            decimals: decimals,
+            positionAfter: positionAfter,
+            thousandsSep: thousandsSep,
+            decimalPoint: decimalPoint),
         size));
     if (allDiscount > 0) {
       b.addAll(EscPosText.rowLR(
           'Total Diskon',
           EscPosText.rp(-allDiscount.round(),
-              symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint),
+              symbol: symbol,
+              decimals: decimals,
+              positionAfter: positionAfter,
+              thousandsSep: thousandsSep,
+              decimalPoint: decimalPoint),
           size));
     }
 
@@ -201,11 +230,21 @@ class OrderReceiptBuilder {
     if (taxVal > 0) {
       b.addAll(EscPosText.rowLR(
           'DPP',
-          EscPosText.rp(dppVal.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint),
+          EscPosText.rp(dppVal.round(),
+              symbol: symbol,
+              decimals: decimals,
+              positionAfter: positionAfter,
+              thousandsSep: thousandsSep,
+              decimalPoint: decimalPoint),
           size));
       b.addAll(EscPosText.rowLR(
           'PPN 11%',
-          EscPosText.rp(taxVal.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint),
+          EscPosText.rp(taxVal.round(),
+              symbol: symbol,
+              decimals: decimals,
+              positionAfter: positionAfter,
+              thousandsSep: thousandsSep,
+              decimalPoint: decimalPoint),
           size));
     }
 
@@ -214,7 +253,12 @@ class OrderReceiptBuilder {
     b.addAll(EscPosCommands.bold(true));
     b.addAll(EscPosText.rowLR(
         'TOTAL BAYAR',
-        EscPosText.rp(totalVal.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint),
+        EscPosText.rp(totalVal.round(),
+            symbol: symbol,
+            decimals: decimals,
+            positionAfter: positionAfter,
+            thousandsSep: thousandsSep,
+            decimalPoint: decimalPoint),
         size));
     b.addAll(EscPosCommands.bold(false));
     b.addAll(EscPosCommands.doubleHeight(false));
@@ -226,20 +270,35 @@ class OrderReceiptBuilder {
       final payAmt = (p['amount'] ?? 0).toDouble();
       b.addAll(EscPosText.rowLR(
           payName,
-          EscPosText.rp(payAmt.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint),
+          EscPosText.rp(payAmt.round(),
+              symbol: symbol,
+              decimals: decimals,
+              positionAfter: positionAfter,
+              thousandsSep: thousandsSep,
+              decimalPoint: decimalPoint),
           size));
     }
     if (payments.isEmpty && paidVal > 0) {
       b.addAll(EscPosText.rowLR(
           'Cash',
-          EscPosText.rp(paidVal.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint),
+          EscPosText.rp(paidVal.round(),
+              symbol: symbol,
+              decimals: decimals,
+              positionAfter: positionAfter,
+              thousandsSep: thousandsSep,
+              decimalPoint: decimalPoint),
           size));
     }
 
     b.addAll(EscPosCommands.bold(true));
     b.addAll(EscPosText.rowLR(
         'CHANGE',
-        EscPosText.rp(changeVal.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint),
+        EscPosText.rp(changeVal.round(),
+            symbol: symbol,
+            decimals: decimals,
+            positionAfter: positionAfter,
+            thousandsSep: thousandsSep,
+            decimalPoint: decimalPoint),
         size));
     b.addAll(EscPosCommands.bold(false));
 
@@ -316,15 +375,22 @@ class OrderReceiptBuilder {
         .replaceFirst(RegExp(r'^Order\s*', caseSensitive: false), '');
     final dateFormatted =
         dateRaw.isNotEmpty ? EscPosText.formatDateShort(dateRaw) : '';
-    b.addAll(EscPosText.rowLR('Ref         :', orderNumberClean, size));
-    b.addAll(EscPosText.rowLR('Tanggal     :', dateFormatted, size));
-    b.addAll(EscPosText.rowLR('Kasir       :', cashier, size));
+    final datePart = dateFormatted.contains(' ')
+        ? dateFormatted.split(' ')[0]
+        : dateFormatted;
+    final timePart =
+        dateFormatted.contains(' ') ? dateFormatted.split(' ')[1] : '';
+    b.addAll(EscPosText.rowLR('Receipt Number:', orderNumberClean, size));
+    b.addAll(EscPosText.rowLR('Date          :', datePart, size));
+    b.addAll(EscPosText.rowLR('Time          :', timePart, size));
+    b.addAll(EscPosText.rowLR('Cashier       :', cashier, size));
     b.addAll(EscPosText.divider(size, char: '='));
 
     b.addAll(EscPosCommands.bold(true));
     b.addAll(EscPosText.sectionHeader('DETAIL ITEM', size));
     b.addAll(EscPosCommands.bold(false));
 
+    b.addAll(EscPosCommands.setFontB(true));
     final lines = d['orderlines'] as List<dynamic>? ?? [];
     for (final line in lines) {
       final m = line as Map<String, dynamic>;
@@ -333,11 +399,7 @@ class OrderReceiptBuilder {
       final qty = (m['qty'] ?? 1).toDouble();
       final customerNote = m['customer_note'] as String? ?? '';
 
-      final uom = (m['uom'] as String? ?? '').trim();
-      final uomLabel = uom.isNotEmpty ? uom : 'Pcs';
-      final qtyStr = '${EscPosText.formatQty(qty)} $uomLabel';
-
-      b.addAll(EscPosCommands.bold(true));
+      final qtyStr = EscPosText.formatQty(qty);
       final nameLines = EscPosText.wordWrap(name, w - qtyStr.length - 1);
       for (int i = 0; i < nameLines.length; i++) {
         if (i == 0) {
@@ -346,12 +408,13 @@ class OrderReceiptBuilder {
           b.addAll(EscPosText.txt(nameLines[i]));
         }
       }
-      b.addAll(EscPosCommands.bold(false));
 
       if (customerNote.isNotEmpty) {
         b.addAll(EscPosText.txt('  * $customerNote'));
       }
     }
+
+    b.addAll(EscPosCommands.setFontB(false));
     b.addAll(EscPosText.divider(size, char: '='));
 
     _renderFooter(b, receiptFooter);
