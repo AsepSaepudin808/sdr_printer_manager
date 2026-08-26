@@ -96,6 +96,14 @@ class OrderReceiptBuilder {
         {'symbol': 'Rp', 'decimal_places': 0};
     final symbol = currency['symbol'] as String? ?? 'Rp';
     final decimals = currency['decimal_places'] as int? ?? 0;
+    final positionAfter =
+        (currency['position'] as String? ?? 'before') == 'after';
+    final thousandsSep = (d['thousands_sep'] as String?) ??
+        (currency['thousands_sep'] as String?) ??
+        '.';
+    final decimalPoint = (d['decimal_point'] as String?) ??
+        (currency['decimal_point'] as String?) ??
+        ',';
 
     b.addAll(EscPosCommands.bold(true));
     b.addAll(EscPosText.sectionHeader('DETAIL ITEM', size));
@@ -137,20 +145,20 @@ class OrderReceiptBuilder {
       final uom = (m['uom'] as String? ?? '').trim();
       final uomLabel = uom.isNotEmpty ? uom : 'Pcs';
       final qtyStr =
-          '${EscPosText.formatQty(qty)} $uomLabel x ${EscPosText.rp(unitPrice.round(), symbol: symbol, decimals: decimals)}';
+          '${EscPosText.formatQty(qty)} $uomLabel x ${EscPosText.rp(unitPrice.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint)}';
       final totalStr =
-          EscPosText.rp(subtotal.round(), symbol: symbol, decimals: decimals);
+          EscPosText.rp(subtotal.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint);
       b.addAll(EscPosText.rowLR(qtyStr, totalStr, size, boldRight: true));
 
       if (discountType == '%' && discountPct > 0 && discountAmt > 0) {
         final discLabel = '  Disc(${EscPosText.formatQty(discountPct)}%)';
         final discStr = EscPosText.rp(-discountAmt.round(),
-            symbol: symbol, decimals: decimals);
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint);
         b.addAll(EscPosText.rowLR(discLabel, discStr, size));
       } else if (discountType == 'Rp' && discountAmt > 0) {
         const discLabel = '  Disc(Rp)';
         final discStr = EscPosText.rp(-discountAmt.round(),
-            symbol: symbol, decimals: decimals);
+            symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint);
         b.addAll(EscPosText.rowLR(discLabel, discStr, size));
       }
 
@@ -161,7 +169,7 @@ class OrderReceiptBuilder {
 
     if (globalDiscountLineAmt > 0) {
       final globalDiscStr = EscPosText.rp(-globalDiscountLineAmt.round(),
-          symbol: symbol, decimals: decimals);
+          symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint);
       b.addAll(EscPosCommands.bold(true));
       b.addAll(
           EscPosText.rowLR('Discount', globalDiscStr, size, boldRight: true));
@@ -179,13 +187,13 @@ class OrderReceiptBuilder {
     b.addAll(EscPosText.divider(size, char: '='));
     b.addAll(EscPosText.rowLR(
         'Total Belanja',
-        EscPosText.rp(subtotalVal.round(), symbol: symbol, decimals: decimals),
+        EscPosText.rp(subtotalVal.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint),
         size));
     if (allDiscount > 0) {
       b.addAll(EscPosText.rowLR(
           'Total Diskon',
           EscPosText.rp(-allDiscount.round(),
-              symbol: symbol, decimals: decimals),
+              symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint),
           size));
     }
 
@@ -193,11 +201,11 @@ class OrderReceiptBuilder {
     if (taxVal > 0) {
       b.addAll(EscPosText.rowLR(
           'DPP',
-          EscPosText.rp(dppVal.round(), symbol: symbol, decimals: decimals),
+          EscPosText.rp(dppVal.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint),
           size));
       b.addAll(EscPosText.rowLR(
           'PPN 11%',
-          EscPosText.rp(taxVal.round(), symbol: symbol, decimals: decimals),
+          EscPosText.rp(taxVal.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint),
           size));
     }
 
@@ -206,7 +214,7 @@ class OrderReceiptBuilder {
     b.addAll(EscPosCommands.bold(true));
     b.addAll(EscPosText.rowLR(
         'TOTAL BAYAR',
-        EscPosText.rp(totalVal.round(), symbol: symbol, decimals: decimals),
+        EscPosText.rp(totalVal.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint),
         size));
     b.addAll(EscPosCommands.bold(false));
     b.addAll(EscPosCommands.doubleHeight(false));
@@ -218,20 +226,20 @@ class OrderReceiptBuilder {
       final payAmt = (p['amount'] ?? 0).toDouble();
       b.addAll(EscPosText.rowLR(
           payName,
-          EscPosText.rp(payAmt.round(), symbol: symbol, decimals: decimals),
+          EscPosText.rp(payAmt.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint),
           size));
     }
     if (payments.isEmpty && paidVal > 0) {
       b.addAll(EscPosText.rowLR(
           'Cash',
-          EscPosText.rp(paidVal.round(), symbol: symbol, decimals: decimals),
+          EscPosText.rp(paidVal.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint),
           size));
     }
 
     b.addAll(EscPosCommands.bold(true));
     b.addAll(EscPosText.rowLR(
         'CHANGE',
-        EscPosText.rp(changeVal.round(), symbol: symbol, decimals: decimals),
+        EscPosText.rp(changeVal.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint),
         size));
     b.addAll(EscPosCommands.bold(false));
 

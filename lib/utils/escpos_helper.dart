@@ -43,12 +43,18 @@ class EscPosHelper {
       EscPosText.sectionHeader(label, size);
   static String sectionHeaderLine(String label, PaperSize size, String char) =>
       EscPosText.sectionHeaderLine(label, size, char);
-  static String rp(int amount,
+  static String rp(num amount,
           {String symbol = 'Rp',
           int decimals = 0,
-          bool positionAfter = false}) =>
+          bool positionAfter = false,
+          String thousandsSep = '.',
+          String decimalPoint = ','}) =>
       EscPosText.rp(amount,
-          symbol: symbol, decimals: decimals, positionAfter: positionAfter);
+          symbol: symbol,
+          decimals: decimals,
+          positionAfter: positionAfter,
+          thousandsSep: thousandsSep,
+          decimalPoint: decimalPoint);
   static String currencyFmt(double amount, Map<String, dynamic> currency) =>
       EscPosText.currencyFmt(amount, currency);
   static String fixLen(String s, int width) => EscPosText.fixLen(s, width);

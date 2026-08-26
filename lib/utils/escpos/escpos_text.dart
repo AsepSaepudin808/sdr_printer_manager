@@ -84,30 +84,18 @@ class EscPosText {
     return line;
   }
 
-  static String rp(int amount,
-      {String symbol = 'Rp', int decimals = 0, bool positionAfter = false}) {
-    String prefix = symbol;
-    String suffix = '';
-    int value = amount.abs();
-    if (decimals > 0) {
-      final divisor = _pow10(decimals);
-      final whole = (value ~/ divisor);
-      final frac = (value % divisor).toString().padLeft(decimals, '0');
-      final wholeStr = _formatWithDot(whole);
-      // Match Odoo: '.' thousands separator, ',' decimal separator (id_ID locale).
-      final result = '$wholeStr,$frac';
-      if (positionAfter) {
-        suffix = ' $symbol';
-        return amount < 0 ? '-$result$suffix' : '$result$suffix';
-      }
-      return amount < 0 ? '-$prefix$result' : '$prefix$result';
-    }
-    final formatted = _formatWithDot(value);
-    if (positionAfter) {
-      suffix = ' $symbol';
-      return amount < 0 ? '-$formatted$suffix' : '$formatted$suffix';
-    }
-    return amount < 0 ? '-$prefix$formatted' : '$prefix$formatted';
+  static String rp(num amount,
+      {String symbol = 'Rp',
+      int decimals = 0,
+      bool positionAfter = false,
+      String thousandsSep = '.',
+      String decimalPoint = ','}) {
+    return formatMoney(amount,
+        symbol: symbol,
+        decimals: decimals,
+        positionAfter: positionAfter,
+        thousandsSep: thousandsSep,
+        decimalPoint: decimalPoint);
   }
 
   static String currencyFmt(double amount, Map<String, dynamic> currency) {
@@ -224,18 +212,6 @@ class EscPosText {
       result *= 10;
     }
     return result;
-  }
-
-  static String _formatWithDot(int value) {
-    final s = value.toString();
-    final buf = StringBuffer();
-    int count = 0;
-    for (int i = s.length - 1; i >= 0; i--) {
-      if (count > 0 && count % 3 == 0) buf.write('.');
-      buf.write(s[i]);
-      count++;
-    }
-    return buf.toString().split('').reversed.join();
   }
 
   static String formatMoney(

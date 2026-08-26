@@ -145,6 +145,40 @@ void main() {
       final result = EscPosHelper.rp(5000, symbol: 'IDR', positionAfter: true);
       expect(result.endsWith('IDR'), true);
     });
+
+    test('rp with decimals=2 treats input as main-unit (regression)', () {
+      // Bug: 62826 used to render as 'Rp628,26' because rp() divided by
+      // pow10(decimals). Should render as 'Rp62.826,00'.
+      final result = EscPosHelper.rp(62826, decimals: 2);
+      expect(result, 'Rp62.826,00');
+    });
+
+    test('rp with decimals=2 and thousandsSep/decimalPoint en_US', () {
+      final result = EscPosHelper.rp(62826,
+          decimals: 2, thousandsSep: ',', decimalPoint: '.');
+      expect(result, 'Rp62,826.00');
+    });
+
+    test('rp with decimals=2 and negative amount', () {
+      final result = EscPosHelper.rp(-62826, decimals: 2);
+      expect(result, '-Rp62.826,00');
+    });
+
+    test('rp with positionAfter=true puts symbol after amount', () {
+      final result = EscPosHelper.rp(62826,
+          symbol: 'IDR', positionAfter: true);
+      expect(result, '62.826 IDR');
+    });
+
+    test('rp with positionAfter=true and decimals=2', () {
+      final result = EscPosHelper.rp(62826,
+          symbol: 'USD',
+          decimals: 2,
+          positionAfter: true,
+          thousandsSep: ',',
+          decimalPoint: '.');
+      expect(result, '62,826.00 USD');
+    });
   });
 
   group('EscPosHelper Date Formatting', () {
