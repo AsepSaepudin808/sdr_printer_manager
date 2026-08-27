@@ -33,6 +33,11 @@ class EscPosCommands {
   static Uint8List openCashDrawer() =>
       Uint8List.fromList([escCmd, 0x70, 0x00, 0x19, 0xFA]);
 
+  static Uint8List setUnderline(bool on) =>
+      Uint8List.fromList([escCmd, 0x2D, on ? 1 : 0]);
+  static Uint8List setCondensed(bool on) =>
+      Uint8List.fromList([escCmd, on ? 0x0F : 0x14]);
+
   static int defaultCharsPerLine(PaperSize size) => switch (size) {
         PaperSize.mm58 => 32,
         PaperSize.mm80 => 48,

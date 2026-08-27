@@ -141,43 +141,85 @@ class OrderReceiptBuilder {
       final customerNote = m['customer_note'] as String? ?? '';
 
       b.addAll(EscPosCommands.align(0));
-      final nameLines = EscPosText.wordWrap(name, w);
-      for (final nl in nameLines) {
-        b.addAll(EscPosText.txt(nl));
-      }
-
-      final qtyStr =
-          '${EscPosText.formatQty(qty)} x ${EscPosText.rp(unitPrice.round(), symbol: symbol, decimals: decimals, positionAfter: positionAfter, thousandsSep: thousandsSep, decimalPoint: decimalPoint)}';
       final totalStr = EscPosText.rp(subtotal.round(),
           symbol: symbol,
           decimals: decimals,
           positionAfter: positionAfter,
           thousandsSep: thousandsSep,
           decimalPoint: decimalPoint);
-      b.addAll(EscPosText.rowLR(qtyStr, totalStr, size, boldRight: true));
+      final nameLines = EscPosText.wordWrap(name, w);
+      final firstLine = nameLines.isNotEmpty ? nameLines[0] : name;
+      b.addAll(EscPosText.rowLR(firstLine, totalStr, size, boldRight: true));
+      for (int i = 1; i < nameLines.length; i++) {
+        b.addAll(EscPosText.txt(nameLines[i]));
+      }
 
-      if (discountType == '%' && discountPct > 0 && discountAmt > 0) {
-        final discLabel = '  Disc(${EscPosText.formatQty(discountPct)}%)';
-        final discStr = EscPosText.rp(-discountAmt.round(),
+      final hasDiscount = discountAmt > 0;
+      final originalUnitPrice = hasDiscount
+          ? (unitPrice + (discountAmt / qty))
+          : unitPrice;
+      final uomRaw = (m['uom'] as String? ?? '').trim();
+      final uomLabel = uomRaw.isNotEmpty ? uomRaw : 'Bundle';
+
+      final unitPriceStr = EscPosText.rp(unitPrice.round(),
+          symbol: symbol,
+          decimals: decimals,
+          positionAfter: positionAfter,
+          thousandsSep: thousandsSep,
+          decimalPoint: decimalPoint);
+      b.addAll(EscPosText.txt(
+          '${EscPosText.formatQty(qty)} x $unitPriceStr / $uomLabel'));
+
+      if (hasDiscount) {
+        final origStr = EscPosText.rp(originalUnitPrice.round(),
             symbol: symbol,
             decimals: decimals,
             positionAfter: positionAfter,
             thousandsSep: thousandsSep,
             decimalPoint: decimalPoint);
-        b.addAll(EscPosText.rowLR(discLabel, discStr, size));
-      } else if (discountType == 'Rp' && discountAmt > 0) {
-        const discLabel = '  Disc(Rp)';
-        final discStr = EscPosText.rp(-discountAmt.round(),
+        final discAmtStr = EscPosText.rp(discountAmt.round(),
             symbol: symbol,
             decimals: decimals,
             positionAfter: positionAfter,
             thousandsSep: thousandsSep,
             decimalPoint: decimalPoint);
-        b.addAll(EscPosText.rowLR(discLabel, discStr, size));
+
+        b.addAll(EscPosCommands.bold(true));
+        b.addAll(EscPosCommands.setUnderline(true));
+        b.addAll(EscPosText.txt(origStr));
+        b.addAll(EscPosCommands.setUnderline(false));
+
+        if (discountType == '%' && discountPct > 0) {
+          b.addAll(EscPosText.txt(
+              ' With a ${EscPosText.formatQty(discountPct)}% discount'));
+        } else {
+          b.addAll(EscPosText.rowLR(' Discount', '- $discAmtStr', size, boldRight: true));
+        }
+        b.addAll(EscPosCommands.bold(false));
+      }
+
+      final bundleDetails = m['bundleDetails'] as List<dynamic>?;
+      if (bundleDetails != null && bundleDetails.isNotEmpty) {
+        b.addAll(EscPosCommands.setCondensed(true));
+        for (final comp in bundleDetails) {
+          final compMap = comp as Map<String, dynamic>;
+          final compQtyRaw = compMap['qty'] ?? 1;
+          final compQty = compQtyRaw is num
+              ? compQtyRaw.toDouble()
+              : (compQtyRaw as double? ?? 1.0);
+          final compQtyStr = compQty == compQty.roundToDouble()
+              ? compQty.toInt().toString()
+              : compQty.toString();
+          final compName = (compMap['name'] as String? ?? '').trim();
+          if (compName.isNotEmpty) {
+            b.addAll(EscPosText.txt('   ${compQtyStr}x $compName'));
+          }
+        }
+        b.addAll(EscPosCommands.setCondensed(false));
       }
 
       if (customerNote.isNotEmpty) {
-        b.addAll(EscPosText.txt('  * $customerNote'));
+        b.addAll(EscPosText.txt('   * $customerNote'));
       }
     }
 
